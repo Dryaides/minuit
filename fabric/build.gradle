@@ -1,0 +1,73 @@
+// Fabric build. 26.x ships unobfuscated, so it uses the Architectury Loom "-no-remap" variant: NO
+// mappings config, plain `implementation` instead of `modImplementation`. An obfuscated version
+// (fabric_obfuscated=true in gradle/versions/<mc>.properties, 1.21.1) takes the remapping variant of
+// the same Loom jar, with Mojang names and a mixin refmap.
+// Output is the one minuit mod jar for Fabric; the mods that use it declare it in `depends`.
+
+plugins {
+    id 'multiloader-loader'
+}
+
+def obfuscated = (project.findProperty('fabric_obfuscated') ?: 'false').toBoolean()
+apply plugin: obfuscated ? 'dev.architectury.loom-remap' : 'dev.architectury.loom-no-remap'
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    if (obfuscated) {
+        mappings loom.officialMojangMappings()
+        modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    } else {
+        implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+        implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    }
+}
+
+if (obfuscated) {
+    // The refmap the 12x minuit.mixins.json names; NeoForge runs Mojang names and needs none.
+    loom {
+        mixin {
+            useLegacyMixinAp = true
+            defaultRefmapName = 'minuit.refmap.json'
+        }
+    }
+    // The published jar is the remapped one, as the game loads it.
+    publishing.publications.named('mod', MavenPublication) {
+        artifacts = [tasks.named('remapJar'), tasks.named('remapSourcesJar')]
+    }
+}
+
+base {
+    archivesName = "${mod_id}-fabric-${minecraft_version}"
+}
+
+processResources {
+    def props = [
+            "version"                : project.version,
+            "mod_id"                 : project.mod_id,
+            "mod_name"               : project.mod_name,
+            "mod_description"        : project.description,
+            "mod_authors"            : project.mod_author,
+            "mod_license"            : project.license,
+            "minecraft_version_range": project.minecraft_version_range_alt.toString(),
+            "java_version"           : project.java_version.toString(),
+            "sources_url"            : project.sources_url,
+            "issues_url"             : project.issues_url,
+    ]
+    inputs.properties(props)
+    filesMatching("fabric.mod.json") { expand props }
+}
+
+// With -PminuitDev the dev entrypoints join fabric.mod.json (dev runs only, see multiloader-loader).
+if (providers.gradleProperty('minuitDev').isPresent()) {
+    processResources {
+        filesMatching("fabric.mod.json") {
+            filter { line ->
+                line.replace('"main": ["dev.dryaides.minuit.fabric.MinuitFabric"]',
+                        '"main": ["dev.dryaides.minuit.fabric.MinuitFabric", "dev.dryaides.minuit.dev.FabricDev"]')
+                    .replace('"client": ["dev.dryaides.minuit.fabric.MinuitFabricClient"]',
+                        '"client": ["dev.dryaides.minuit.fabric.MinuitFabricClient", "dev.dryaides.minuit.dev.FabricDevClient"]')
+            }
+        }
+    }
+}

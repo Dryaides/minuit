@@ -1,0 +1,95 @@
+// Applied by the loader subprojects (:fabric and :neoforge). Pulls :common's SOURCE and
+// resources directly into the loader compile so each loader jar recompiles common against that
+// loader's Minecraft. Mirrors the ml26 multiloader-loader convention.
+
+plugins {
+    id 'multiloader-common'
+}
+
+configurations {
+    commonJava {
+        canBeResolved = true
+    }
+    commonResources {
+        canBeResolved = true
+    }
+}
+
+// One mod jar per loader carries both source modules, recompiled against this loader's Minecraft.
+def sharedProjects = [':protocol': "${mod_id}-protocol", ':core': "${mod_id}-core", ':common': mod_id]
+
+dependencies {
+    sharedProjects.each { path, capabilityId ->
+        compileOnly(project(path)) {
+            capabilities {
+                requireCapability "$group:$capabilityId"
+            }
+        }
+        commonJava project(path: path, configuration: 'commonJava')
+        commonResources project(path: path, configuration: 'commonResources')
+    }
+}
+
+// The loader's own glue per Minecraft generation and version, the same port_dirs as :common.
+port_dirs.split(',')*.trim().each { dir ->
+    sourceSets.main.java.srcDir "src/port${dir}/java"
+}
+
+// Dev-only test menu (common/src/dev + <loader>/src/dev): compiled into the dev runs only, with
+// `-PminuitDev`. The jar task drops its package even then, so no published jar can carry it.
+if (providers.gradleProperty('minuitDev').isPresent()) {
+    sourceSets.main.java.srcDir rootProject.file('common/src/dev/java')
+    sourceSets.main.java.srcDir project.file('src/dev/java')
+}
+tasks.named('jar', Jar) {
+    exclude 'dev/dryaides/minuit/dev/**'
+}
+
+tasks.named('compileJava', JavaCompile) {
+    dependsOn(configurations.commonJava)
+    source(configurations.commonJava)
+}
+
+// What this jar was built for, read at run time and by the tests: META-INF/<mod_id>/build.properties.
+def buildInfo = tasks.register('buildInfo', WriteProperties) {
+    destinationFile = layout.buildDirectory.file("generated/buildInfo/META-INF/${mod_id}/build.properties")
+    property 'mc_version', minecraft_version
+    property 'loader', project.name
+    property 'version', project.version
+    property 'port_variant', port_variant
+    property 'port_dirs', port_dirs
+}
+
+processResources {
+    dependsOn(configurations.commonResources)
+    from(configurations.commonResources)
+    dependsOn(buildInfo)
+    from(layout.buildDirectory.dir('generated/buildInfo'))
+}
+
+tasks.named('javadoc', Javadoc).configure {
+    dependsOn(configurations.commonJava)
+    source(configurations.commonJava)
+}
+
+tasks.named("sourcesJar", Jar) {
+    dependsOn(configurations.commonJava)
+    from(configurations.commonJava)
+    dependsOn(configurations.commonResources)
+    from(configurations.commonResources)
+}
+
+// Embeddable artifact for jar-in-jar (Fabric `include`, NeoForge jarJar): the mod jar alone, with
+// no dependencies in the POM, so a consumer's nested jar never drags the loader or Minecraft in.
+// The MC version sits in the artifactId so the version stays plain semver for jarJar's ranges.
+publishing {
+    publications {
+        register('mod', MavenPublication) {
+            groupId = 'dev.dryaides'
+            artifactId = "${mod_id}-${project.name}-${minecraft_version}"
+            version = project.version
+            artifact tasks.named('jar')
+            artifact tasks.named('sourcesJar')
+        }
+    }
+}

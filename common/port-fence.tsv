@@ -1,0 +1,11 @@
+# variant dir (common/src/port<dir>/java)	allowed code lines; only goes down
+1182	75
+1192	75
+11x	1136
+1201	269
+1211	286
+12x	987
+26	18
+26_2	18
+26_3	18
+26x	1241

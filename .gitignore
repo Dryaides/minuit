@@ -1,0 +1,26 @@
+.gradle/
+build/
+**/build/
+!buildSrc/src/**/build/
+runs/
+**/runs/
+.idea/
+*.iml
+.vscode/
+eclipse/
+bin/
+.classpath
+.project
+.settings/
+**/run/
+**/run-*/
+_temp/
+**/testbench/out/
+__pycache__/
+_temp*/
+**/logs/
+*.pyc
+/wt-*/
+# Showcase site checkout, kept out of this repo.
+/site/
+/web/

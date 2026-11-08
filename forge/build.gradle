@@ -1,0 +1,71 @@
+// MinecraftForge build for MC 1.18.2 to 1.20.1, included instead of :neoforge when gradle/versions/<mc>.properties
+// names forge_version. Same mod as the Fabric jar: the code comes from :core and :common, this module
+// only carries the entry points (src/port<dir>, as port_dirs) and the metadata. ModDevGradle's legacy mode reobfuscates the jar to SRG
+// names, so the mixins need their refmap.
+
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev.legacyforge'
+}
+
+legacyForge {
+    version = "${minecraft_version}-${forge_version}"
+
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+// :common's sources are recompiled here, so the processor sees the 12x or 11x mixins and writes their refmap,
+// the one minuit.mixins.json names. Without it the SRG jar cannot find its targets.
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+    config "${mod_id}.mixins.json"
+}
+
+dependencies {
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+jar {
+    // Forge 40 to 47 read the mixin configs from the manifest, not from mods.toml.
+    manifest.attributes(['MixinConfigs': "${mod_id}.mixins.json"])
+}
+
+// The published jar is the reobfuscated one in build/libs, as the game loads it; build/devlibs is Mojang names.
+publishing.publications.named('mod', MavenPublication) {
+    artifacts = [tasks.named('reobfJar'), tasks.named('sourcesJar')]
+}
+
+base {
+    archivesName = "${mod_id}-forge-${minecraft_version}"
+}
+
+processResources {
+    // Maven ranges must carry no whitespace: FML parses them with Maven's VersionRange.
+    def props = [
+            "version"                   : project.version,
+            "mod_id"                    : project.mod_id,
+            "mod_name"                  : project.mod_name,
+            "mod_description"           : project.description,
+            "mod_authors"               : project.mod_author,
+            "mod_license"               : project.license,
+            "issues_url"                : project.issues_url,
+            "sources_url"               : project.sources_url,
+            "minecraft_version_range"   : project.minecraft_version_range.toString().replaceAll('\\s', ''),
+            "forge_version_range"       : project.forge_version_range.toString().replaceAll('\\s', ''),
+            "forge_loader_version_range": project.forge_loader_version_range.toString(),
+    ]
+    inputs.properties(props)
+    filesMatching("META-INF/mods.toml") { expand props }
+}

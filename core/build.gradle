@@ -1,0 +1,75 @@
+// Plain Java: no Minecraft, no voice chat API on the classpath, so a net.minecraft import cannot
+// compile here. Built for Java 21 (1.21.1's level) while the rest of the tree stays on java_version.
+// The loader modules recompile these sources into the one mod jar, as for :common.
+
+plugins {
+    id 'java-library'
+}
+
+def versionProps = new Properties()
+rootProject.file("gradle/versions/${(findProperty('mc_version') ?: '26.1.2')}.properties").withInputStream { versionProps.load(it) }
+
+base {
+    archivesName = "${mod_id}-core-${versionProps.minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    api(project(':protocol')) {
+        capabilities {
+            requireCapability "$group:$mod_id-protocol"
+        }
+    }
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    // Minecraft ships gson and slf4j; compile-time only, never packaged.
+    compileOnly 'com.google.code.gson:gson:2.11.0'
+    compileOnly 'org.slf4j:slf4j-api:2.0.13'
+}
+
+['apiElements', 'runtimeElements', 'sourcesElements'].each { variant ->
+    configurations."$variant".outgoing {
+        capability("$group:$mod_id-core:$version")
+    }
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
+
+// The pure sections of the testbench, run as JUnit. Like the testbench, they run only when asked
+// (`:core:test`), never as part of an ordinary build.
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+}
+
+tasks.named('test', Test) {
+    enabled = gradle.startParameter.taskNames.any { it.toLowerCase().contains('test') }
+    useJUnitPlatform()
+    testLogging { events 'failed'; exceptionFormat 'full' }
+}

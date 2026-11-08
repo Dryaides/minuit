@@ -1,0 +1,10 @@
+# file	allowed Minecraft names (imports and FQN classes); only goes down
+client/MinuitEntities	2
+client/MinuitItems	1
+client/MinuitKeys	4
+client/MinuitMenuScreens	6
+client/ThemeScreen	1
+mixin/client/MinecraftMixin	2
+internal/game/GameItems	5
+internal/game/ServerForms	1
+server/MinuitServer	1

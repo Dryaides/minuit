@@ -1,0 +1,76 @@
+// The wire format shared with servers and plugins: plain Java, no Minecraft, so a Paper plugin
+// can carry it too. Built for Java 21 (1.21.1's level) while the rest of the tree stays on java_version.
+// The loader modules recompile these sources into the one mod jar, as for :common.
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+def versionProps = new Properties()
+rootProject.file("gradle/versions/${(findProperty('mc_version') ?: '26.1.2')}.properties").withInputStream { versionProps.load(it) }
+
+base {
+    archivesName = "${mod_id}-protocol-${versionProps.minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+repositories { mavenCentral() }
+
+
+['apiElements', 'runtimeElements', 'sourcesElements'].each { variant ->
+    configurations."$variant".outgoing {
+        capability("$group:$mod_id-protocol:$version")
+    }
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+artifacts {
+    commonJava sourceSets.main.java.sourceDirectories.singleFile
+    commonResources sourceSets.main.resources.sourceDirectories.singleFile
+}
+
+// The codec tests run only when asked (`:protocol:test`), never as part of an ordinary build.
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test) {
+    enabled = gradle.startParameter.taskNames.any { it.toLowerCase().contains('test') }
+    useJUnitPlatform()
+    testLogging { events 'failed'; exceptionFormat 'full' }
+}
+
+// No Minecraft inside, so one artifact serves every MC version; Paper plugins shade it with minuit-paper.
+publishing {
+    publications {
+        register('protocol', MavenPublication) {
+            groupId = 'dev.dryaides'
+            artifactId = "${mod_id}-protocol"
+            version = project.version
+            artifact tasks.named('jar')
+            artifact tasks.named('sourcesJar')
+        }
+    }
+}

@@ -1,0 +1,101 @@
+// Loader-agnostic module: the Minecraft side of the kit (draw adapter, screen host, player choice).
+// Compiled against plain vanilla via NeoForm; the loader modules recompile these sources.
+
+plugins {
+    id 'multiloader-common'
+}
+
+// Compile common against plain vanilla with official names: NeoForm, or on 1.20.1 (no NeoForm there)
+// ModDevGradle's legacy mode with Forge's MCP config of that version.
+def legacy = project.hasProperty('forge_version')
+if (legacy) {
+    apply plugin: 'net.neoforged.moddev.legacyforge'
+    legacyForge {
+        mcpVersion = minecraft_version
+    }
+} else {
+    apply plugin: 'net.neoforged.moddev'
+    neoForge {
+        neoFormVersion = neoform_version
+    }
+}
+
+configurations {
+    commonJava {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+    commonResources {
+        canBeResolved = false
+        canBeConsumed = true
+    }
+}
+
+// The port dirs of this Minecraft version (gradle/versions/<mc>.properties), generation first:
+// their sources are the only ones besides src/main that may differ between versions.
+def portDirs = port_dirs.split(',')*.trim()
+if (portDirs.last() != port_variant) {
+    throw new GradleException("port_dirs ${port_dirs} must end with port_variant ${port_variant}")
+}
+portDirs.each { dir ->
+    sourceSets.main.java.srcDir "src/port${dir}/java"
+    sourceSets.main.resources.srcDir "src/port${dir}/resources"
+}
+
+artifacts {
+    sourceSets.main.java.sourceDirectories.each { commonJava it }
+    sourceSets.main.resources.sourceDirectories.each { commonResources it }
+}
+
+repositories {
+    // The mixin annotations, for mixin/ only; each loader ships its own mixin at runtime.
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+        content { includeGroup 'net.fabricmc' }
+    }
+}
+
+dependencies {
+    // The pure half. api, so the mods that compile against :common see it too.
+    api(project(':core')) {
+        capabilities {
+            requireCapability "$group:$mod_id-core"
+        }
+    }
+    compileOnly('net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7')
+}
+
+// Import fence: no common file may gain Minecraft names, src/main stays Java 17 source, and the
+// variant dirs hold only Minecraft glue; the ceilings in fence.tsv and port-fence.tsv only go down.
+tasks.register('fence', Exec) {
+    group = 'verification'
+    workingDir = rootDir
+    commandLine 'python', 'tools/fence.py', rootDir.path
+    inputs.dir('src')
+    inputs.file('fence.tsv')
+    inputs.file('port-fence.tsv')
+    outputs.upToDateWhen { false }
+}
+tasks.named('check') { dependsOn 'fence' }
+
+// The dialog codec check runs only when asked (`:common:test`), never as part of an ordinary build.
+// Its tests read the 26x dialogs, so a generation without dialogs compiles none of them.
+if (!portDirs.contains('26x')) {
+    sourceSets.test.java.srcDirs = []
+}
+if (!legacy) {
+    neoForge {
+        addModdingDependenciesTo sourceSets.test
+    }
+}
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('test', Test) {
+    enabled = gradle.startParameter.taskNames.any { it.toLowerCase().contains('test') }
+    useJUnitPlatform()
+    testLogging { events 'failed'; exceptionFormat 'full' }
+}

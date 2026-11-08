@@ -1,0 +1,50 @@
+// Multi-loader root for minuit, the UI theme library. The code lives in :core and :common;
+// :fabric and :neoforge compile both into one mod jar each, installed on its own.
+
+plugins {
+    id 'net.neoforged.moddev' version '2.0.148' apply false
+    // MinecraftForge 1.20.1 (:forge, and :common compiled against plain 1.20.1): the same ModDevGradle jar.
+    id 'net.neoforged.moddev.legacyforge' version '2.0.148' apply false
+    // 26.x ships unobfuscated, no mojmap artifact published. Use the -no-remap Architectury Loom
+    // variant on the Fabric side and skip the mappings configuration entirely.
+    id 'dev.architectury.loom-no-remap' version '1.17-SNAPSHOT' apply false
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+// Local file Maven repo shared by the mods that embed minuit; never a remote one.
+// It sits beside the folder holding .mods-root; without the marker, beside this repo.
+def modsRoot = { File d -> while (d != null && !new File(d, '.mods-root').exists()) d = d.parentFile; d }(rootDir)
+def mavenDir = modsRoot ? new File(modsRoot, 'maven') : rootProject.file('../maven')
+subprojects {
+    plugins.withId('maven-publish') {
+        publishing.repositories {
+            maven {
+                name = 'dryaidesLocal'
+                url = mavenDir.toURI()
+            }
+        }
+    }
+}
+
+// The MC version is picked at configuration time (-Pmc_version), so each version publishes
+// through a nested build: `./gradlew publishLocal_26_1_2` and so on. Local iterations publish as
+// <version>-SNAPSHOT; `-Prelease` publishes the plain version from gradle.properties.
+def publishedVersion = project.hasProperty('release') ? version.toString() : "${version}-SNAPSHOT".toString()
+rootProject.file('gradle/versions').listFiles().findAll { it.name.endsWith('.properties') }.each { f ->
+    def mcv = f.name - '.properties'
+    def paper = f.text.contains('paper_api_version=')
+    def loader = (f.text =~ /(?m)^forge_version=/).find() ? 'forge' : 'neoforge'
+    tasks.register("publishLocal_${mcv.replace('.', '_')}", GradleBuild) {
+        group = 'publishing'
+        description = "Publishes the Fabric and NeoForge (Forge on 1.20.1) jars for MC ${mcv} (and Paper where it exists), and the protocol, to the shared maven/."
+        buildName = "minuit-publish-${mcv}"
+        tasks = [':fabric:publishAllPublicationsToDryaidesLocalRepository',
+                 ":${loader}:publishAllPublicationsToDryaidesLocalRepository".toString(),
+                 ':protocol:publishAllPublicationsToDryaidesLocalRepository'] +
+                (paper ? [':paper:publishAllPublicationsToDryaidesLocalRepository'] : [])
+        startParameter.projectProperties = [mc_version: mcv, version: publishedVersion]
+    }
+}

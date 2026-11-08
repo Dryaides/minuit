@@ -1,0 +1,74 @@
+// minuit-paper: the forms of :protocol served from a Paper plugin, no mod loader. A plugin shades
+// this jar and the protocol jar (relocated). Paper 26.x runs on Java 25, so this module builds for 25.
+
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+def versionProps = new Properties()
+rootProject.file("gradle/versions/${(findProperty('mc_version') ?: '26.1.2')}.properties").withInputStream { versionProps.load(it) }
+
+base {
+    archivesName = "${mod_id}-paper-${versionProps.minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'PaperMC'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+}
+
+dependencies {
+    api(project(':protocol')) {
+        capabilities {
+            requireCapability "$group:$mod_id-protocol"
+        }
+    }
+    compileOnly "io.papermc.paper:paper-api:${versionProps.paper_api_version}"
+
+    testImplementation "io.papermc.paper:paper-api:${versionProps.paper_api_version}"
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// As in :protocol, the tests run only when asked (`:paper:test`).
+tasks.named('test', Test) {
+    enabled = gradle.startParameter.taskNames.any { it.toLowerCase().contains('test') }
+    useJUnitPlatform()
+    testLogging { events 'failed'; exceptionFormat 'full' }
+}
+
+// A plugin shades this jar and minuit-protocol (relocated); the POM names the protocol so a
+// consumer's shadow configuration pulls it, and leaves paper-api to the plugin's own compileOnly.
+publishing {
+    publications {
+        register('paper', MavenPublication) {
+            groupId = 'dev.dryaides'
+            artifactId = "${mod_id}-paper-${versionProps.minecraft_version}"
+            version = project.version
+            artifact tasks.named('jar')
+            artifact tasks.named('sourcesJar')
+            pom.withXml {
+                def dep = asNode().appendNode('dependencies').appendNode('dependency')
+                dep.appendNode('groupId', 'dev.dryaides')
+                dep.appendNode('artifactId', "${mod_id}-protocol")
+                dep.appendNode('version', project.version)
+                dep.appendNode('scope', 'compile')
+            }
+        }
+    }
+}

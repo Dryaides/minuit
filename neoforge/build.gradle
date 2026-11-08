@@ -1,0 +1,55 @@
+// NeoForge build for MC 26.x. Same mod as the Fabric jar: the code comes from :core and :common,
+// this module only carries the entry point and the metadata.
+// 26.x ships unobfuscated, so ModDevGradle needs no mappings configuration either.
+
+plugins {
+    id 'multiloader-loader'
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    version = neoforge_version
+
+    runs {
+        client { client() }
+        server {
+            server()
+            programArgument '--nogui'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+// AccessTransformer auto-pickup (FML hardcodes this path) if the mod ever ships one.
+def accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+if (accessTransformer.exists()) {
+    neoForge.accessTransformers.from accessTransformer
+}
+
+base {
+    archivesName = "${mod_id}-neoforge-${minecraft_version}"
+}
+
+processResources {
+    // Maven ranges must carry no whitespace: FML parses them with Maven's VersionRange.
+    def props = [
+            "version"                      : project.version,
+            "mod_id"                       : project.mod_id,
+            "mod_name"                     : project.mod_name,
+            "mod_description"              : project.description,
+            "mod_authors"                  : project.mod_author,
+            "mod_license"                  : project.license,
+            "issues_url"                   : project.issues_url,
+            "sources_url"                  : project.sources_url,
+            "minecraft_version_range"      : project.minecraft_version_range.toString().replaceAll('\\s', ''),
+            "neoforge_version_range"       : project.neoforge_version_range.toString().replaceAll('\\s', ''),
+            "neoforge_loader_version_range": project.neoforge_loader_version_range.toString(),
+    ]
+    inputs.properties(props)
+    filesMatching("META-INF/neoforge.mods.toml") { expand props }
+}
