@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "minuit_components_bench",
+  "version": "0",
+  "name": "minuit components bench",
+  "description": "Dev only: shows the components under development in a MinuitScreen.",
+  "license": "MIT",
+  "environment": "client",
+  "mixins": ["minuit_components_bench.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16",
+    "minecraft": "~26.3",
+    "minuit": ">=1.0.0 <2.0.0"
+  }
+}

@@ -51,11 +51,56 @@ public final class Shapes {
         }
     }
 
+    /**
+     * The pixels of {@link #rounded} at x, y, w, h, r that lie outside the same shape {@code t} pixels in with radius
+     * {@code r - t}: a ring {@code t} thick with no gap at its corners, which two {@link #ring}s one pixel apart leave.
+     */
+    public static void band(Draw d, int x, int y, int w, int h, int r, int t, int color) {
+        if (w <= 0 || h <= 0 || t <= 0) {
+            return;
+        }
+        r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+        int iw = w - 2 * t;
+        int ih = h - 2 * t;
+        int ir = Math.max(0, Math.min(r - t, Math.min(iw, ih) / 2));
+        for (int row = 0; row < h; row++) {
+            int inset = rowInset(r, h, row);
+            int inner = row - t;
+            if (iw <= 0 || ih <= 0 || inner < 0 || inner >= ih) {
+                d.fill(x + inset, y + row, x + w - inset, y + row + 1, color);
+                continue;
+            }
+            int open = Math.max(inset, t + rowInset(ir, ih, inner));
+            d.fill(x + inset, y + row, x + open, y + row + 1, color);
+            d.fill(x + w - open, y + row, x + w - inset, y + row + 1, color);
+        }
+    }
+
     /** Horizontal inset of row {@code row} (0 = top) of a corner of radius r. */
     private static int cornerInset(int r, int row) {
         double dy = r - row - 0.5;
         double dx = Math.sqrt(Math.max(0, r * r - dy * dy));
         return (int) Math.round(r - dx);
+    }
+
+    /** The way an {@link #arrow} points. */
+    enum Point {
+        UP, DOWN, LEFT, RIGHT
+    }
+
+    /**
+     * A pixel triangle: row {@code i} from the tip is {@code 2i + 1} pixels wide, centred on the tip pixel, so the
+     * width is odd, the tip is one pixel and both sides step the same. Every arrow, caret and pointer is drawn here.
+     */
+    static void arrow(Draw d, int tipX, int tipY, int height, Point way, int color) {
+        for (int i = 0; i < height; i++) {
+            switch (way) {
+                case UP -> d.fill(tipX - i, tipY + i, tipX + i + 1, tipY + i + 1, color);
+                case DOWN -> d.fill(tipX - i, tipY - i, tipX + i + 1, tipY - i + 1, color);
+                case LEFT -> d.fill(tipX + i, tipY - i, tipX + i + 1, tipY + i + 1, color);
+                case RIGHT -> d.fill(tipX - i, tipY - i, tipX - i + 1, tipY + i + 1, color);
+            }
+        }
     }
 
     /** How a raised surface catches the light from the top left. */
@@ -230,10 +275,14 @@ public final class Shapes {
      * contrasts more, pure black or white when the near tone falls short.
      */
     public static int textOn(Palette p, int face) {
-        for (int c : new int[]{p.raisedText(), p.primaryText(), p.text()}) {
-            if (contrast(c, face) >= 4.5) {
-                return c;
-            }
+        if (contrast(p.raisedText(), face) >= 4.5) {
+            return p.raisedText();
+        }
+        if (contrast(p.primaryText(), face) >= 4.5) {
+            return p.primaryText();
+        }
+        if (contrast(p.text(), face) >= 4.5) {
+            return p.text();
         }
         boolean dark = contrast(0xFF000000, face) >= contrast(0xFFFFFFFF, face);
         int near = dark ? NEAR_BLACK : NEAR_WHITE;

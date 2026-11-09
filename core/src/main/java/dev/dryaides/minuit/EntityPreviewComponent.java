@@ -23,6 +23,10 @@ public class EntityPreviewComponent extends BaseComponent {
     private boolean turned;
     private Consumer<Float> onTurn = yaw -> { };
 
+    /** Degrees a drag turns a 3D view per pixel: sideways, then up and down. Shared with {@link Scene3DComponent}. */
+    static final float DRAG_YAW_DEGREES = 2F;
+    static final float DRAG_PITCH_DEGREES = 1F;
+
     public EntityPreviewComponent(Box box, EntityView view) {
         this(box, null, view);
     }
@@ -112,7 +116,7 @@ public class EntityPreviewComponent extends BaseComponent {
         if (!this.dragging) {
             return false;
         }
-        turn((float) dx * 2F, (float) dy);
+        turn((float) dx * DRAG_YAW_DEGREES, (float) dy * DRAG_PITCH_DEGREES);
         return true;
     }
 

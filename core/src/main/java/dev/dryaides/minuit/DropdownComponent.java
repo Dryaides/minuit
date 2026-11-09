@@ -58,13 +58,29 @@ public final class DropdownComponent extends BaseComponent {
         this.show = show;
     }
 
-    /** The list's height for these lines, frame included. */
+    /** The list's height for these lines, frame included, in the vanilla family. */
     public static int listHeight(List<Line> lines) {
-        int h = 7;
+        return listHeight(FrameStyles.VANILLA, lines);
+    }
+
+    /** The list's height for these lines in {@code frame}: the rows keep {@link PopupList#inset} on every side. */
+    public static int listHeight(FrameStyle frame, List<Line> lines) {
+        Insets in = PopupList.inset(frame);
+        int h = in.top() + in.bottom();
         for (Line line : lines) {
             h += line instanceof Header ? HEADER : LINE;
         }
         return h;
+    }
+
+    @Override
+    protected Box focusBox(FrameStyle frame) {
+        return FrameStyle.withBleed(frame, focusBox());
+    }
+
+    @Override
+    protected int focusCorner(FrameStyle frame) {
+        return frame.buttonCorner();
     }
 
     @Override
@@ -126,6 +142,7 @@ public final class DropdownComponent extends BaseComponent {
 
         /** The ringed line, an index into the dropdown's lines; -1 before the first arrow. */
         private int keyed = -1;
+        private Insets in = PopupList.inset(FrameStyles.VANILLA);
 
         Popup() {
             super(DropdownComponent.this.listX, DropdownComponent.this.y + DropdownComponent.this.h + 1, DropdownComponent.this.listW,
@@ -135,14 +152,13 @@ public final class DropdownComponent extends BaseComponent {
         @Override
         protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
             Palette p = theme.palette();
-            this.h = listHeight(DropdownComponent.this.lines);
+            this.in = PopupList.inset(theme.frame());
+            this.h = listHeight(theme.frame(), DropdownComponent.this.lines);
             // below the band a family draws under the dropdown's box
             this.y = DropdownComponent.this.y + DropdownComponent.this.h + 1 + FrameStyle.bleedOf(theme.frame()).bottom();
             this.tooltip = null;
-            // an offset copy of the panel's own mask, so no square corner shows under a round one
-            theme.frame().shadow(d, p, this.x, this.y + 2, this.w, this.h, Shapes.alpha(p.shadow(), 0x60));
-            theme.frame().panel(d, p, this.x, this.y, this.w, this.h);
-            int y = this.y + 3;
+            theme.frame().popup(d, p, this.x, this.y, this.w, this.h);
+            int y = this.y + this.in.top();
             for (Line line : DropdownComponent.this.lines) {
                 if (line instanceof Header header) {
                     d.textIn(header.text(), new Box("", this.x + 8, y + 1, this.w - 12, HEADER - 1), p.textSoft());
@@ -153,14 +169,14 @@ public final class DropdownComponent extends BaseComponent {
                 boolean over = mx >= this.x && mx < this.x + this.w && my >= y && my < y + LINE;
                 boolean clickable = clickable(entry);
                 if (over && clickable) {
-                    Shapes.rounded(d, this.x + 3, y, this.w - 6, LINE, Math.max(2, theme.frame().corner()), p.raisedHover());
+                    theme.frame().row(d, p, this.x + in.left(), y, this.w - in.left() - in.right(), LINE, p.raisedHover());
                     this.tooltip = entry.tooltip().isEmpty() ? null : entry.tooltip();
                 } else if (over && !entry.tooltip().isEmpty()) {
                     this.tooltip = entry.tooltip();
                 }
                 drawEntry(d, theme, p, entry, y);
                 if (DropdownComponent.this.lines.indexOf(line) == this.keyed) {
-                    Shapes.ring(d, this.x + 2, y - 1, this.w - 4, LINE + 2, 3, p.text());
+                    theme.frame().plate(d, p, this.x + in.left() - 1, y - 1, this.w - in.left() - in.right() + 2, LINE + 2, 0, p.text());
                 }
                 y += LINE;
             }
@@ -220,7 +236,7 @@ public final class DropdownComponent extends BaseComponent {
 
         @Override
         public boolean mouseClicked(double mx, double my, int button) {
-            int y = this.y + 3;
+            int y = this.y + this.in.top();
             for (Line line : DropdownComponent.this.lines) {
                 int h = line instanceof Header ? HEADER : LINE;
                 if (line instanceof Entry entry && my >= y && my < y + h) {

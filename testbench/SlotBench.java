@@ -27,7 +27,7 @@ public class SlotBench {
         BenchDraw.McFont font = new BenchDraw.McFont();
         BaseComponent.clock = () -> WidgetBench.now;
         int shots = 0;
-        String looks = args.length > 1 ? args[1] : "bedrock/stone,slate/teal";
+        String looks = args.length > 1 ? args[1] : "bedrock/bedrock,slate/teal";
         for (String look : looks.split(",")) {
             String familyId = look.split("/")[0];
             ThemeFamily family = Themes.family(null, familyId);
@@ -41,6 +41,7 @@ public class SlotBench {
                 int my = (WidgetBench.H - 180) / 2 + SlotScenes.MY;
                 ItemView under = ItemSource.under(scene, mx, my);
                 WidgetBench.expect(name + " item under the mouse", "minecraft:oak_log", under == null ? null : under.id());
+                shots += WidgetBench.shot(font, SlotScenes.hudScene(theme), -1, -1, out, "hud-" + name);
             }
         }
         System.out.println(shots + " shots, " + WidgetBench.problems.size() + " problems");

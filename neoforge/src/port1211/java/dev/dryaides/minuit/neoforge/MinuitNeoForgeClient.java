@@ -9,12 +9,14 @@ import dev.dryaides.minuit.client.form.FormScreen;
 import dev.dryaides.minuit.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
+import dev.dryaides.minuit.internal.port.Platform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
@@ -32,6 +34,7 @@ public final class MinuitNeoForgeClient {
 
     public MinuitNeoForgeClient(IEventBus modBus) {
         Bridges.install();
+        Platform.development(!FMLEnvironment.production);
         modBus.addListener(FMLClientSetupEvent.class, event -> event.enqueueWork((Runnable) MinuitClient::themeChoices));
         modBus.addListener(RegisterClientReloadListenersEvent.class,
                 event -> event.registerReloadListener(new ThemeReload()));

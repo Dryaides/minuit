@@ -5,6 +5,8 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.resources.Identifier;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -39,13 +41,28 @@ public abstract class AbstractContainerScreenMixin {
         }
     }
 
+    /** The ghost has one owner: a slot part that draws its own empty outline, so the game's grey one is left out. */
+    @Redirect(method = "extractSlot", require = 0, at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/inventory/Slot;getNoItemIcon()Lnet/minecraft/resources/Identifier;"))
+    private Identifier minuit$themeGhost(Slot slot) {
+        if ((Object) this instanceof MinuitContainerScreen<?> screen && screen.placement().drawsGhost(slot.index)) {
+            return null;
+        }
+        return slot.getNoItemIcon();
+    }
+
     @Inject(method = "getHoveredSlot", at = @At("HEAD"), cancellable = true)
     private void minuit$shownSlot(double x, double y, CallbackInfoReturnable<Slot> cir) {
         if ((Object) this instanceof MinuitContainerScreen<?> screen) {
             Slot found = null;
+            if (!screen.placement().reachable(x, y)) {
+                cir.setReturnValue(null);
+                return;
+            }
             for (Slot slot : this.menu.slots) {
                 if (slot.isActive() && screen.showsSlot(slot)
-                        && isHovering(slot, x - screen.slotOffsetX(slot), y - screen.slotOffsetY(slot))) {
+                        && isHovering(slot, x - screen.slotOffsetX(slot) - screen.placement().shiftX(slot.index),
+                                y - screen.slotOffsetY(slot) - screen.placement().shiftY(slot.index))) {
                     found = slot;
                     break;
                 }

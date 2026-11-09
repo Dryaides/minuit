@@ -1,0 +1,94 @@
+// Java 8 build of core (and protocol) for 1.16.5: the Java 17 class files are lowered by JvmDowngrader,
+// the core sources stay untouched. Included only when a java8 task is asked (see settings.gradle).
+// `:core-java8:test8` runs core's JUnit tests from the shaded jar on JDK 8.
+
+plugins {
+    id 'java'
+    id 'xyz.wagyourtail.jvmdowngrader' version '1.3.4'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+repositories { mavenCentral() }
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(17) }
+
+def coreProject = project(':core')
+def protocolProject = project(':protocol')
+
+configurations {
+    test8Runtime
+    java8Gson
+}
+
+dependencies {
+    test8Runtime platform('org.junit:junit-bom:5.11.4')
+    test8Runtime 'org.junit.jupiter:junit-jupiter'
+    test8Runtime 'org.junit.platform:junit-platform-launcher'
+    test8Runtime 'com.google.code.gson:gson:2.11.0'
+    test8Runtime 'org.slf4j:slf4j-api:2.0.13'
+    // 1.16.5 ships Gson 2.8.0, older than core's calls (JsonParser.parseString came in 2.8.6).
+    java8Gson('com.google.code.gson:gson:2.8.9') { transitive = false }
+}
+
+def coreJar = tasks.register('coreJar', Jar) {
+    archiveClassifier = 'java17'
+    from coreProject.sourceSets.main.output, protocolProject.sourceSets.main.output
+}
+def coreDowngraded = tasks.register('coreDowngraded', xyz.wagyourtail.jvmdg.gradle.task.DowngradeJar) {
+    inputFile = coreJar.flatMap { it.archiveFile }
+    archiveClassifier = 'downgraded'
+}
+// The Java 8 core jar: JvmDowngrader's API stubs shaded under dev/dryaides/minuit/jvmdg.
+def java8CoreJar = tasks.register('java8CoreJar', xyz.wagyourtail.jvmdg.gradle.task.ShadeJar) {
+    inputFile = coreDowngraded.flatMap { it.archiveFile }
+    shadePath = ({ String name -> 'dev/dryaides/minuit/jvmdg/' } as kotlin.jvm.functions.Function1)
+    archiveClassifier = 'java8'
+}
+
+// What the 1.16.5 loader modules compile against and carry in their jar: the Java 8 core with its own Gson,
+// relocated so it never meets the game's.
+def java8ModJar = tasks.register('java8ModJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier = 'java8-mod'
+    from(java8CoreJar.flatMap { it.archiveFile }.map { zipTree(it) })
+    configurations = [project.configurations.java8Gson]
+    relocate 'com.google.gson', 'dev.dryaides.minuit.shaded.gson'
+    exclude 'META-INF/MANIFEST.MF', 'META-INF/maven/**', 'module-info.class'
+}
+configurations {
+    java8Core {
+        canBeConsumed = true
+        canBeResolved = false
+    }
+}
+artifacts {
+    java8Core java8ModJar
+}
+
+// The tests run from one jar holding core, protocol and the test classes, shaded together: two jars shaded
+// apart would each carry their own partial copy of the same stub class, and the first on the classpath wins.
+def testJar = tasks.register('coreTestJar', Jar) {
+    archiveClassifier = 'tests-java17'
+    from coreProject.sourceSets.main.output, protocolProject.sourceSets.main.output, coreProject.sourceSets.test.output
+}
+def testDowngraded = tasks.register('coreTestDowngraded', xyz.wagyourtail.jvmdg.gradle.task.DowngradeJar) {
+    inputFile = testJar.flatMap { it.archiveFile }
+    archiveClassifier = 'tests-downgraded'
+}
+def testShaded = tasks.register('coreTestShaded', xyz.wagyourtail.jvmdg.gradle.task.ShadeJar) {
+    inputFile = testDowngraded.flatMap { it.archiveFile }
+    shadePath = ({ String name -> 'dev/dryaides/minuit/jvmdg/' } as kotlin.jvm.functions.Function1)
+    archiveClassifier = 'tests-java8'
+}
+
+tasks.register('test8', Test) {
+    dependsOn java8CoreJar, testShaded
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(8) }
+    useJUnitPlatform()
+    testClassesDirs = files({ zipTree(testShaded.get().archiveFile) })
+    classpath = files(testShaded.flatMap { it.archiveFile }) + configurations.test8Runtime
+    // The tests read core's resources by relative path, as under :core:test.
+    workingDir = coreProject.projectDir
+    maxHeapSize = '1G'
+    testLogging { events 'failed'; exceptionFormat 'full' }
+    reports.junitXml.outputLocation = layout.buildDirectory.dir('test8-results')
+}

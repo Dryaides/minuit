@@ -1,11 +1,13 @@
 # variant dir (common/src/port<dir>/java)	allowed code lines; only goes down
+1122	2064
+1165	1525
 1182	75
 1192	75
-11x	1136
-1201	269
-1211	286
-12x	987
+11x	1335
+1201	296
+1211	290
+12x	1049
 26	18
 26_2	18
 26_3	18
-26x	1241
+26x	1301

@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.dryaides.minuit.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "minuit.refmap.json",
+  "mixins": [],
+  "client": [
+    "client.AbstractContainerScreenMixin",
+    "client.GuiComponentInvoker",
+    "client.MinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

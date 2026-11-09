@@ -22,13 +22,27 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
     private BiPredicate<Integer, ItemView> onDrop;
     private int cursor;
     private int tipCell = -1;
+    private final int pitch;
+    private final int inset;
+    private final boolean wells;
 
     /** @param grid from {@link SlotLayout#grid}, {@code cols * 18} by {@code rows * 18} */
     public SlotGridComponent(Box grid, int rows, int cols) {
+        this(grid, rows, cols, SlotLayout.PITCH, 0, true);
+    }
+
+    /**
+     * A grid of cells {@code pitch} apart, the first {@code inset} px in from the box, drawn as slot wells or,
+     * with {@code wells} false, as bare 16 px items centred in the cell (the subclass draws what lies under).
+     */
+    protected SlotGridComponent(Box grid, int rows, int cols, int pitch, int inset, boolean wells) {
         super(grid);
-        if (grid.w() != cols * SlotLayout.PITCH || grid.h() != rows * SlotLayout.PITCH) {
-            throw new IllegalArgumentException(grid + " is not " + rows + " by " + cols + " slots of 18");
+        if (grid.w() != 2 * inset + cols * pitch || grid.h() != 2 * inset + rows * pitch) {
+            throw new IllegalArgumentException(grid + " is not " + rows + " by " + cols + " cells of " + pitch);
         }
+        this.pitch = pitch;
+        this.inset = inset;
+        this.wells = wells;
         this.rows = rows;
         this.cols = cols;
         this.items = new ItemView[rows * cols];
@@ -91,30 +105,64 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
         if (!isOver(mx, my)) {
             return -1;
         }
-        int c = (int) ((mx - this.x) / SlotLayout.PITCH);
-        int r = (int) ((my - this.y) / SlotLayout.PITCH);
-        return r * this.cols + c;
+        double lx = mx - this.x - this.inset;
+        double ly = my - this.y - this.inset;
+        if (lx < 0 || ly < 0 || lx >= this.cols * this.pitch || ly >= this.rows * this.pitch) {
+            return -1;
+        }
+        return (int) (ly / this.pitch) * this.cols + (int) (lx / this.pitch);
+    }
+
+    /** Screen x of the cell's 16 px item: 1 px into an 18 px well, 2 px into a 20 px HUD cell. */
+    public int itemX(int index) {
+        return cellBox(index).x() + (this.wells ? 1 : (this.pitch - 16) / 2);
+    }
+
+    /** Screen y of the cell's 16 px item. */
+    public int itemY(int index) {
+        return cellBox(index).y() + (this.wells ? 1 : (this.pitch - 16) / 2);
     }
 
     /** The cell's well, screen coordinates. */
     public Box cellBox(int index) {
-        return new Box("slot" + index, this.x + index % this.cols * SlotLayout.PITCH,
-                this.y + index / this.cols * SlotLayout.PITCH, SlotLayout.PITCH, SlotLayout.PITCH);
+        return new Box("slot" + index, this.x + this.inset + index % this.cols * this.pitch,
+                this.y + this.inset + index / this.cols * this.pitch, this.pitch, this.pitch);
+    }
+
+    /** One well per cell while it holds the menu: an 18 px well, or a 20 px cell on a standalone HUD bar. */
+    @Override
+    protected List<SlotLayout.Well> menuWells() {
+        if (!holdsMenu()) {
+            return List.of();
+        }
+        List<SlotLayout.Well> out = new ArrayList<>(this.rows * this.cols);
+        for (int i = 0; i < this.rows * this.cols; i++) {
+            out.add(new SlotLayout.Well(cellBox(i), 0, 0));
+        }
+        return out;
     }
 
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         int over = hovered ? cellAt(mx, my) : -1;
         this.tipCell = -1;
+        renderUnder(d, theme);
         for (int i = 0; i < this.items.length; i++) {
             Box cell = cellBox(i);
-            boolean game = SlotComponent.cell(d, theme, cell.x(), cell.y(), this.items[i], this.counts[i], null,
-                    i == over, this.marks[i], mx, my);
+            boolean game = this.wells
+                    ? SlotComponent.cell(d, theme, cell.x(), cell.y(), this.items[i], this.counts[i], null,
+                            i == over, this.marks[i], mx, my)
+                    : SlotComponent.items(d, theme, cell.x(), cell.y(), (this.pitch - 16) / 2, this.items[i],
+                            this.counts[i], null, i == over, mx, my);
             if (game) {
                 this.tipCell = i;
             }
         }
         renderOver(d, theme);
+    }
+
+    /** Before the cells: what a subclass draws under them. */
+    protected void renderUnder(Draw d, Theme theme) {
     }
 
     /** After the cells: what a subclass draws over them. */

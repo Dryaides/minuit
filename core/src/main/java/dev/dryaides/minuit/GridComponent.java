@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Lists;
+
 import dev.dryaides.minuit.internal.Maths;
 import java.util.List;
 import java.util.function.Consumer;
@@ -83,7 +85,7 @@ public class GridComponent<T> extends BaseComponent {
     public GridComponent(Box box, int columns, int cellHeight, int gapX, int gapY, List<T> items, CellRenderer<T> renderer,
                  Consumer<T> onClick) {
         super(box);
-        this.columns = columns;
+        this.columns = Math.max(1, columns);
         this.cellHeight = cellHeight;
         this.gapX = gapX;
         this.gapY = gapY;
@@ -93,7 +95,7 @@ public class GridComponent<T> extends BaseComponent {
     }
 
     public void setItems(List<T> items) {
-        this.items = List.copyOf(items);
+        this.items = Lists.withoutNulls(items);
         int rows = (this.items.size() + this.columns - 1) / this.columns;
         this.h = Math.max(0, rows * (this.cellHeight + this.gapY) - this.gapY);
     }

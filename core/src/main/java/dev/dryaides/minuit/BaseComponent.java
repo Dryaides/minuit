@@ -92,6 +92,17 @@ public abstract class BaseComponent {
         return this;
     }
 
+    /** The game draws a tip's box from this far above the point it is given. */
+    static final int TIP_RISE = 16;
+
+    /**
+     * The height the host lays this widget's tip from, in place of the pointer's: a widget whose tip would hide the
+     * things it names returns a height that puts the tip's box under itself.
+     */
+    public int tooltipY(double mx, double my) {
+        return (int) Math.floor(my);
+    }
+
     /**
      * The lines to show while the mouse is at ({@code mx}, {@code my}), or null. {@link PanelComponent} asks
      * every widget and draws the answer; a widget that holds others, or whose tip depends on the part
@@ -147,6 +158,42 @@ public abstract class BaseComponent {
 
     protected abstract void render(Draw d, Theme theme, int mx, int my, boolean hovered);
 
+    /** The panel's translations, given when the panel adds this widget; a widget with default texts keeps them. */
+    void words(Words words) {
+    }
+
+    /**
+     * A default text: {@code own} when the mod set one, else the lang entry {@code key}, else {@code english}
+     * when no panel gave words or the lang file lacks the key (the bench).
+     */
+    static String text(String own, Words words, String key, String english) {
+        if (own != null) {
+            return own;
+        }
+        if (words != null) {
+            String found = words.get(key);
+            if (!found.equals(key)) {
+                return found;
+            }
+        }
+        return english;
+    }
+
+    /** {@code count} names from {@code prefix.1} on; a key the lang file lacks keeps the English name. */
+    static String[] names(Words words, String prefix, String[] english) {
+        String[] out = english.clone();
+        if (words != null) {
+            for (int i = 0; i < out.length; i++) {
+                String key = prefix + "." + (i + 1);
+                String found = words.get(key);
+                if (found != null && !found.equals(key)) {
+                    out[i] = found;
+                }
+            }
+        }
+        return out;
+    }
+
     /** Once per game tick, from the panel holding it; a widget holding others passes it on. */
     public void tick() {
     }
@@ -201,6 +248,16 @@ public abstract class BaseComponent {
         return navigable() ? List.of(this) : List.of();
     }
 
+    /**
+     * The wells this widget draws over menu slots, screen coordinates; empty for a widget that holds no menu
+     * slot. A container screen places a menu slot on the first well that holds its item. A slot part of your
+     * own overrides this; the built-in ones list their cells while they hold the menu ({@code holdsMenu}).
+     */
+    @Incubating
+    protected List<SlotLayout.Well> menuWells() {
+        return List.of();
+    }
+
     /** The keyboard arrives on this stop, forward by Tab or back by Shift+Tab. */
     protected void enter(boolean forward) {
     }
@@ -215,6 +272,11 @@ public abstract class BaseComponent {
         return box();
     }
 
+    /** {@link #focusBox} in this family, for a widget whose outline the family draws past its box. */
+    protected Box focusBox(FrameStyle frame) {
+        return focusBox();
+    }
+
     /**
      * Marks this widget as the keyboard's stop its own way, over its last draw; false leaves the panel
      * to ring it.
@@ -226,6 +288,11 @@ public abstract class BaseComponent {
     /** The corner radius of {@link #focusBox}, which the ring follows. */
     protected int focusCorner() {
         return 3;
+    }
+
+    /** {@link #focusCorner} in this family, for a widget whose corners the family draws: the ring is that corner grown. */
+    protected int focusCorner(FrameStyle frame) {
+        return focusCorner();
     }
 
     /** A key while this widget is {@link #focused}, or while the keyboard is on this stop; true when it used it. */

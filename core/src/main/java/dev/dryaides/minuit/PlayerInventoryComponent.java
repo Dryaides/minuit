@@ -13,12 +13,30 @@ public class PlayerInventoryComponent extends BaseComponent implements ItemSourc
     public final HotbarComponent hotbar;
     /** Drawn {@link SlotLayout#LABEL_GAP} over the first row, as vanilla's "Inventory"; null for none (a container screen draws its own). */
     public String label;
+    private final boolean hudHotbar;
 
     public PlayerInventoryComponent(Box inventory) {
+        this(inventory, false);
+    }
+
+    /**
+     * @param hudHotbar true to draw the hotbar as the game's HUD bar ({@link HotbarComponent#hud}, 182 by 22,
+     *                  cells 20 px apart, selection framed) under the rows, which stay 18 px slots. The bar is
+     *                  centred on {@code inventory} ({@link SlotLayout#hudHotbar(Box)}) and its items sit level
+     *                  with the rows' items. A container screen shows a vanilla menu's hotbar slots on the bar
+     *                  by itself; a menu built for the HUD look takes {@link SlotLayout#playerCellsHud}.
+     */
+    public PlayerInventoryComponent(Box inventory, boolean hudHotbar) {
         super(inventory);
+        this.hudHotbar = hudHotbar;
         this.rows = new SlotGridComponent(SlotLayout.inventoryRows(inventory), 3, 9);
-        this.hotbar = new HotbarComponent(SlotLayout.hotbar(inventory));
-        this.hotbar.framesSelection = false;
+        if (hudHotbar) {
+            Box bar = SlotLayout.hudHotbar(inventory);
+            this.hotbar = HotbarComponent.hud(bar.name(), bar.x(), bar.y());
+        } else {
+            this.hotbar = new HotbarComponent(SlotLayout.hotbar(inventory));
+            this.hotbar.framesSelection = false;
+        }
     }
 
     /** Display mode: the 36 items in vanilla's index order, null for an empty slot. */
@@ -47,6 +65,33 @@ public class PlayerInventoryComponent extends BaseComponent implements ItemSourc
     /** True over menu slots, so the container screen gives the click to the game. */
     public boolean holdsMenu() {
         return this.rows.holdsMenu() && this.hotbar.holdsMenu();
+    }
+
+    /**
+     * The rows' wells, then the hotbar's. On the HUD look each hotbar index gives two: the HUD item's own
+     * 16 px box first, for a menu built for that look, then the classic row's 18 px well shifted onto the bar,
+     * for a vanilla menu. The exact box comes first because vanilla slots 3 to 5 also fall in HUD cells 3 to 5.
+     */
+    @Override
+    protected List<SlotLayout.Well> menuWells() {
+        if (!holdsMenu()) {
+            return List.of();
+        }
+        List<SlotLayout.Well> out = new ArrayList<>(this.rows.menuWells());
+        if (!this.hudHotbar) {
+            out.addAll(this.hotbar.menuWells());
+            return out;
+        }
+        List<SlotLayout.Cell> classic = SlotLayout.cells(SlotLayout.hotbar(box()), 0);
+        for (int i = 0; i < 9; i++) {
+            int ix = this.hotbar.itemX(i);
+            int iy = this.hotbar.itemY(i);
+            SlotLayout.Cell cell = classic.get(i);
+            out.add(new SlotLayout.Well(new Box("hud" + i, ix, iy, 16, 16), 0, 0));
+            out.add(new SlotLayout.Well(new Box("slot" + i, cell.x() - 1, cell.y() - 1, SlotLayout.PITCH, SlotLayout.PITCH),
+                    ix - cell.x(), iy - cell.y()));
+        }
+        return out;
     }
 
     @Override

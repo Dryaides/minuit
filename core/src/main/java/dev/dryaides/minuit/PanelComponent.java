@@ -3,6 +3,7 @@ package dev.dryaides.minuit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A screen's content without the screen: widgets, the drawing between them, mouse dispatch and
@@ -79,6 +80,9 @@ public abstract class PanelComponent {
     }
 
     protected final <W extends BaseComponent> W add(W widget) {
+        if (this.words != null) {
+            widget.words(this.words);
+        }
         this.widgets.add(widget);
         return widget;
     }
@@ -143,8 +147,8 @@ public abstract class PanelComponent {
             }
             return;
         }
-        Box b = this.cursor.focusBox();
-        Shapes.ring(d, b.x() - 2, b.y() - 2, b.w() + 4, b.h() + 4, this.cursor.focusCorner() + 2,
+        Box b = this.cursor.focusBox(this.theme.frame());
+        Shapes.ring(d, b.x() - 2, b.y() - 2, b.w() + 4, b.h() + 4, this.cursor.focusCorner(this.theme.frame()) + 2,
                 this.theme.palette().text());
         if (clip) {
             d.endScissor();
@@ -277,12 +281,43 @@ public abstract class PanelComponent {
      * {@link TipDelay#MS}; the host calls it after {@link #draw}.
      */
     public final void drawTooltip(Draw d, int mx, int my) {
-        this.tip.draw(d, tooltipAt(mx, my), mx, my);
+        List<String> lines = tooltipAt(mx, my);
+        BaseComponent owner = lines == null ? null : tipOwner(mx, my);
+        this.tip.draw(d, lines, mx, owner == null ? my : owner.tooltipY(mx, my));
+    }
+
+    /** The widget whose tip shows at the pointer, or null when the tip is the panel's own. */
+    private BaseComponent tipOwner(double mx, double my) {
+        if (this.overlay != null) {
+            return this.overlay;
+        }
+        for (int i = this.widgets.size() - 1; i >= 0; i--) {
+            BaseComponent widget = this.widgets.get(i);
+            if (widget.visible && widget.tooltipAt(mx, my) != null) {
+                return widget;
+            }
+        }
+        return null;
     }
 
     /** The widget holding the keyboard, or null. */
     public BaseComponent focus() {
         return this.focus;
+    }
+
+    /**
+     * Moves the keyboard cursor to {@code widget}'s first stop, as Tab would, so Enter and Space then press it. A widget
+     * with no stop only takes the keyboard.
+     */
+    public void cursorTo(BaseComponent widget) {
+        Objects.requireNonNull(widget, "widget");
+        for (BaseComponent stop : stops()) {
+            if (stop == widget || widget.stops().contains(stop)) {
+                moveTo(stop, true);
+                return;
+            }
+        }
+        focus(widget);
     }
 
     /** Gives the keyboard to {@code widget}, or takes it back for null. */

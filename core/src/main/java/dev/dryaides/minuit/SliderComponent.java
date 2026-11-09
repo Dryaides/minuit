@@ -12,6 +12,9 @@ import java.util.function.IntFunction;
 public class SliderComponent extends BaseComponent {
 
     private static final int VALUE_ROOM = 24;
+    /** The shortest track a long value label may leave, as {@link RangeSliderComponent} keeps. */
+    private static final int TRACK_MIN_W = 24;
+    private static final int LABEL_FLOOR_W = 12;
     private final int min;
     private final int max;
     private final IntConsumer onChange;
@@ -93,7 +96,23 @@ public class SliderComponent extends BaseComponent {
     }
 
     private int trackWidth() {
-        return this.gameLook ? this.w - 8 : this.w - this.valueRoom - 8;
+        return Math.max(0, this.gameLook ? this.w - 8 : this.w - this.valueRoom - 8);
+    }
+
+    /**
+     * The room a slider keeps for its value label beside the track, shared with {@link RangeSliderComponent}:
+     * the label's width (at least {@code least}) while the track keeps its minimum, else what is left
+     * when that still holds {@code floor} pixels of text, else none.
+     */
+    static int labelRoom(int wanted, int least, int spare, int floor) {
+        if (wanted <= 0) {
+            return 0;
+        }
+        int room = Math.max(least, wanted);
+        if (room <= spare) {
+            return room;
+        }
+        return spare >= floor ? spare : 0;
     }
 
     @Override
@@ -111,8 +130,8 @@ public class SliderComponent extends BaseComponent {
                     this.active ? p.raisedText() : p.disabledText());
             return;
         }
-        this.valueRoom = Math.max(VALUE_ROOM, Math.max(d.width(this.label.apply(this.min)),
-                d.width(this.label.apply(this.max))) + 4);
+        int wanted = Math.max(d.width(this.label.apply(this.min)), d.width(this.label.apply(this.max))) + 4;
+        this.valueRoom = labelRoom(wanted, VALUE_ROOM, this.w - 8 - TRACK_MIN_W, LABEL_FLOOR_W);
         int tx = this.x + 4;
         int tw = trackWidth();
         int ty = this.y + this.h / 2 - 2;
@@ -125,8 +144,11 @@ public class SliderComponent extends BaseComponent {
         if (this.active) {
             theme.frame().knob(d, p, tx + filled - 3, this.y + this.h / 2 - 4, this.dragging || this.hoverAnim >= 0.5F);
         }
-        d.text(number, this.x + this.w - 2 - d.width(number), this.y + (this.h - 8) / 2 + 1,
-                this.active ? p.text() : p.disabledText());
+        if (this.valueRoom > 0) {
+            String shown = d.ellipsize(number, this.valueRoom - 4);
+            d.text(shown, this.x + this.w - 2 - d.width(shown), this.y + (this.h - 8) / 2 + 1,
+                    this.active ? p.text() : p.disabledText());
+        }
     }
 
     private void set(int v) {
@@ -137,7 +159,7 @@ public class SliderComponent extends BaseComponent {
     }
 
     private void update(double mx) {
-        float t = (float) Maths.clamp((mx - this.x - 4) / trackWidth(), 0, 1);
+        float t = (float) Maths.clamp((mx - this.x - 4) / Math.max(1, trackWidth()), 0, 1);
         int n = ticks();
         int index = Math.round(t * n);
         set(index >= n ? this.max : this.min + index * this.step);

@@ -19,7 +19,7 @@
   "mixins": ["minuit.mixins.json"],
   "depends": {
     "fabricloader": ">=0.16",
-    "fabric-api": "*",
+    "${fabric_api_id}": "*",
     "minecraft": "${minecraft_version_range}",
     "java": ">=${java_version}"
   },

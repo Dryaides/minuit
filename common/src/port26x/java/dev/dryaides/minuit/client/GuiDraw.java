@@ -54,33 +54,47 @@ public final class GuiDraw extends Draw {
 
     @Override
     public void item(String itemId, int x, int y) {
-        ItemStack stack = byId(itemId);
-        if (!stack.isEmpty()) {
-            this.g.item(stack, x, y);
-        }
+        item(ItemView.of(itemId), x, y);
     }
 
+    /**
+     * A stack of this id, shared, or null while the game cannot make one yet. Items get their components when a
+     * world's registries load: before that (title screen, mod list), {@code new ItemStack} throws "Components not
+     * bound yet". That failure is not cached, so the real item shows once a world is loaded.
+     */
     private static ItemStack byId(String itemId) {
-        return ITEMS.computeIfAbsent(itemId, id -> {
-            Identifier parsed = GameIds.id(id);
-            return parsed == null ? ItemStack.EMPTY
+        ItemStack known = ITEMS.get(itemId);
+        if (known != null) {
+            return known;
+        }
+        ItemStack made;
+        try {
+            Identifier parsed = GameIds.id(itemId);
+            made = parsed == null ? ItemStack.EMPTY
                     : GameIds.ITEMS.getOptional(parsed).map(ItemStack::new).orElse(ItemStack.EMPTY);
-        });
+        } catch (RuntimeException notBoundYet) {
+            return null;
+        }
+        ITEMS.put(itemId, made);
+        return made;
     }
 
-    /** The view's own stack, else one of its id with its count. */
+    /** The view's own stack, else one of its id with its count; null while no world is loaded. */
     private static ItemStack stack(ItemView item) {
         if (item.stack() instanceof ItemStack own) {
             return own;
         }
         ItemStack shared = byId(item.id());
-        return item.count() == 1 || shared.isEmpty() ? shared : shared.copyWithCount(item.count());
+        return shared == null || item.count() == 1 || shared.isEmpty() ? shared : shared.copyWithCount(item.count());
     }
 
     @Override
     public void item(ItemView item, int x, int y) {
         ItemStack stack = stack(item);
-        if (!stack.isEmpty()) {
+        if (stack == null) {
+            // no world yet: the library's stand-in rather than a crash
+            super.item(item, x, y);
+        } else if (!stack.isEmpty()) {
             this.g.item(stack, x, y);
         }
     }
@@ -88,7 +102,7 @@ public final class GuiDraw extends Draw {
     @Override
     public void itemDecorations(ItemView item, int x, int y) {
         ItemStack stack = stack(item);
-        if (!stack.isEmpty()) {
+        if (stack != null && !stack.isEmpty()) {
             this.g.itemDecorations(this.font, stack, x, y);
         }
     }
@@ -96,7 +110,7 @@ public final class GuiDraw extends Draw {
     @Override
     public void itemDecorations(ItemView item, int x, int y, String count) {
         ItemStack stack = stack(item);
-        if (!stack.isEmpty()) {
+        if (stack != null && !stack.isEmpty()) {
             // an empty string hides the count: the game draws its own for a null one
             this.g.itemDecorations(this.font, stack, x, y, count == null ? "" : count);
         }
@@ -105,7 +119,7 @@ public final class GuiDraw extends Draw {
     @Override
     public boolean itemTooltip(ItemView item, int mx, int my) {
         ItemStack stack = stack(item);
-        if (stack.isEmpty()) {
+        if (stack == null || stack.isEmpty()) {
             return false;
         }
         this.g.setTooltipForNextFrame(this.font, stack, mx, my);

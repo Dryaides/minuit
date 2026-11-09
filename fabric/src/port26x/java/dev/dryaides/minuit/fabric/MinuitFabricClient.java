@@ -8,7 +8,9 @@ import dev.dryaides.minuit.client.form.FormScreen;
 import dev.dryaides.minuit.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
+import dev.dryaides.minuit.internal.port.Platform;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ServerboundPlayChannelEvents;
@@ -32,6 +34,7 @@ public final class MinuitFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         Bridges.install();
+        Platform.development(FabricLoader.getInstance().isDevelopmentEnvironment());
         MinuitClient.themeChoices();
         ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(
                 Identifier.fromNamespaceAndPath("minuit", ThemeReload.ID), new ThemeReload());

@@ -371,11 +371,15 @@ final class BenchDraw {
             }
         }
 
-        /** Open scissors, each already cut to the one under it, in screen pixels. */
+        /** Open scissors after the push offsets, each already cut to the one under it, in GUI pixels. */
         private final Deque<int[]> clips = new ArrayDeque<>();
 
         @Override
         public void scissor(int x0, int y0, int x1, int y1) {
+            x0 = (int) Math.floor(this.tx + x0 * this.scale);
+            y0 = (int) Math.floor(this.ty + y0 * this.scale);
+            x1 = (int) Math.floor(this.tx + x1 * this.scale);
+            y1 = (int) Math.floor(this.ty + y1 * this.scale);
             int[] clip = {x0, y0, x1, y1};
             int[] under = this.clips.peek();
             if (under != null) {

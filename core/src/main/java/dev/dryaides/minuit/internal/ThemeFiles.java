@@ -43,9 +43,17 @@ public final class ThemeFiles {
 
     private static final String THEMES = "themes";
     private static final String CHROMAS = "chromas";
+    private static final String SERIES = "series";
+    private static final Map<Palette, int[]> SERIES_OF = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final String PALETTES = "palettes";
+    private static final String ACCENTS = "accents";
+    private static volatile Map<String, int[]> seriesPalettes = Map.of();
     private static final String FAMILY_FILE = "family.json";
     private static final int DEFAULT_ORDER = 100;
-    private static final RecordComponent[] ROLES = Palette.class.getRecordComponents();
+    /** Palette's roles, read on first use, so that series() runs where records have no reflection (the site's TeaVM build). */
+    private static final class Roles {
+        static final RecordComponent[] ALL = Palette.class.getRecordComponents();
+    }
 
     private ThemeFiles() {
     }
@@ -187,20 +195,94 @@ public final class ThemeFiles {
         JsonObject o = element.getAsJsonObject();
         Map<String, Integer> index = roleIndex();
         for (String key : o.keySet()) {
-            if (!index.containsKey(key)) {
+            if (!index.containsKey(key) && !SERIES.equals(key)) {
                 throw new BadFile(where + "." + key, "unknown role");
             }
         }
-        int[] colours = new int[ROLES.length];
-        for (int i = 0; i < ROLES.length; i++) {
-            String field = where + "." + ROLES[i].getName();
-            JsonElement value = o.get(ROLES[i].getName());
+        int[] colours = new int[Roles.ALL.length];
+        for (int i = 0; i < Roles.ALL.length; i++) {
+            String field = where + "." + Roles.ALL[i].getName();
+            JsonElement value = o.get(Roles.ALL[i].getName());
             if (value == null) {
                 throw new BadFile(field, "missing");
             }
             colours[i] = colour(value, field);
         }
-        return build(colours);
+        Palette palette = build(colours);
+        JsonElement series = o.get(SERIES);
+        if (series != null) {
+            if (!series.isJsonArray() || series.getAsJsonArray().isEmpty()) {
+                throw new BadFile(where + "." + SERIES, "not a list of colours");
+            }
+            int[] list = new int[series.getAsJsonArray().size()];
+            for (int i = 0; i < list.length; i++) {
+                list[i] = colour(series.getAsJsonArray().get(i), where + "." + SERIES + "[" + i + "]");
+            }
+            SERIES_OF.put(palette, list);
+        }
+        return palette;
+    }
+
+    /** One accent file, {@code {"order": 10, "light": "#FF2563EB", "dark": "#FF3B82F6"}}; order is optional. */
+    private static Accent accent(String id, JsonObject root) throws BadFile {
+        for (String key : root.keySet()) {
+            if (!key.equals("order") && !key.equals("light") && !key.equals("dark")) {
+                throw new BadFile(key, "unknown field, use order, light and dark");
+            }
+        }
+        for (String key : new String[] {"light", "dark"}) {
+            if (!root.has(key)) {
+                throw new BadFile(key, "missing");
+            }
+        }
+        return new Accent(id, colour(root.get("light"), "light") | 0xFF000000,
+                colour(root.get("dark"), "dark") | 0xFF000000);
+    }
+
+    /** The kit's own accents, read from its jar, in {@link Accent#BUILT_IN} order. */
+    public static List<Accent> builtInAccents() {
+        List<Accent> out = new ArrayList<>();
+        for (String id : Accent.BUILT_IN) {
+            String path = "/assets/minuit/" + ROOT + "/" + ACCENTS + "/" + id + ".json";
+            try (InputStream in = ThemeFiles.class.getResourceAsStream(path)) {
+                if (in == null) {
+                    throw new IllegalStateException("minuit built-in theme file missing: " + path);
+                }
+                out.add(accent(id, object(new String(in.readAllBytes(), StandardCharsets.UTF_8))));
+            } catch (IOException | BadFile e) {
+                throw new IllegalStateException("minuit built-in theme file " + path + ": " + e.getMessage(), e);
+            }
+        }
+        return out;
+    }
+
+    /** A series palette file's colours by its {@code <namespace>:<id>}; null when none was loaded. */
+    public static int[] seriesPalette(String id) {
+        return seriesPalettes.get(id);
+    }
+
+    /** One series palette file, {@code {"colors": ["#RRGGBB", ...]}}. */
+    public static int[] seriesPaletteFile(String text) throws BadFile {
+        JsonObject root;
+        try {
+            root = JsonParser.parseString(text).getAsJsonObject();
+        } catch (JsonParseException | IllegalStateException e) {
+            throw new BadFile("file", "not a JSON object");
+        }
+        JsonElement colors = root.get("colors");
+        if (colors == null || !colors.isJsonArray() || colors.getAsJsonArray().isEmpty()) {
+            throw new BadFile("colors", "missing, or not a list of colours");
+        }
+        int[] out = new int[colors.getAsJsonArray().size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = colour(colors.getAsJsonArray().get(i), "colors[" + i + "]") | 0xFF000000;
+        }
+        return out;
+    }
+
+    /** The chart series colours a chroma file lists for this palette, in order; null when it lists none. */
+    public static int[] series(Palette palette) {
+        return SERIES_OF.get(palette);
     }
 
     /** {@code palette} with one variant's overrides of a family applied; null stays null. */
@@ -208,10 +290,10 @@ public final class ThemeFiles {
         if (palette == null || overrides == null || overrides.isEmpty()) {
             return palette;
         }
-        int[] colours = new int[ROLES.length];
+        int[] colours = new int[Roles.ALL.length];
         try {
-            for (int i = 0; i < ROLES.length; i++) {
-                colours[i] = (int) ROLES[i].getAccessor().invoke(palette);
+            for (int i = 0; i < Roles.ALL.length; i++) {
+                colours[i] = (int) Roles.ALL[i].getAccessor().invoke(palette);
             }
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException(e);
@@ -219,7 +301,12 @@ public final class ThemeFiles {
         for (Override o : overrides) {
             colours[o.role()] = o.alphaOnly() ? o.value() << 24 | colours[o.role()] & 0xFFFFFF : o.value();
         }
-        return build(colours);
+        Palette applied = build(colours);
+        int[] series = SERIES_OF.get(palette);
+        if (series != null) {
+            SERIES_OF.put(applied, series);
+        }
+        return applied;
     }
 
     /** {@code #RRGGBB} (opaque) or {@code #AARRGGBB}. */
@@ -238,8 +325,8 @@ public final class ThemeFiles {
 
     private static Map<String, Integer> roleIndex() {
         Map<String, Integer> index = new LinkedHashMap<>();
-        for (int i = 0; i < ROLES.length; i++) {
-            index.put(ROLES[i].getName(), i);
+        for (int i = 0; i < Roles.ALL.length; i++) {
+            index.put(Roles.ALL[i].getName(), i);
         }
         return index;
     }
@@ -247,7 +334,7 @@ public final class ThemeFiles {
     private static Palette build(int[] colours) {
         Object[] args = Arrays.stream(colours).boxed().toArray();
         try {
-            Class<?>[] types = new Class<?>[ROLES.length];
+            Class<?>[] types = new Class<?>[Roles.ALL.length];
             Arrays.fill(types, int.class);
             return Palette.class.getDeclaredConstructor(types).newInstance(args);
         } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
@@ -269,12 +356,22 @@ public final class ThemeFiles {
         Map<String, String> owners = new LinkedHashMap<>();
         Map<String, Found> shared = new LinkedHashMap<>();
         Map<String, Map<String, Found>> local = new LinkedHashMap<>();
+        Map<String, int[]> palettes = new LinkedHashMap<>();
+        Map<String, Accent> accents = new LinkedHashMap<>();
+        Map<String, Integer> accentOrder = new LinkedHashMap<>();
         for (Entry entry : entries) {
             String[] parts = entry.path().toLowerCase(Locale.ROOT).split("/");
             try {
                 if (parts.length == 2 && parts[0].equals(CHROMAS) && parts[1].endsWith(".json")) {
                     String id = stem(parts[1]);
                     shared.put(id, new Found(id, "minuit.chroma." + id, chroma(entry.text())));
+                } else if (parts.length == 2 && parts[0].equals(ACCENTS) && parts[1].endsWith(".json")) {
+                    String id = stem(parts[1]);
+                    JsonObject root = object(entry.text());
+                    accents.put(id, accent(id, root));
+                    accentOrder.put(id, order(root));
+                } else if (parts.length == 2 && parts[0].equals(PALETTES) && parts[1].endsWith(".json")) {
+                    palettes.put(entry.namespace() + ":" + stem(parts[1]), seriesPaletteFile(entry.text()));
                 } else if (parts.length == 3 && parts[0].equals(THEMES) && parts[2].equals(FAMILY_FILE)) {
                     families.put(parts[1], family(entry.text()));
                     owners.put(parts[1], entry.namespace());
@@ -284,11 +381,17 @@ public final class ThemeFiles {
                             .put(id, new Found(id, "minuit.chroma." + parts[1] + "." + id, chroma(entry.text())));
                 } else {
                     log.accept("minuit theme file " + entry.source()
-                            + " skipped: not at chromas/<chroma>.json or themes/<family>/<file>.json");
+                            + " skipped: not at chromas/<chroma>.json, accents/<id>.json, palettes/<id>.json or themes/<family>/<file>.json");
                 }
             } catch (BadFile e) {
                 log.accept("minuit theme file " + entry.source() + " skipped: " + e.getMessage());
             }
+        }
+        seriesPalettes = Map.copyOf(palettes);
+        if (!accents.isEmpty()) {
+            Accent.load(accents.values().stream()
+                    .sorted(Comparator.comparingInt((Accent a) -> accentOrder.get(a.id())).thenComparing(Accent::id))
+                    .toList());
         }
         Comparator<Found> byOrder = Comparator.<Found>comparingInt(f -> f.file().order()).thenComparing(Found::id);
         List<Found> sharedOrdered = shared.values().stream().sorted(byOrder).toList();

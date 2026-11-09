@@ -4,7 +4,10 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.ItemDropTarget;
 import dev.dryaides.minuit.ItemView;
+import dev.dryaides.minuit.Incubating;
 import dev.dryaides.minuit.PanelComponent;
+import dev.dryaides.minuit.SlotLayout;
+import dev.dryaides.minuit.SlotPlacement;
 import dev.dryaides.minuit.internal.ContainerLogic;
 import dev.dryaides.minuit.port.mc.GameInput;
 import net.minecraft.client.gui.screens.Screen;
@@ -12,7 +15,9 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,6 +46,13 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         public Box container() {
             return containerBox();
         }
+
+        @Override
+        public SlotLayout.Cell hoveredCell() {
+            Slot slot = hoveredSlot;
+            return slot == null ? null : new SlotLayout.Cell(slot.index,
+                    leftPos + slot.x + Math.round(slotOffsetX(slot)), topPos + slot.y + Math.round(slotOffsetY(slot)));
+        }
     });
 
     /** The vanilla screen of the same menu this one replaced; null when the kit screen is the menu's own. */
@@ -56,6 +68,7 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         super(menu, inventory, title);
         this.imageWidth = imageWidth;
         this.imageHeight = imageHeight;
+        this.inventoryLabelY = imageHeight - 94;
         this.vanilla = vanilla;
     }
 
@@ -84,6 +97,73 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         this.minecraft.setScreen(this.vanilla);
     }
 
+    /**
+     * Whether the screen draws this menu slot and lets the pointer reach it, read on every frame and
+     * every pointer event. A hidden slot is drawn, hovered and clicked as an inactive one: no item, no
+     * hover, no tooltip, no click, drag or number key. The menu's own rules still reach it: a shift-click
+     * or a double-click gather elsewhere can move items in or out, as the server decides.
+     * Return {@link #placedByPanel} to hide every slot no component places.
+     */
+    public boolean showsSlot(Slot slot) {
+        return true;
+    }
+
+    /**
+     * True when a slot part of the panel ({@code SlotComponent}, {@code SlotGridComponent},
+     * {@code PlayerInventoryComponent}, or your own through {@code menuWells}) draws this menu slot's well at
+     * the menu's place. Return it from {@link #showsSlot} to hide every slot the panel leaves out: vanilla's
+     * armour, offhand and crafting slots under a kit that only lays out the inventory. Reads the placement of
+     * the last frame; a slot moved for good with {@link #slotOffsetX} counts as not placed.
+     */
+    public final boolean placedByPanel(Slot slot) {
+        return this.logic.placement().placed(slot.index);
+    }
+
+    /** The panel's slot placement this frame; see {@link SlotPlacement}. */
+    @Incubating
+    public final SlotPlacement placement() {
+        return this.logic.placement();
+    }
+
+    /**
+     * True moves the inventory title onto the panel's {@code PlayerInventoryComponent}, where its own label
+     * would sit, on every init. False (the default) leaves inventoryLabelX/Y as the game and your constructor set them.
+     */
+    @Incubating
+    protected boolean labelsFollowPanel() {
+        return false;
+    }
+
+    /** False hides the carried stack the game draws at the pointer, read on every frame. */
+    public boolean drawsCarried() {
+        return true;
+    }
+
+    /**
+     * How far from its place the game draws this menu slot's item now, read on every frame and every
+     * pointer lookup, so the pointer finds the slot where it is drawn. Give the slots of a sliding
+     * region the offset of its {@code Glide} ({@code glide.offsetY(distance)}), the same glide as the
+     * wells' widget.
+     */
+    public float slotOffsetX(Slot slot) {
+        return 0F;
+    }
+
+    /** The y part of {@link #slotOffsetX}. */
+    public float slotOffsetY(Slot slot) {
+        return 0F;
+    }
+
+    /** The container's left edge on screen, read on every {@code init}; vanilla centres it. */
+    protected int containerLeft() {
+        return (this.width - this.imageWidth) / 2;
+    }
+
+    /** The container's top edge on screen, read on every {@code init}; vanilla centres it. */
+    protected int containerTop() {
+        return (this.height - this.imageHeight) / 2;
+    }
+
     /** False hides the theme tab beside the panel; read on every frame and click. */
     protected boolean showsThemeTab() {
         return true;
@@ -95,8 +175,22 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
     @Override
     protected void init() {
         super.init();
+        this.leftPos = containerLeft();
+        this.topPos = containerTop();
         this.host.init();
         this.panel = build(this.leftPos, this.topPos);
+        List<SlotLayout.Cell> cells = new ArrayList<>();
+        for (Slot slot : this.menu.slots) {
+            cells.add(new SlotLayout.Cell(slot.index, this.leftPos + slot.x, this.topPos + slot.y));
+        }
+        this.logic.init(this.panel, cells, i -> showsSlot(this.menu.slots.get(i)), getClass().getName(),
+                new Box("title", this.leftPos + this.titleLabelX, this.topPos + this.titleLabelY,
+                        this.font.width(this.title), this.font.lineHeight));
+        Box label = labelsFollowPanel() ? this.logic.inventoryLabel(this.panel) : null;
+        if (label != null) {
+            this.inventoryLabelX = label.x() - this.leftPos;
+            this.inventoryLabelY = label.y() - this.topPos;
+        }
     }
 
     /** The wells go here, from the background pass, under the items the game draws next. */
@@ -170,8 +264,13 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        this.logic.mouseReleased(this.panel, mouseX, mouseY, button);
-        return super.mouseReleased(mouseX, mouseY, button);
+        return this.logic.mouseReleased(this.panel, mouseX, mouseY, button)
+                || super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    protected boolean hasClickedOutside(double mouseX, double mouseY, int left, int top, int button) {
+        return this.logic.clickedOutside(this.panel, mouseX, mouseY, super.hasClickedOutside(mouseX, mouseY, left, top, button));
     }
 
     @Override

@@ -63,7 +63,7 @@ public final class WidgetBench {
         BaseComponent.clock = () -> now;
         int shots = 0;
         checks();
-        String looks = args.length > 1 ? args[1] : "bedrock/stone,slate/teal";
+        String looks = args.length > 1 ? args[1] : "bedrock/bedrock,slate/teal";
         for (String look : looks.split(",")) {
             String familyId = look.split("/")[0];
             ThemeFamily family = Themes.family(null, familyId);

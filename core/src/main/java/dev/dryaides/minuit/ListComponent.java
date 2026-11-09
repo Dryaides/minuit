@@ -1,6 +1,7 @@
 package dev.dryaides.minuit;
 
-import dev.dryaides.minuit.internal.Maths;
+import dev.dryaides.minuit.internal.Lists;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -38,7 +39,8 @@ public class ListComponent<T> extends BaseComponent {
     /** Each row's widgets, moved up by the scroll as {@link ScrollComponent} moves its children. */
     private final List<List<BaseComponent>> widgets = new ArrayList<>();
     private final HoverGlows<T> glows = new HoverGlows<>();
-    private double scroll;
+    private final ScrollBar bar = new ScrollBar();
+    private FrameStyle frame = FrameStyles.VANILLA;
     public T selected;
 
     public ListComponent(Box box, int rowHeight, RowRenderer<T> renderer, Consumer<T> onClick) {
@@ -47,7 +49,7 @@ public class ListComponent<T> extends BaseComponent {
 
     public ListComponent(Box box, int rowHeight, RowRenderer<T> renderer, RowClick<T> onClick) {
         super(box);
-        this.rowHeight = rowHeight;
+        this.rowHeight = Math.max(1, rowHeight);
         this.renderer = renderer;
         this.onClick = onClick;
     }
@@ -60,8 +62,8 @@ public class ListComponent<T> extends BaseComponent {
     }
 
     public void setItems(List<T> items) {
-        this.items = new ArrayList<>(items);
-        this.scroll = Math.min(this.scroll, maxScroll());
+        this.items = new ArrayList<>(Lists.withoutNulls(items));
+        this.bar.content(this.items.size() * this.rowHeight, this.h);
         buildWidgets();
     }
 
@@ -72,7 +74,7 @@ public class ListComponent<T> extends BaseComponent {
         }
         for (int i = 0; i < this.items.size(); i++) {
             List<BaseComponent> row = new ArrayList<>(this.rowWidgets.build(this.items.get(i), i, rowBox(i, 0)));
-            row.forEach(w -> w.y -= (int) this.scroll);
+            row.forEach(w -> w.y -= this.bar.offset());
             this.widgets.add(row);
         }
     }
@@ -87,14 +89,20 @@ public class ListComponent<T> extends BaseComponent {
     }
 
     public double scroll() {
-        return this.scroll;
+        return this.bar.offset();
     }
 
     public void setScroll(double scroll) {
-        double next = Maths.clamp(scroll, 0, maxScroll());
-        int shift = (int) next - (int) this.scroll;
+        int before = this.bar.offset();
+        this.bar.content(this.items.size() * this.rowHeight, this.h);
+        this.bar.offset((int) scroll);
+        follow(before);
+    }
+
+    /** Moves the row widgets by what the bar moved since {@code before}. */
+    private void follow(int before) {
+        int shift = this.bar.offset() - before;
         this.widgets.forEach(row -> row.forEach(w -> w.y -= shift));
-        this.scroll = next;
     }
 
     /** Scrolls just enough for this row to be fully inside the list. */
@@ -104,9 +112,9 @@ public class ListComponent<T> extends BaseComponent {
             return;
         }
         int rowTop = index * this.rowHeight;
-        if (rowTop < this.scroll) {
+        if (rowTop < this.bar.offset()) {
             setScroll(rowTop);
-        } else if (rowTop + this.rowHeight > this.scroll + this.h) {
+        } else if (rowTop + this.rowHeight > this.bar.offset() + this.h) {
             setScroll(rowTop + this.rowHeight - this.h);
         }
     }
@@ -123,12 +131,12 @@ public class ListComponent<T> extends BaseComponent {
         }
     }
 
-    private double maxScroll() {
-        return Math.max(0, this.items.size() * this.rowHeight - this.h);
+    private int barX() {
+        return ScrollBar.wellX(this.frame, this.x, this.w);
     }
 
     private Box rowBox(int index, int scrolled) {
-        return new Box("row", this.x + 4, this.y + index * this.rowHeight - scrolled, this.w - BAR - 8, this.rowHeight);
+        return new Box("row", this.x + 4, this.y + index * this.rowHeight - scrolled, this.w - 8 - ScrollBar.room(this.frame), this.rowHeight);
     }
 
     private List<BaseComponent> allWidgets() {
@@ -140,43 +148,40 @@ public class ListComponent<T> extends BaseComponent {
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         Palette p = theme.palette();
-        theme.frame().well(d, p, this.x, this.y, this.w, this.h, false);
+        this.frame = theme.frame();
+        this.frame.well(d, p, this.x, this.y, this.w, this.h, false);
         if (!this.focused) {
             allWidgets().forEach(w -> w.focused = false);
         }
-        boolean in = hovered && mx < this.x + this.w - BAR;
+        boolean in = hovered && mx < barX();
         int cx = in ? mx : Integer.MIN_VALUE;
         int cy = in ? my : Integer.MIN_VALUE;
         this.glows.frame(clock.getAsLong());
         d.scissor(this.x + 1, this.y + 1, this.x + this.w - 1, this.y + this.h - 1);
-        int first = (int) (this.scroll / this.rowHeight);
+        int scroll = this.bar.offset();
+        int first = scroll / this.rowHeight;
         for (int i = first; i < this.items.size(); i++) {
-            int ry = this.y + i * this.rowHeight - (int) this.scroll;
+            int ry = this.y + i * this.rowHeight - scroll;
             if (ry > this.y + this.h) {
                 break;
             }
             T item = this.items.get(i);
             boolean rowHover = in && my >= ry && my < ry + this.rowHeight;
-            boolean isSelected = item.equals(this.selected);
+            boolean isSelected = java.util.Objects.equals(item, this.selected);
             float glow = this.glows.of(item, rowHover);
             if (isSelected || glow > 0F) {
-                Shapes.rounded(d, this.x + 2, ry + 1, this.w - BAR - 4, this.rowHeight - 2, Math.max(2, theme.frame().corner()),
+                theme.frame().row(d, p, this.x + 2, ry + 1, this.w - 4 - ScrollBar.room(this.frame), this.rowHeight - 2,
                         isSelected ? p.raisedHover() : Shapes.mix(Shapes.alpha(p.raised(), 0), p.raised(), glow));
             }
-            this.renderer.draw(d, theme, item, rowBox(i, (int) this.scroll), rowHover, isSelected);
+            this.renderer.draw(d, theme, item, rowBox(i, scroll), rowHover, isSelected);
             for (BaseComponent w : widgetsOf(i)) {
                 w.draw(d, theme, cx, cy, this.delta);
             }
         }
         d.endScissor();
-        double max = maxScroll();
-        if (max > 0) {
-            int track = this.h - 4;
-            int thumb = Math.max(10, (int) (track * (this.h / (double) (this.items.size() * this.rowHeight))));
-            int ty = this.y + 2 + (int) ((track - thumb) * (this.scroll / max));
-            Shapes.rounded(d, this.x + this.w - 5, this.y + 2, 3, track, 1, p.track());
-            Shapes.rounded(d, this.x + this.w - 5, ty, 3, thumb, 1, p.accent());
-        }
+        this.bar.content(this.items.size() * this.rowHeight, this.h);
+        int barX = barX();
+        this.bar.draw(d, theme, barX, this.y + 2, this.h - 4, hovered && this.bar.overThumb(mx, my, barX, this.y + 2, this.h - 4));
     }
 
     /** The row under the mouse, or null. Used for the row tooltips. */
@@ -187,10 +192,10 @@ public class ListComponent<T> extends BaseComponent {
 
     /** The index of the row under the mouse, or -1. */
     public int indexAt(double mx, double my) {
-        if (!isOver(mx, my) || mx >= this.x + this.w - BAR) {
+        if (!isOver(mx, my) || mx >= barX()) {
             return -1;
         }
-        int index = (int) ((my - this.y + this.scroll) / this.rowHeight);
+        int index = (int) ((my - this.y + this.bar.offset()) / this.rowHeight);
         return index >= 0 && index < this.items.size() ? index : -1;
     }
 
@@ -210,12 +215,19 @@ public class ListComponent<T> extends BaseComponent {
         if (!isOver(mx, my)) {
             return false;
         }
-        setScroll(this.scroll - amount * this.rowHeight);
+        setScroll(this.bar.offset() - Math.round(amount * this.rowHeight));
         return true;
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        if (this.active && button == 0 && isOver(mx, my) && mx >= barX()) {
+            int before = this.bar.offset();
+            this.bar.content(this.items.size() * this.rowHeight, this.h);
+            boolean held = this.bar.press(mx, my, barX(), this.y + 2, this.h - 4);
+            follow(before);
+            return held;
+        }
         int index = this.active ? indexAt(mx, my) : -1;
         if (index < 0) {
             return false;
@@ -229,7 +241,7 @@ public class ListComponent<T> extends BaseComponent {
             }
         }
         T row = this.items.get(index);
-        Box box = rowBox(index, (int) this.scroll);
+        Box box = rowBox(index, this.bar.offset());
         this.selected = row;
         click();
         this.onClick.clicked(row, index, (int) mx - box.x(), (int) my - box.y());
@@ -238,7 +250,8 @@ public class ListComponent<T> extends BaseComponent {
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
-        boolean any = false;
+        boolean any = this.bar.dragging();
+        this.bar.release();
         for (BaseComponent w : allWidgets()) {
             any |= w.mouseReleased(mx, my, button);
         }
@@ -247,6 +260,12 @@ public class ListComponent<T> extends BaseComponent {
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (this.bar.dragging()) {
+            int before = this.bar.offset();
+            this.bar.drag(my);
+            follow(before);
+            return true;
+        }
         for (BaseComponent w : allWidgets()) {
             if (w.visible && w.mouseDragged(mx, my, button, dx, dy)) {
                 return true;

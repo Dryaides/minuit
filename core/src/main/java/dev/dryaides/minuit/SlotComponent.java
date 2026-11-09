@@ -57,6 +57,12 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
         return this.item == null && this.onClick == null && this.onDrop == null;
     }
 
+    /** Its 18 px well while it holds the menu. */
+    @Override
+    protected List<SlotLayout.Well> menuWells() {
+        return holdsMenu() ? List.of(new SlotLayout.Well(box(), 0, 0, this.empty != null)) : List.of();
+    }
+
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         this.gameTip = cell(d, theme, this.x, this.y, this.item, this.count, this.empty, hovered, this.marked, mx, my);
@@ -70,30 +76,38 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
     static boolean cell(Draw d, Theme theme, int x, int y, ItemView item, long count, IconArt empty,
                         boolean hovered, boolean marked, int mx, int my) {
         theme.frame().slot(d, theme.palette(), x, y, hovered, marked);
+        return items(d, theme, x, y, 1, item, count, empty, hovered, mx, my);
+    }
+
+    /** The item of a cell whose 16 px item area starts {@code off} px in from {@code x, y}; no well. */
+    static boolean items(Draw d, Theme theme, int x, int y, int off, ItemView item, long count, IconArt empty,
+                         boolean hovered, int mx, int my) {
+        int ix = x + off;
+        int iy = y + off;
         if (item == null) {
             if (empty != null) {
-                empty.draw(d, x + 1 + (16 - empty.width()) / 2, y + 1 + (16 - empty.height()) / 2,
+                empty.draw(d, ix + (16 - empty.width()) / 2, iy + (16 - empty.height()) / 2,
                         theme.palette().text(), 0.4F);
             }
             if (hovered) {
-                d.fill(x + 1, y + 1, x + 17, y + 17, Shapes.SLOT_HOVER_FRONT);
+                d.fill(ix, iy, ix + 16, iy + 16, Shapes.SLOT_HOVER_FRONT);
             }
             return false;
         }
-        d.item(item, x + 1, y + 1);
+        d.item(item, ix, iy);
         String label = count > 1 ? shortCount(count) : null;
         if (label == null || d.width(label) <= 16) {
-            d.itemDecorations(item, x + 1, y + 1, label);
+            d.itemDecorations(item, ix, iy, label);
         } else {
             // Too wide for the slot at full size: half size in the corner, as storage mods draw it.
-            d.itemDecorations(item, x + 1, y + 1, "");
-            d.push(x + 17 - d.width(label) * 0.5F, y + 13, 0.5F);
+            d.itemDecorations(item, ix, iy, "");
+            d.push(ix + 16 - d.width(label) * 0.5F, iy + 12, 0.5F);
             d.text(label, 1, 1, 0xFF3F3F3F);
             d.text(label, 0, 0, 0xFFFFFFFF);
             d.pop();
         }
         if (hovered) {
-            d.fill(x + 1, y + 1, x + 17, y + 17, Shapes.SLOT_HOVER_FRONT);
+            d.fill(ix, iy, ix + 16, iy + 16, Shapes.SLOT_HOVER_FRONT);
         }
         return hovered && d.itemTooltip(item, mx, my);
     }

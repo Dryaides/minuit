@@ -40,10 +40,10 @@ public final class MinuitMenuScreens {
 
     /** From the screen-opening hook: the screen to open in place of {@code next}. */
     public static Screen swap(Screen next) {
-        if (!(next instanceof MenuAccess<?> access) || next instanceof MinuitContainerScreen<?> || FACTORIES.isEmpty()) {
+        if (!(next instanceof MenuAccess<?>) || next instanceof MinuitContainerScreen<?> || FACTORIES.isEmpty()) {
             return next;
         }
-        AbstractContainerMenu menu = access.getMenu();
+        AbstractContainerMenu menu = ((MenuAccess<?>) next).getMenu();
         if (menu == handedBack) {
             handedBack = null;
             return next;

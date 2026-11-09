@@ -173,7 +173,12 @@ public abstract class Draw {
     /** The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide. */
     protected abstract String cut(String text, int maxWidth);
 
-    /** The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide, no ellipsis. */
+    /**
+     * The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide, no ellipsis.
+     *
+     * @deprecated forwards to {@link #cut}; use that. To be removed in 2.0.
+     */
+    @Deprecated
     public final String prefix(String text, int maxWidth) {
         return cut(text, maxWidth);
     }
@@ -232,6 +237,11 @@ public abstract class Draw {
 
     public abstract void pop();
 
+    /**
+     * Clips what follows to the box from ({@code x0}, {@code y0}) to ({@code x1}, {@code y1}), given in the
+     * same coordinates as a fill drawn here: under a {@link #push} it moves and scales with it. Each box
+     * is cut to the one open under it; {@link #endScissor} closes the last one.
+     */
     public abstract void scissor(int x0, int y0, int x1, int y1);
 
     public abstract void endScissor();
@@ -339,7 +349,13 @@ public abstract class Draw {
             text(shown, x, y + (height - 8) / 2, color);
             return;
         }
-        push(x, y + (height - 8 * scale) / 2F, scale);
+        int gs = guiScale();
+        if (gs > 2) {
+            // whole screen pixels per font pixel, rounded down so the text still fits
+            scale = Math.max(Math.round(floor * gs) / (float) gs, (float) Math.floor(scale * gs) / gs);
+            shown = ellipsize(text, (int) (maxWidth / scale));
+        }
+        push(snap(x, gs), snap(y + (height - 8 * scale) / 2F, gs), scale);
         text(shown, 0, 0, color);
         pop();
     }

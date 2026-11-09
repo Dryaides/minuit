@@ -53,6 +53,8 @@ processResources {
             "java_version"           : project.java_version.toString(),
             "sources_url"            : project.sources_url,
             "issues_url"             : project.issues_url,
+            // Fabric API's mod id was "fabric" until the 1.19 era; 1.16.5 sets fabric_api_id=fabric.
+            "fabric_api_id"          : (project.findProperty('fabric_api_id') ?: 'fabric-api').toString(),
     ]
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand props }

@@ -1,0 +1,60 @@
+// MinecraftForge build for MC 1.16.5, used instead of build.gradle when gradle/versions/<mc>.properties sets
+// forge_loom=true (settings.gradle). ModDevGradle cannot set up a Forge whose MCP config predates the Mojang
+// names, so Architectury Loom in its Forge mode does: Mojang names in the sources, the jar remapped to SRG
+// with the mixin refmap. Same entry points (src/port<dir>) and mods.toml as build.gradle.
+
+plugins {
+    id 'multiloader-loader'
+}
+
+// Read by Loom when it is applied.
+ext.set('loom.platform', 'forge')
+apply plugin: 'dev.architectury.loom-remap'
+
+loom {
+    forge {
+        mixinConfig "${mod_id}.mixins.json"
+    }
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName = "${mod_id}.refmap.json"
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    forge "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+}
+
+jar {
+    manifest.attributes(['MixinConfigs': "${mod_id}.mixins.json"])
+}
+
+// The published jar is the remapped one, as the game loads it.
+publishing.publications.named('mod', MavenPublication) {
+    artifacts = [tasks.named('remapJar'), tasks.named('remapSourcesJar')]
+}
+
+base {
+    archivesName = "${mod_id}-forge-${minecraft_version}"
+}
+
+processResources {
+    // Maven ranges must carry no whitespace: FML parses them with Maven's VersionRange.
+    def props = [
+            "version"                   : project.version,
+            "mod_id"                    : project.mod_id,
+            "mod_name"                  : project.mod_name,
+            "mod_description"           : project.description,
+            "mod_authors"               : project.mod_author,
+            "mod_license"               : project.license,
+            "issues_url"                : project.issues_url,
+            "sources_url"               : project.sources_url,
+            "minecraft_version_range"   : project.minecraft_version_range.toString().replaceAll('\\s', ''),
+            "forge_version_range"       : project.forge_version_range.toString().replaceAll('\\s', ''),
+            "forge_loader_version_range": project.forge_loader_version_range.toString(),
+    ]
+    inputs.properties(props)
+    filesMatching("META-INF/mods.toml") { expand props }
+}

@@ -40,8 +40,10 @@ public class WaveComponent extends BaseComponent {
         int lit = this.color != 0 ? this.color : Shapes.mix(p.accent(), 0xFFFFFFFF, 0.35F);
         int middle = this.y + this.h / 2;
         int bars = (this.w - 12) / 4;
+        // Bars stay inside the well's 2 px edge, whatever the level or the height.
+        int room = Math.max(1, this.h / 2 - 2);
         for (int i = 0; i < bars; i++) {
-            int half = this.live ? half(ticks, i, this.level) : 1;
+            int half = Math.min(room, this.live ? half(ticks, i, this.level) : 1);
             int bx = this.x + 6 + i * 4;
             d.fill(bx, middle - half, bx + 2, middle + half,
                     this.live ? Shapes.mix(p.raisedHover(), lit, half / 6F) : p.wellEdge());

@@ -1,6 +1,6 @@
 # minuit per Minecraft version
 
-How the code is split so one library builds for 1.18.2, 1.19.2, 1.20.1, 1.21.1 and 26.1.2 to 26.3, and how to add or fix a version.
+How the code is split so one library builds for 1.16.5, 1.18.2, 1.19.2, 1.20.1, 1.21.1 and 26.1.2 to 26.3, and how to add or fix a version.
 
 ## Layers
 
@@ -27,6 +27,7 @@ Core reaches the game through the bridges in `core/.../internal/port` (`GamePlat
 | 1.20.1 | `12x,1201` | `1201` | Forge, Fabric | 17 |
 | 1.19.2 | `11x,1192` | `1192` | Forge, Fabric | 17 |
 | 1.18.2 | `11x,1182` | `1182` | Forge, Fabric | 17 |
+| 1.16.5 | `1165` | `1165` | Forge, Fabric | 8 |
 
 `gradle/versions/<mc>.properties` sets these. `port_dirs` lists folder suffixes, generation first, version last; the last must equal `port_variant` (`common/build.gradle` throws otherwise). A generation dir (`26x`, `12x`, `11x`) holds what the versions of that generation share, a version dir holds what differs. `11x` is the generation before `GuiGraphics`: `GuiDraw` wraps the frame's `PoseStack` and the `GuiComponent` statics, and carries the pose to the model-view stack for each item draw, which the item renderer of those versions reads instead; the 1.18.2 and 1.19.2 dirs differ only in `GameScreens` (text components, FOV option) and `ThemeReload` (resource listing). A class lives in the generation dir or the version dir, never both.
 
@@ -38,7 +39,7 @@ Core reaches the game through the bridges in `core/.../internal/port` (`GamePlat
 ./gradlew build -Pmc_version=26.1.2 --no-daemon
 ```
 
-Replace `26.1.2` with `26.2`, `26.3`, `1.21.1`, `1.20.1`, `1.19.2` or `1.18.2`. Use `-Dorg.gradle.jvmargs=-Xmx2G` and at most 4 workers. `build` includes `:common:fence`.
+Replace `26.1.2` with `26.2`, `26.3`, `1.21.1`, `1.20.1`, `1.19.2`, `1.18.2` or `1.16.5`. Use `-Dorg.gradle.jvmargs=-Xmx2G` and at most 4 workers. `build` includes `:common:fence`.
 
 ## Fences
 
@@ -49,6 +50,15 @@ Replace `26.1.2` with `26.2`, `26.3`, `1.21.1`, `1.20.1`, `1.19.2` or `1.18.2`. 
 - `common/port-fence.tsv`: per port dir, the code line count (comments and strings skipped). It only goes down. A port file with no Minecraft type fails (move it to core), two version dirs of one generation holding a file with the same code fails (move it to the generation dir), and one class in both a generation dir and a version dir fails.
 
 Before raising a ceiling, move the logic to core or the file to the generation dir. If the growth is real glue (a new port dir, a new bridge implementation), run `python tools/fence.py <tree> --write`, read the diff of both `.tsv` files, and commit it with the change that justifies it. A new port dir gets its row the same way.
+
+## Java 8 (1.16.5)
+
+1.16.5 runs on Java 8 and predates the 1.17 render rewrite, so it has its own dir `1165` and no generation dir: fixed-function GL (`RenderSystem.pushMatrix`, `color4f`, `TextureManager.bind`), no key constants in `InputConstants` (GLFW's), log4j instead of slf4j.
+
+- Core and protocol are never recompiled there. `:core-java8:java8ModJar` is the JvmDowngrader jar (`java8CoreJar`, stubs under `dev/dryaides/minuit/jvmdg`) with Gson 2.8.9 relocated to `dev/dryaides/minuit/shaded/gson`: 1.16.5 ships Gson 2.8.0, which lacks `JsonParser.parseString`. The loaders compile against it and carry it in their jar (`multiloader-loader.gradle`, `java_version=8`). `settings.gradle` includes `:core-java8` for any version with `java_version=8`.
+- `:common` compiles nothing on 1.16.5: neither NeoForm nor ModDevGradle sets up a Minecraft before 1.17. It hands its sources to the loaders, which compile `src/main` and `port1165` at Java 8.
+- `main_overrides` in the version file lists `src/main` classes that cannot compile there (`GameItems`: `ItemStack.is(tag)` came in 1.18). The version dir holds its copy; `:common` and the loaders leave the `src/main` one out. The other versions never see the key.
+- `forge_loom=true` makes `settings.gradle` build `:forge` from `forge/build-loom.gradle`: Architectury Loom in Forge mode (Forge 36, Mojang names, the jar remapped to SRG with the refmap), because ModDevGradle refuses an MCP config without Mojang names (`NFRT currently does not support MCP versions ... pre 1.17`).
 
 ## Obfuscated versions
 

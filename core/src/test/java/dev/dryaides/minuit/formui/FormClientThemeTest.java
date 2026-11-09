@@ -38,6 +38,7 @@ class FormClientThemeTest {
         assertSame(FrameStyles.SLATE, FormClient.theme("sesame:shop").frame());
         assertSame(FrameStyles.SOFT, FormClient.theme("example:shop").frame());
         assertEquals("example", FormClient.theme("example:shop").id());
-        assertSame(FrameStyles.SOFT, FormClient.theme("other:shop").frame());
+        // THEMES.md: no choice and no global, the mod wears what it registered; unregistered, the kit default (Vanilla).
+        assertSame(FrameStyles.VANILLA, FormClient.theme("other:shop").frame());
     }
 }

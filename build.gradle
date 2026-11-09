@@ -1,6 +1,17 @@
 // Multi-loader root for minuit, the UI theme library. The code lives in :core and :common;
 // :fabric and :neoforge compile both into one mod jar each, installed on its own.
 
+// :core-java8 runs JvmDowngrader, which needs commons-compress 1.26+; the loader plugins pull an older one
+// onto this classloader. Raised only for a java8 task or a Java 8 version (1.16.5), so the other builds keep their classpath.
+buildscript {
+    def mcv = gradle.startParameter.projectProperties.getOrDefault('mc_version', '26.1.2')
+    def versionFile = file("gradle/versions/${mcv}.properties")
+    def java8 = versionFile.exists() && (versionFile.text =~ /(?m)^java_version=8\s*$/).find()
+    if (java8 || gradle.startParameter.taskNames.any { it.contains('java8') }) {
+        dependencies { classpath 'org.apache.commons:commons-compress:1.28.0' }
+    }
+}
+
 plugins {
     id 'net.neoforged.moddev' version '2.0.148' apply false
     // MinecraftForge 1.20.1 (:forge, and :common compiled against plain 1.20.1): the same ModDevGradle jar.

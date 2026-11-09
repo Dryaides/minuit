@@ -27,6 +27,7 @@ public final class Platform {
     private static volatile ScreenBridge screens = ScreenBridge.NONE;
     private static volatile KeyCodes keyCodes = KeyCodes.GLFW;
     private static volatile Words words = game.words();
+    private static volatile boolean development;
 
     private Platform() {
     }
@@ -91,5 +92,20 @@ public final class Platform {
 
     public static Words words() {
         return words;
+    }
+
+    /** The loader's client entry calls it once: true in a development environment, where the kit writes notes for the modder. */
+    public static void development(boolean on) {
+        development = on;
+    }
+
+    /** False until the loader says otherwise, so a released game never gets the modder's notes. */
+    public static boolean development() {
+        return development;
+    }
+
+    /** One line on {@code System.err}, which the game copies into its log on every version; core has no logger. */
+    public static void note(String line) {
+        System.err.println(line);
     }
 }

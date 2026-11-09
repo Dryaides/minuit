@@ -3,6 +3,8 @@ package dev.dryaides.minuit.client;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Matrix4f;
+import com.mojang.math.Vector4f;
 import dev.dryaides.minuit.Draw;
 import dev.dryaides.minuit.EntityView;
 import dev.dryaides.minuit.ItemView;
@@ -53,7 +55,7 @@ public final class GuiDraw extends Draw {
 
     private static final Map<String, ItemStack> ITEMS = new ConcurrentHashMap<>();
 
-    /** The open scissor boxes, GUI coordinates, each cut to the one under it as {@code GuiGraphics} does later. */
+    /** The open scissor boxes, GUI coordinates after the pose, each cut to the one under it. */
     private static final Deque<int[]> SCISSORS = new ArrayDeque<>();
 
     private final PoseStack pose;
@@ -163,7 +165,8 @@ public final class GuiDraw extends Draw {
     public void sprite(String atlas, String sprite, int x, int y, int w, int h, float alpha) {
         ResourceLocation id = GameIds.id(sprite);
         ResourceLocation atlasId = GameIds.id(atlas);
-        if (id == null || atlasId == null || SpriteIcon.GUI.equals(atlas)) {
+        if (id == null || atlasId == null || SpriteIcon.GUI.equals(atlas)
+                || GameSprites.atlasMarker(this, atlasId, id, x, y, w, h, alpha)) {
             return;
         }
         textured(alpha, () -> GameSprites.atlas(this.pose, atlasId, id, x, y, w, h));
@@ -246,6 +249,9 @@ public final class GuiDraw extends Draw {
 
     @Override
     public void image(String texture, int x, int y, int w, int h, int texW, int texH, float alpha) {
+        if (GameSprites.markerFile(this, texture, x, y, w, h, alpha)) {
+            return;
+        }
         ResourceLocation id = GameIds.id(texture);
         if (id != null) {
             textured(id, alpha, () -> GuiComponent.blit(this.pose, x, y, w, h, 0F, 0F, texW, texH, texW, texH));
@@ -287,6 +293,15 @@ public final class GuiDraw extends Draw {
 
     @Override
     public void scissor(int x0, int y0, int x1, int y1) {
+        Matrix4f m = this.pose.last().pose();
+        Vector4f a = new Vector4f(x0, y0, 0F, 1F);
+        Vector4f b = new Vector4f(x1, y1, 0F, 1F);
+        a.transform(m);
+        b.transform(m);
+        x0 = (int) Math.floor(Math.min(a.x(), b.x()));
+        y0 = (int) Math.floor(Math.min(a.y(), b.y()));
+        x1 = (int) Math.floor(Math.max(a.x(), b.x()));
+        y1 = (int) Math.floor(Math.max(a.y(), b.y()));
         int[] under = SCISSORS.peek();
         int[] box = under == null ? new int[] {x0, y0, x1, y1}
                 : new int[] {Math.max(x0, under[0]), Math.max(y0, under[1]), Math.min(x1, under[2]), Math.min(y1, under[3])};
@@ -305,7 +320,7 @@ public final class GuiDraw extends Draw {
         }
     }
 
-    /** In window pixels from the bottom left, the pose ignored, as the game's own scissor works. */
+    /** In window pixels from the bottom left, the box already through the pose. */
     private static void apply(int[] box) {
         Window window = Minecraft.getInstance().getWindow();
         double scale = window.getGuiScale();

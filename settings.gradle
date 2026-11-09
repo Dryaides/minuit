@@ -1,6 +1,22 @@
 pluginManagement {
     repositories {
+        exclusiveContent {
+            // RetroFuturaGradle, the 1.12.2 Forge toolchain (:forge1122).
+            forRepository {
+                maven {
+                    name = 'GTNH'
+                    url = uri("https://nexus.gtnewhorizons.com/repository/public/")
+                }
+            }
+            filter {
+                includeGroupAndSubgroups("com.gtnewhorizons")
+            }
+        }
         gradlePluginPortal()
+        maven {
+            name = 'WagYourTail'
+            url = uri("https://maven.wagyourtail.xyz/releases")
+        }
         mavenCentral()
         maven {
             name = 'Fabric'
@@ -50,14 +66,30 @@ rootProject.name = "minuit"
 include("core")
 // The wire format of the data-driven screens and the hello, plain Java like core.
 include("protocol")
-// The Minecraft bridges (draw adapter, screen host, theme files and player choice).
-include("common")
-include("fabric")
 def mcVersion = providers.gradleProperty('mc_version').getOrElse('26.1.2')
 def versionProps = new Properties()
 file("gradle/versions/${mcVersion}.properties").withInputStream { versionProps.load(it) }
+// 1.12.2 has no Mojang names, so :common and the Loom/ModDevGradle modules cannot build it:
+// RetroFuturaGradle builds :forge1122 alone, on MCP names, over the Java 8 core.
+if (versionProps.getProperty('legacy_forge') == 'true') {
+    include("core-java8")
+    include("forge1122")
+    return
+}
+// The Minecraft bridges (draw adapter, screen host, theme files and player choice).
+include("common")
+include("fabric")
+// The Java 8 core jar (JvmDowngrader), configured only when one of its tasks is asked or the version runs on Java 8.
+def java8 = versionProps.getProperty('java_version') == '8'
+if (java8 || gradle.startParameter.taskNames.any { it.contains("java8") }) {
+    include("core-java8")
+}
 // 1.18.2 to 1.20.1 run MinecraftForge (their gradle/versions file names forge_version); every later version NeoForge.
 include(versionProps.containsKey('forge_version') ? "forge" : "neoforge")
+// Forge before 1.17 has no Mojang-named MCP config, which ModDevGradle needs: Architectury Loom builds that :forge.
+if (versionProps.getProperty('forge_loom') == 'true') {
+    project(':forge').buildFileName = 'build-loom.gradle'
+}
 // The plugin side for Paper servers: the transport over Bukkit's Messenger and the dialog fallback.
 // Only for the Minecraft versions whose gradle/versions file names a Paper API (26.x).
 if (versionProps.containsKey('paper_api_version')) {

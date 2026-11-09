@@ -8,7 +8,12 @@ plugins {
 // Compile common against plain vanilla with official names: NeoForm, or on 1.20.1 (no NeoForm there)
 // ModDevGradle's legacy mode with Forge's MCP config of that version.
 def legacy = project.hasProperty('forge_version')
-if (legacy) {
+// 1.16.5 (Java 8): neither NeoForm nor ModDevGradle sets up a Minecraft before 1.17, so :common only hands its
+// sources to the loaders, which compile them against their own Minecraft and the Java 8 core jar.
+def java8 = java_version == '8'
+if (java8) {
+    tasks.named('compileJava') { enabled = false }
+} else if (legacy) {
     apply plugin: 'net.neoforged.moddev.legacyforge'
     legacyForge {
         mcpVersion = minecraft_version
@@ -42,6 +47,15 @@ portDirs.each { dir ->
     sourceSets.main.resources.srcDir "src/port${dir}/resources"
 }
 
+// A version dir's copy of a src/main class (main_overrides) stands in for it; the loaders filter the same way.
+def mainOverrides = (project.findProperty('main_overrides') ?: '').toString().split(',')*.trim().findAll()
+if (mainOverrides) {
+    def mainDir = file('src/main/java')
+    sourceSets.main.java.exclude { element ->
+        mainOverrides.contains(element.relativePath.pathString) && element.file.path.startsWith(mainDir.path)
+    }
+}
+
 artifacts {
     sourceSets.main.java.sourceDirectories.each { commonJava it }
     sourceSets.main.resources.sourceDirectories.each { commonResources it }
@@ -58,9 +72,11 @@ repositories {
 
 dependencies {
     // The pure half. api, so the mods that compile against :common see it too.
-    api(project(':core')) {
-        capabilities {
-            requireCapability "$group:$mod_id-core"
+    if (!java8) {
+        api(project(':core')) {
+            capabilities {
+                requireCapability "$group:$mod_id-core"
+            }
         }
     }
     compileOnly('net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7')

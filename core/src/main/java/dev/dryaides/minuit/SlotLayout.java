@@ -22,6 +22,18 @@ public final class SlotLayout {
     /** One slot: its index in the container and the item corner, container-local. */
     public record Cell(int index, int x, int y) { }
 
+    /**
+     * Where a slot part shows a menu slot: the box the slot's 16 px item must sit in at the menu's place, and
+     * how far the part shows that item from there (0, 0 for a well drawn around the item). {@code ghost} is
+     * true when the part draws the empty slot's outline itself, so the game leaves its own out.
+     */
+    @Incubating
+    public record Well(Box box, int shiftX, int shiftY, boolean ghost) {
+        public Well(Box box, int shiftX, int shiftY) {
+            this(box, shiftX, shiftY, false);
+        }
+    }
+
     private SlotLayout() {
     }
 
@@ -56,6 +68,40 @@ public final class SlotLayout {
     /** The hotbar under the rows, a {@link #grid} box. */
     public static Box hotbar(Box inventory) {
         return new Box(inventory.name() + "/hotbar", inventory.x(), inventory.y() + 3 * PITCH + HOTBAR_GAP, 9 * PITCH, PITCH);
+    }
+
+    /** The game's HUD hotbar sprite, 182 by 22: nine cells 20 px apart, the first 1 px in from the box. */
+    public static final int HUD_HOTBAR_W = 182;
+    public static final int HUD_HOTBAR_H = 22;
+    public static final int HUD_HOTBAR_PITCH = 20;
+
+    /** The HUD hotbar's box with its top left corner at {@code x, y}; an item sits 3 px in from the corner. */
+    public static Box hudHotbar(String name, int x, int y) {
+        return new Box(name, x, y, HUD_HOTBAR_W, HUD_HOTBAR_H);
+    }
+
+    /**
+     * The HUD hotbar's bar under {@code inventory}, as {@code PlayerInventoryComponent(box, true)} draws it:
+     * centred on the box, its items level with the classic hotbar row's.
+     */
+    @Incubating
+    public static Box hudHotbar(Box inventory) {
+        Box row = hotbar(inventory);
+        return hudHotbar(row.name(), inventory.x() + (inventory.w() - HUD_HOTBAR_W) / 2, row.y() + 1 - 3);
+    }
+
+    /**
+     * Rows as {@link #playerCells}, the hotbar on the HUD bar's item corners: for a menu built for the HUD look,
+     * whose hotbar slots then sit where {@code PlayerInventoryComponent(box, true)} draws the items.
+     */
+    @Incubating
+    public static List<Cell> playerCellsHud(Box inventory) {
+        List<Cell> out = new ArrayList<>(cells(inventoryRows(inventory), 9));
+        Box bar = hudHotbar(inventory);
+        for (int i = 0; i < 9; i++) {
+            out.add(new Cell(i, bar.x() + 3 + i * HUD_HOTBAR_PITCH, bar.y() + 3));
+        }
+        return out;
     }
 
     /** The player's slots in vanilla's order: indices 9 to 35 for the rows, then 0 to 8 for the hotbar. */

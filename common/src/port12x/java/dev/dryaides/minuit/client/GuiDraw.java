@@ -20,6 +20,8 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemStack;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -202,6 +204,9 @@ public final class GuiDraw extends Draw {
 
     @Override
     public void image(String texture, int x, int y, int w, int h, int texW, int texH, float alpha) {
+        if (GameSprites.markerFile(this.g, texture, x, y, w, h, alpha)) {
+            return;
+        }
         ResourceLocation id = GameIds.id(texture);
         if (id != null) {
             textured(alpha, () -> this.g.blit(id, x, y, w, h, 0F, 0F, texW, texH, texW, texH));
@@ -242,7 +247,12 @@ public final class GuiDraw extends Draw {
 
     @Override
     public void scissor(int x0, int y0, int x1, int y1) {
-        this.g.enableScissor(x0, y0, x1, y1);
+        // GuiGraphics.enableScissor ignores the pose before 26.x.
+        Matrix4f pose = this.g.pose().last().pose();
+        Vector3f a = pose.transformPosition(x0, y0, 0F, new Vector3f());
+        Vector3f b = pose.transformPosition(x1, y1, 0F, new Vector3f());
+        this.g.enableScissor((int) Math.floor(Math.min(a.x, b.x)), (int) Math.floor(Math.min(a.y, b.y)),
+                (int) Math.floor(Math.max(a.x, b.x)), (int) Math.floor(Math.max(a.y, b.y)));
     }
 
     @Override

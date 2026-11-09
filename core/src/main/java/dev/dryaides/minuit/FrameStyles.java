@@ -15,6 +15,14 @@ public final class FrameStyles {
     private FrameStyles() {
     }
 
+    /**
+     * How wide a bar's fill is drawn: at least a round cap (the inner height), never wider than the track,
+     * so a narrow bar's first percent does not cross its right frame.
+     */
+    static int pillWidth(int w, int h, int filled) {
+        return Math.max(filled, Math.min(w - 2, h - 2));
+    }
+
     /** The style a theme file names, or null. */
     public static FrameStyle byName(String name) {
         return name == null ? null : Holder.BY_NAME.get(name);
@@ -34,6 +42,16 @@ public final class FrameStyles {
 
     /** A notebook: stitched leather cover, a paper page, cards with a ruled line under the title. */
     public static final FrameStyle LEATHER = new FrameStyle() {
+        @Override
+        public Insets panelInsets() {
+            return new Insets(6, 6, 6, 7);
+        }
+
+        @Override
+        public int panelShadow() {
+            return 3;
+        }
+
         @Override
         public int corner() {
             return 6;
@@ -74,6 +92,11 @@ public final class FrameStyles {
     /** The kit's own: a flat dark card with a thin border, readable over any world. */
     public static final FrameStyle SLATE = new FrameStyle() {
         @Override
+        public int panelShadow() {
+            return 2;
+        }
+
+        @Override
         public int corner() {
             return 3;
         }
@@ -111,6 +134,11 @@ public final class FrameStyles {
      * that the pressed face sinks into, two-square switches, segmented slider bars.
      */
     public static final FrameStyle BEDROCK = new FrameStyle() {
+        @Override
+        public Insets panelInsets() {
+            return new Insets(2, 1, 1, 1);
+        }
+
         @Override
         public void shadow(Draw d, Palette p, int x, int y, int w, int h, int color) {
             d.fill(x, y, x + w, y + h, color);
@@ -153,7 +181,7 @@ public final class FrameStyles {
                 return;
             }
             boolean pressed = relief == Shapes.Relief.PRESSED;
-            int[] ref = off ? null : measured(color);
+            int[] ref = off ? null : nearRef(color);
             int face = pressed && ref == null ? Shapes.mix(color, 0xFF000000, 0.15F) : color;
             int band = ref != null ? pressed ? ref[3] : ref[4] : Shapes.mix(color, 0xFF000000, off ? 0.15F : 0.57F);
             int depth = pressed ? 1 : 2;
@@ -175,6 +203,11 @@ public final class FrameStyles {
         public void button(Draw d, Palette p, int x, int y, int w, int h, ButtonComponent.Role role, int color,
                            Shapes.Relief relief) {
             raised(d, p, x, y, w, h + BAND, color, relief);
+        }
+
+        @Override
+        public int buttonCorner() {
+            return 0;
         }
 
         /** The dark band under an Ore UI button: two rows below the box, so the label centres on the whole box. */
@@ -231,7 +264,7 @@ public final class FrameStyles {
         /**
          * Rim and band colours measured on the Ore UI Edit World screen (edit_world.png), keyed by the face
          * they surround: top row, left column, right column, the lit row over the band, the band. Faces the
-         * screen does not show (hover faces, other chromas) keep the white-mix formulas.
+         * screen does not show get them through {@link #nearRef}.
          */
         private static int[] measured(int face) {
             return switch (face | 0xFF000000) {
@@ -240,6 +273,41 @@ public final class FrameStyles {
                 case 0xFFCA3636 -> new int[]{0xFFD65F5F, 0xFFD65F5F, 0xFFD24A49, 0xFFD04A4A, 0xFFAD1D1E};
                 default -> null;
             };
+        }
+
+        /**
+         * The rims and band of a face the screen does not show (a hover face, a face between rest and hover):
+         * those measured around the nearest measured face, each moved by the face's step from it, so a hover
+         * face keeps the rest face's rim contrast and a red button keeps a red band. Null for a face far from
+         * every measured one, which falls back to the formulas.
+         */
+        private static int[] nearRef(int face) {
+            int best = -1;
+            int bestDist = 0;
+            for (int key : new int[]{0xFFD0D1D4, 0xFF3C8527, 0xFFCA3636}) {
+                int dist = 0;
+                for (int sh = 0; sh <= 16; sh += 8) {
+                    dist += Math.abs((face >> sh & 0xFF) - (key >> sh & 0xFF));
+                }
+                if (best == -1 || dist < bestDist) {
+                    best = key;
+                    bestDist = dist;
+                }
+            }
+            if (bestDist > 90) {
+                return null;
+            }
+            int[] ref = measured(best);
+            int[] out = new int[ref.length];
+            for (int i = 0; i < ref.length; i++) {
+                int c = 0xFF000000;
+                for (int sh = 0; sh <= 16; sh += 8) {
+                    int v = (ref[i] >> sh & 0xFF) + (face >> sh & 0xFF) - (best >> sh & 0xFF);
+                    c |= Math.max(0, Math.min(255, v)) << sh;
+                }
+                out[i] = c;
+            }
+            return out;
         }
 
         private void rims(Draw d, int x, int y, int w, int b, int top, int left, int right, int low) {
@@ -412,6 +480,43 @@ public final class FrameStyles {
             d.fill(x + 3, y + h - 1, x + w - 2, y + h, color);
         }
 
+        /** The band between {@link #shadow}'s silhouette and the same silhouette {@code thickness} pixels in. */
+        @Override
+        public void panelEdge(Draw d, Palette p, int x, int y, int w, int h, int thickness, int color) {
+            int iw = w - 2 * thickness;
+            int ih = h - 2 * thickness;
+            for (int row = 0; row < h; row++) {
+                int left = silhouetteLeft(row, h);
+                int right = silhouetteRight(row, h);
+                int inner = row - thickness;
+                if (iw <= 0 || ih <= 0 || inner < 0 || inner >= ih) {
+                    d.fill(x + left, y + row, x + w - right, y + row + 1, color);
+                    continue;
+                }
+                int openLeft = Math.max(left, thickness + silhouetteLeft(inner, ih));
+                int openRight = Math.max(right, thickness + silhouetteRight(inner, ih));
+                d.fill(x + left, y + row, x + openLeft, y + row + 1, color);
+                d.fill(x + w - openRight, y + row, x + w - right, y + row + 1, color);
+            }
+        }
+
+        /** How far {@link #shadow}'s row {@code row} of {@code h} starts in from the left. */
+        private static int silhouetteLeft(int row, int h) {
+            int fromBottom = h - 1 - row;
+            return row < 3 ? 2 - row : fromBottom < 3 ? 3 - fromBottom : 0;
+        }
+
+        /** How far {@link #shadow}'s row {@code row} of {@code h} ends in from the right. */
+        private static int silhouetteRight(int row, int h) {
+            int fromBottom = h - 1 - row;
+            return row < 3 ? 3 - row : fromBottom < 3 ? 2 - fromBottom : 0;
+        }
+
+        @Override
+        public int buttonCorner() {
+            return 0;
+        }
+
         @Override
         public void header(Draw d, Palette p, int x, int y, int w, int h) {
             d.fill(x + 2, y + h - 1, x + w - 2, y + h, p.surfaceEdge());
@@ -425,10 +530,10 @@ public final class FrameStyles {
             d.fill(x, y, x + w, y + 1, p.surfaceEdge());
         }
 
-        /** A slot of inventory.png cut in nine, which this well copies. */
+        /** The inventory.png slot sprite on a slot-sized box; a larger well fills p.well() inside the same bevel. */
         @Override
         public void well(Draw d, Palette p, int x, int y, int w, int h, boolean focused) {
-            if (art(d, p, GuiPart.WELL, x, y, w, h)) {
+            if (Math.abs(w - 18) <= 2 && Math.abs(h - 18) <= 2 && art(d, p, GuiPart.WELL, x, y, w, h)) {
                 if (focused) {
                     Shapes.ring(d, x, y, w, h, 0, p.accent());
                 }
@@ -615,6 +720,17 @@ public final class FrameStyles {
             }
         }
 
+        /** The game has no radio: the round mark takes checkbox.png's outline, well and white mark. */
+        @Override
+        public void radio(Draw d, Palette p, int x, int y, int side, boolean on, boolean lit, boolean active) {
+            int cell = Math.max(1, side / FormLook.RADIO_ART);
+            FormLook.pixels(d, FormLook.RADIO_INSIDE, x, y, cell, active ? p.track() : p.disabled());
+            FormLook.pixels(d, FormLook.RADIO_RING, x, y, cell, lit && active ? 0xFFFFFFFF : p.frameDark());
+            if (on) {
+                FormLook.pixels(d, FormLook.RADIO_DOT, x + 2 * cell, y + 2 * cell, cell, active ? p.raisedText() : p.disabledText());
+            }
+        }
+
         /** slider.png: the checkbox's outline and well, stretched over the box. */
         @Override
         public void sliderBar(Draw d, Palette p, int x, int y, int w, int h, boolean lit, boolean active) {
@@ -697,6 +813,11 @@ public final class FrameStyles {
          * own grey where the game's sprite sits on a dark list.
          */
         @Override
+        public int scrollerGap() {
+            return 0;
+        }
+
+        @Override
         public void scroller(Draw d, Palette p, int x, int y, int h, int thumbY, int thumbH, boolean lit) {
             if (art(d, p, GuiPart.SCROLLER_BACKGROUND, x, y, 6, h)) {
                 d.guiPart(GuiPart.SCROLLER, x, thumbY, 6, thumbH, 1F);
@@ -706,6 +827,15 @@ public final class FrameStyles {
             d.fill(x, thumbY, x + 6, thumbY + thumbH, p.trim());
             d.fill(x, thumbY, x + 5, thumbY + thumbH - 1, p.frameLight());
             d.fill(x + 1, thumbY + 1, x + 5, thumbY + thumbH - 1, lit ? p.frameLight() : p.surfaceEdge());
+        }
+
+        /** hotbar.png, the HUD bar; off the art, the family's slot wells at the same 20 px pitch. */
+        @Override
+        public void hotbar(Draw d, Palette p, int x, int y) {
+            if (art(d, p, GuiPart.HOTBAR, x, y, 182, 22)) {
+                return;
+            }
+            FrameStyle.super.hotbar(d, p, x, y);
         }
 
         /** hotbar_selection.png's rings, black then light, mid and dark green-grey, around the 16 px item. */
@@ -744,6 +874,11 @@ public final class FrameStyles {
      * shows through another, and two faint diagonal glints across the panel.
      */
     public static final FrameStyle GLASS = new FrameStyle() {
+        @Override
+        public Insets panelInsets() {
+            return new Insets(2, 1, 1, 1);
+        }
+
         @Override
         public int corner() {
             return 1;
@@ -799,6 +934,11 @@ public final class FrameStyles {
             }
         }
 
+        @Override
+        public int buttonCorner() {
+            return 1;
+        }
+
         /** A 1 px line around the box, its corner pixels left out. */
         private void outline(Draw d, int x, int y, int w, int h, int color) {
             if (w < 3 || h < 3) {
@@ -816,6 +956,16 @@ public final class FrameStyles {
      * top left and a dark rim at the bottom right, sunk by the same rims swapped.
      */
     public static final FrameStyle SOFT = new FrameStyle() {
+        @Override
+        public Insets panelInsets() {
+            return new Insets(2, 2, 2, 2);
+        }
+
+        @Override
+        public int panelShadow() {
+            return 2;
+        }
+
         /** Pressed in: a face a little darker than the plate, under rims swapped to sunk. */
         @Override
         public int selectedFace(Palette p, float hover) {
@@ -917,7 +1067,7 @@ public final class FrameStyles {
             rims(d, p, x, y, w, h, Math.min(3, h / 2), p.track(), false, 1);
             int filled = Math.round(Maths.clamp(value, 0F, 1F) * (w - 2));
             if (filled > 0) {
-                Shapes.rounded(d, x + 1, y + 1, Math.max(filled, h - 2), h - 2, Math.min(2, h / 2 - 1), color);
+                Shapes.rounded(d, x + 1, y + 1, pillWidth(w, h, filled), h - 2, Math.min(2, h / 2 - 1), color);
             }
         }
 
@@ -947,6 +1097,16 @@ public final class FrameStyles {
      * on tall shapes; a sunk shape swaps them.
      */
     public static final FrameStyle BUBBLY = new FrameStyle() {
+        @Override
+        public Insets panelInsets() {
+            return new Insets(3, 3, 3, 4);
+        }
+
+        @Override
+        public int panelShadow() {
+            return 2;
+        }
+
         @Override
         public int corner() {
             return 4;
@@ -986,7 +1146,7 @@ public final class FrameStyles {
         }
 
         private static void clay(Draw d, int x, int y, int w, int h, int r, int face, int shadow, int relief, float lit) {
-            clay(d, x, y, w, h, r, face, shadow, relief, lit, 0.4F, 0.14F);
+            clay(d, x, y, w, h, r, face, shadow, relief, lit, 0.4F, SUNK_SHADE);
         }
 
         /** {@code sunkLit} and {@code sunkShade} are the light on the bottom edge and the shade on the top edge of a sunk shape. */
@@ -1007,6 +1167,12 @@ public final class FrameStyles {
                 edge(d, x + 1, y + 1, m, -up, 2, Shapes.mix(face, 0xFF000000, relief > 0 ? 0.06F : sunkShade / 2));
             }
         }
+
+        /**
+         * The shade on the top edge of a sunk shape. A well or a panel surface gets no bottom light: on a dark face
+         * it reads as a white line across the box.
+         */
+        private static final float SUNK_SHADE = 0.14F;
 
         /** A recessed well for a bar or a track: the bottom light is as faint as a second row, so it reads as an edge, not a line. */
         private static final float TRACK_LIT = 0.03F;
@@ -1038,7 +1204,7 @@ public final class FrameStyles {
         public void panel(Draw d, Palette p, int x, int y, int w, int h) {
             Shapes.rounded(d, x + 1, y + 2, w, h, 4, Shapes.alpha(p.shadow(), (p.shadow() >>> 24) / 2));
             clay(d, x, y, w, h, 4, p.frame(), p.shadow(), 1, LIT);
-            clay(d, x + 3, y + 3, w - 6, h - 7, 3, p.surface(), 0, -1, LIT);
+            clay(d, x + 3, y + 3, w - 6, h - 7, 3, p.surface(), 0, -1, LIT, 0F, SUNK_SHADE);
         }
 
         @Override
@@ -1054,7 +1220,7 @@ public final class FrameStyles {
         @Override
         public void well(Draw d, Palette p, int x, int y, int w, int h, boolean focused) {
             Shapes.rounded(d, x, y, w, h, 3, focused ? p.accent() : p.wellEdge());
-            clay(d, x + 1, y + 1, w - 2, h - 2, 2, p.well(), 0, -1, LIT);
+            clay(d, x + 1, y + 1, w - 2, h - 2, 2, p.well(), 0, -1, LIT, 0F, SUNK_SHADE);
         }
 
         /** A dark face on a dark surface gets a dimmer highlight, so an idle button does not wear a white line. */
@@ -1073,7 +1239,7 @@ public final class FrameStyles {
             int filled = Math.round(Maths.clamp(value, 0F, 1F) * (w - 2));
             if (filled > 0) {
                 float lit = luminance(p.surface()) < 0.5F ? LIT * Math.min(1F, 0.8F + 0.4F * luminance(color)) : LIT;
-                pill(d, x + 1, y + 1, Math.max(filled, h - 2), h - 2, Math.max(0, r - 1), color, lit * 0.5F);
+                pill(d, x + 1, y + 1, pillWidth(w, h, filled), h - 2, Math.max(0, r - 1), color, lit * 0.5F);
             }
         }
 

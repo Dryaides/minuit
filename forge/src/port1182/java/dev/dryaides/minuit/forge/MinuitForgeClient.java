@@ -9,6 +9,7 @@ import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.wire.Channels;
+import dev.dryaides.minuit.internal.port.Platform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ServerboundCustomPayloadPacket;
@@ -18,6 +19,7 @@ import net.minecraftforge.client.gui.ForgeIngameGui;
 import net.minecraftforge.client.gui.OverlayRegistry;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 /**
@@ -33,6 +35,7 @@ final class MinuitForgeClient {
 
     static void init(IEventBus modBus) {
         Bridges.install();
+        Platform.development(!FMLEnvironment.production);
         modBus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(() -> {
             MinuitClient.themeChoices();
             OverlayRegistry.registerOverlayBelow(ForgeIngameGui.CHAT_PANEL_ELEMENT, "minuit bubbles",

@@ -1,6 +1,5 @@
 package dev.dryaides.minuit;
 
-import dev.dryaides.minuit.internal.Maths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,10 +19,8 @@ public class ScrollComponent extends BaseComponent {
     public int step = 10;
     /** Room kept under the lowest child, for what it draws below its box (a shadow, a ring). */
     public int bottomRoom = 0;
-    private int scroll;
-    /** The mouse y on the thumb when a drag started, or -1. */
-    private double grab = -1;
-    private int grabScroll;
+    private final ScrollBar bar = new ScrollBar();
+    private Words words;
 
     public ScrollComponent(Box box) {
         super(box);
@@ -31,9 +28,18 @@ public class ScrollComponent extends BaseComponent {
 
     /** Adds a widget at its unscrolled place; the content grows to hold it. */
     public <W extends BaseComponent> W add(W widget) {
-        widget.y -= this.scroll;
+        widget.y -= this.bar.offset();
+        if (this.words != null) {
+            widget.words(this.words);
+        }
         this.children.add(widget);
         return widget;
+    }
+
+    @Override
+    void words(Words words) {
+        this.words = words;
+        this.children.forEach(child -> child.words(words));
     }
 
     /** Takes {@code widget} out, back at its unscrolled place; the scroll stays within what is left. */
@@ -41,9 +47,9 @@ public class ScrollComponent extends BaseComponent {
         if (!this.children.remove(widget)) {
             return false;
         }
-        widget.y += this.scroll;
+        widget.y += this.bar.offset();
         widget.focused = false;
-        setScroll(this.scroll);
+        setScroll(this.bar.offset());
         return true;
     }
 
@@ -60,11 +66,11 @@ public class ScrollComponent extends BaseComponent {
      * where it was as far as the new content allows: a list refreshed from the server.
      */
     public void replaceChildren(List<? extends BaseComponent> widgets) {
-        int kept = this.scroll;
+        int kept = this.bar.offset();
         for (BaseComponent child : List.copyOf(this.children)) {
             remove(child);
         }
-        this.scroll = 0;
+        this.bar.offset(0);
         widgets.forEach(this::add);
         setScroll(kept);
     }
@@ -81,36 +87,44 @@ public class ScrollComponent extends BaseComponent {
         int bottom = 0;
         for (BaseComponent child : this.children) {
             if (child.visible) {
-                bottom = Math.max(bottom, child.y + this.scroll + child.h - this.y);
+                bottom = Math.max(bottom, child.y + this.bar.offset() + child.h - this.y);
             }
         }
         return bottom == 0 ? 0 : bottom + this.bottomRoom + this.bleed;
     }
 
     public int scroll() {
-        return this.scroll;
+        return this.bar.offset();
     }
 
     public void setScroll(int value) {
-        int next = Maths.clamp(value, 0, maxScroll());
+        int before = this.bar.offset();
+        this.bar.content(contentHeight(), this.h);
+        this.bar.offset(value);
+        follow(before);
+    }
+
+    /** Moves the children by what the bar moved since {@code before}. */
+    private void follow(int before) {
+        int moved = this.bar.offset() - before;
         for (BaseComponent child : this.children) {
-            child.y -= next - this.scroll;
+            child.y -= moved;
         }
-        this.scroll = next;
     }
 
     /** Scrolls just enough for {@code box}, in unscrolled screen coordinates, to be inside. */
     public void reveal(Box box) {
         int top = box.y() - this.y;
-        if (top < this.scroll) {
+        if (top < this.bar.offset()) {
             setScroll(top);
-        } else if (top + box.h() > this.scroll + this.h) {
+        } else if (top + box.h() > this.bar.offset() + this.h) {
             setScroll(top + box.h() - this.h);
         }
     }
 
     private int maxScroll() {
-        return Math.max(0, contentHeight() - this.h);
+        this.bar.content(contentHeight(), this.h);
+        return this.bar.max();
     }
 
     private boolean inside(double mx, double my) {
@@ -119,9 +133,7 @@ public class ScrollComponent extends BaseComponent {
 
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
-        if (this.scroll > maxScroll()) {
-            setScroll(maxScroll());
-        }
+        setScroll(this.bar.offset());
         if (!this.focused) {
             this.children.forEach(child -> child.focused = false);
         }
@@ -136,22 +148,9 @@ public class ScrollComponent extends BaseComponent {
             }
         }
         d.endScissor();
-        int max = maxScroll();
-        if (max > 0) {
-            Palette p = theme.palette();
-            int[] thumb = thumb();
-            boolean lit = this.grab >= 0 || (hovered && mx >= this.x + this.w - BAR && my >= thumb[0] && my < thumb[0] + thumb[1]);
-            theme.frame().scroller(d, p, this.x + this.w - BAR, this.y + 2, this.h - 4, thumb[0], thumb[1], lit);
-        }
-    }
-
-    /** The thumb's top and height. */
-    private int[] thumb() {
-        int track = this.h - 4;
-        int length = Math.max(10, track * this.h / Math.max(1, contentHeight()));
-        int max = maxScroll();
-        int top = this.y + 2 + (max == 0 ? 0 : (track - length) * this.scroll / max);
-        return new int[]{top, length};
+        int barX = this.x + this.w - BAR;
+        boolean lit = hovered && this.bar.overThumb(mx, my, barX, this.y + 2, this.h - 4);
+        this.bar.draw(d, theme, barX, this.y + 2, this.h - 4, lit);
     }
 
     @Override
@@ -176,12 +175,9 @@ public class ScrollComponent extends BaseComponent {
         }
         if (!inside(mx, my)) {
             if (maxScroll() > 0 && button == 0) {
-                int[] thumb = thumb();
-                if (my < thumb[0] || my >= thumb[0] + thumb[1]) {
-                    setScroll(this.scroll + (my < thumb[0] ? -this.h : this.h));
-                }
-                this.grab = my;
-                this.grabScroll = this.scroll;
+                int before = this.bar.offset();
+                this.bar.press(mx, my, this.x + this.w - BAR, this.y + 2, this.h - 4);
+                follow(before);
             }
             return true;
         }
@@ -239,7 +235,7 @@ public class ScrollComponent extends BaseComponent {
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
-        this.grab = -1;
+        this.bar.release();
         boolean any = false;
         for (BaseComponent child : this.children) {
             any |= child.mouseReleased(mx, my, button);
@@ -249,12 +245,11 @@ public class ScrollComponent extends BaseComponent {
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (this.grab >= 0) {
-            int[] thumb = thumb();
-            int travel = this.h - 4 - thumb[1];
-            if (travel > 0) {
-                setScroll(this.grabScroll + (int) Math.round((my - this.grab) * maxScroll() / travel));
-            }
+        if (this.bar.dragging()) {
+            int before = this.bar.offset();
+            this.bar.content(contentHeight(), this.h);
+            this.bar.drag(my);
+            follow(before);
             return true;
         }
         for (BaseComponent child : this.children) {
@@ -277,9 +272,9 @@ public class ScrollComponent extends BaseComponent {
                 }
             }
         }
-        int before = this.scroll;
-        setScroll(this.scroll - (int) Math.round(amount * this.step));
-        return this.scroll != before || maxScroll() > 0;
+        int before = this.bar.offset();
+        setScroll(before - (int) Math.round(amount * this.step));
+        return this.bar.offset() != before || maxScroll() > 0;
     }
 
     @Override

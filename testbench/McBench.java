@@ -37,7 +37,7 @@ public class McBench {
         Theme first = Themes.defaultTheme();
         checks(font, first);
         int shots = 0;
-        for (String look : (args.length > 1 ? args[1] : "bedrock/stone,slate/teal").split(",")) {
+        for (String look : (args.length > 1 ? args[1] : "bedrock/bedrock,slate/teal").split(",")) {
             String familyId = look.split("/")[0];
             ThemeFamily family = Themes.family(null, familyId);
             ThemeFamily.Chroma chroma = family.chroma(look.split("/")[1]);

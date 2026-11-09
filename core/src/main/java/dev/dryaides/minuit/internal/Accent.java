@@ -19,16 +19,28 @@ import java.util.Locale;
  */
 public record Accent(String id, int light, int dark) {
 
-    public static final Accent BLUE = new Accent("blue", 0xFF2563EB, 0xFF3B82F6);
-    public static final Accent GREEN = new Accent("green", 0xFF16A34A, 0xFF22C55E);
-    public static final Accent ORANGE = new Accent("orange", 0xFFEA580C, 0xFFF97316);
-    public static final Accent ROSE = new Accent("rose", 0xFFE11D48, 0xFFF43F5E);
-    public static final Accent VIOLET = new Accent("violet", 0xFF7C3AED, 0xFF8B5CF6);
-    /** minuit's own: midnight blue, after the night gradient of the logo. */
-    public static final Accent MIDNIGHT = new Accent("midnight", 0xFF3B3F9E, 0xFF8E96F5);
+    /** Ids of the accents the kit ships, as {@code accents/<id>.json} in its jar, in the order the picker shows them. */
+    static final List<String> BUILT_IN = List.of("blue", "green", "orange", "rose", "violet", "midnight");
 
-    /** The presets in the order a theme page shows them. */
-    public static final List<Accent> PRESETS = List.of(BLUE, GREEN, ORANGE, ROSE, VIOLET, MIDNIGHT);
+    private static volatile List<Accent> presets;
+
+    /**
+     * The presets in the order a theme page shows them: those the last resource reload found, or
+     * the kit's own before any reload.
+     */
+    public static List<Accent> presets() {
+        List<Accent> list = presets;
+        if (list == null) {
+            list = ThemeFiles.builtInAccents();
+            presets = list;
+        }
+        return list;
+    }
+
+    /** Replaces the presets with {@code list}; called by the theme file reload. */
+    static void load(List<Accent> list) {
+        presets = List.copyOf(list);
+    }
 
     /** The preset saved under {@code id}, or null for blank or unknown (no overlay). */
     public static Accent byId(String id) {
@@ -36,7 +48,7 @@ public record Accent(String id, int light, int dark) {
             return null;
         }
         String key = id.trim().toLowerCase(Locale.ROOT);
-        for (Accent a : PRESETS) {
+        for (Accent a : presets()) {
             if (a.id.equals(key)) {
                 return a;
             }
@@ -55,15 +67,16 @@ public record Accent(String id, int light, int dark) {
     }
 
     /**
-     * {@code p} with its accent roles in this colour. The hover steps toward the text (darker on
-     * light, lighter on dark); the text on the primary fill is picked by contrast.
+     * {@code p} with its accent roles in this colour. The text on the primary fill is picked by
+     * contrast, and the hover steps away from that text (darker under white, lighter under black), so
+     * the label reads on the hover at least as well as on the rest face.
      */
     public Palette over(Palette p) {
         boolean dark = dark(p);
         int c = dark ? this.dark : this.light;
         int deep = Shapes.mix(c, 0xFF000000, 0.25F);
-        int hover = Shapes.mix(c, dark ? 0xFFFFFFFF : 0xFF000000, 0.15F);
         int onFill = Shapes.contrast(0xFFFFFFFF, c) >= Shapes.contrast(0xFF09090B, c) ? 0xFFFFFFFF : 0xFF09090B;
+        int hover = Shapes.mix(c, onFill == 0xFFFFFFFF ? 0xFF000000 : 0xFFFFFFFF, 0.15F);
         return new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(),
                 p.surface(), p.surfaceEdge(), p.section(), p.well(), p.wellEdge(),
                 p.text(), p.textSoft(), p.textFaint(),

@@ -16,19 +16,44 @@ configurations {
 }
 
 // One mod jar per loader carries both source modules, recompiled against this loader's Minecraft.
-def sharedProjects = [':protocol': "${mod_id}-protocol", ':core': "${mod_id}-core", ':common': mod_id]
+// On Java 8 (1.16.5) core and protocol come in as the JvmDowngrader jar of :core-java8 instead of their sources.
+def java8 = java_version == '8'
+def sharedProjects = java8 ? [':common': mod_id] :
+        [':protocol': "${mod_id}-protocol", ':core': "${mod_id}-core", ':common': mod_id]
+
+configurations {
+    java8Core {
+        canBeResolved = true
+    }
+}
 
 dependencies {
     sharedProjects.each { path, capabilityId ->
-        compileOnly(project(path)) {
-            capabilities {
-                requireCapability "$group:$capabilityId"
+        if (!java8) {
+            compileOnly(project(path)) {
+                capabilities {
+                    requireCapability "$group:$capabilityId"
+                }
             }
         }
         commonJava project(path: path, configuration: 'commonJava')
         commonResources project(path: path, configuration: 'commonResources')
     }
+    if (java8) {
+        java8Core project(path: ':core-java8', configuration: 'java8Core')
+        compileOnly files(configurations.java8Core)
+    }
 }
+
+// A version dir may replace a common/src/main class whose code cannot compile on its Minecraft (main_overrides,
+// paths under src/main/java): the src/main copy is left out of this loader's compile and sources.
+def mainOverrides = (project.findProperty('main_overrides') ?: '').toString().split(',')*.trim().findAll()
+def commonMain = rootProject.file('common/src/main/java')
+def commonSources = mainOverrides ? files({
+    configurations.commonJava.files.collect { dir ->
+        dir == commonMain ? fileTree(dir) { exclude mainOverrides } : fileTree(dir)
+    }
+}).builtBy(configurations.commonJava) : configurations.commonJava
 
 // The loader's own glue per Minecraft generation and version, the same port_dirs as :common.
 port_dirs.split(',')*.trim().each { dir ->
@@ -43,11 +68,17 @@ if (providers.gradleProperty('minuitDev').isPresent()) {
 }
 tasks.named('jar', Jar) {
     exclude 'dev/dryaides/minuit/dev/**'
+    if (java8) {
+        dependsOn(configurations.java8Core)
+        from({ configurations.java8Core.collect { zipTree(it) } }) {
+            exclude 'META-INF/MANIFEST.MF'
+        }
+    }
 }
 
 tasks.named('compileJava', JavaCompile) {
     dependsOn(configurations.commonJava)
-    source(configurations.commonJava)
+    source(commonSources)
 }
 
 // What this jar was built for, read at run time and by the tests: META-INF/<mod_id>/build.properties.
@@ -69,12 +100,12 @@ processResources {
 
 tasks.named('javadoc', Javadoc).configure {
     dependsOn(configurations.commonJava)
-    source(configurations.commonJava)
+    source(commonSources)
 }
 
 tasks.named("sourcesJar", Jar) {
     dependsOn(configurations.commonJava)
-    from(configurations.commonJava)
+    from(commonSources)
     dependsOn(configurations.commonResources)
     from(configurations.commonResources)
 }

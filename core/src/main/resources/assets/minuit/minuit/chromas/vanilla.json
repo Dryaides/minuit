@@ -9,7 +9,7 @@
       "surface": "#FFC6C6C6",
       "surfaceEdge": "#FF8B8B8B",
       "section": "#FFC6C6C6",
-      "well": "#FF8B8B8B",
+      "well": "#FFA8A8A8",
       "wellEdge": "#FF373737",
       "text": "#FF404040",
       "textSoft": "#FF404040",
@@ -31,7 +31,8 @@
       "track": "#FF2C2C2C",
       "disabled": "#FF2C2C2C",
       "disabledText": "#FFA0A0A0",
-      "shadow": "#40000000"
+      "shadow": "#40000000",
+      "series": ["#FF3E8E1C", "#FF1F4FD0", "#FFE8A800", "#FFC42020", "#FF7A28B8", "#FF0E8C8C", "#FFE06010", "#FFC8389A"]
     },
     "dark": {
       "frame": "#FF4F4F4F",

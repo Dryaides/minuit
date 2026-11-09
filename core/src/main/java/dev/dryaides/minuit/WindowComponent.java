@@ -67,7 +67,7 @@ public final class WindowComponent extends BaseComponent implements ItemSource, 
         if (saved != null) {
             this.dx = saved.dx();
             this.dy = saved.dy();
-            this.scale = saved.scale();
+            this.scale = Float.isFinite(saved.scale()) ? saved.scale() : 1F;
             this.savedCollapsed = saved.collapsed();
         }
         place();
@@ -177,16 +177,24 @@ public final class WindowComponent extends BaseComponent implements ItemSource, 
     }
 
     private float minScale() {
-        return Math.max(0.25F, Math.max(this.minW / (float) this.content.width(),
-                this.minH / (float) this.content.height()));
+        return Math.max(0.25F, Math.max(this.minW / (float) contentW(), this.minH / (float) contentH()));
+    }
+
+    /** The content's size, at least 1, so an empty panel scales like a 1 px one instead of giving NaN. */
+    private int contentW() {
+        return Math.max(1, this.content.width());
+    }
+
+    private int contentH() {
+        return Math.max(1, this.content.height());
     }
 
     private float maxScale() {
         if (this.screen == null) {
             return 3F;
         }
-        float byW = (this.screen.w() - 2 * PAD) / (float) this.content.width();
-        float byH = (this.screen.h() - top() - PAD) / (float) this.content.height();
+        float byW = (this.screen.w() - 2 * PAD) / (float) contentW();
+        float byH = (this.screen.h() - top() - PAD) / (float) contentH();
         return Math.max(minScale(), Math.min(3F, Math.min(byW, byH)));
     }
 
@@ -399,8 +407,8 @@ public final class WindowComponent extends BaseComponent implements ItemSource, 
                 return true;
             }
             case SCALE -> {
-                this.scale = (float) Math.max((mx - contentX()) / this.content.width(),
-                        (my - contentY()) / this.content.height());
+                this.scale = (float) Math.max((mx - contentX()) / contentW(),
+                        (my - contentY()) / contentH());
                 place();
                 return true;
             }

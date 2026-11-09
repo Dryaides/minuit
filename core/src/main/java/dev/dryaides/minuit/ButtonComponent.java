@@ -244,4 +244,14 @@ public class ButtonComponent extends BaseComponent {
         this.action.accept(0);
         return true;
     }
+
+    @Override
+    protected Box focusBox(FrameStyle frame) {
+        return FrameStyle.withBleed(frame, focusBox());
+    }
+
+    @Override
+    protected int focusCorner(FrameStyle frame) {
+        return frame.buttonCorner();
+    }
 }

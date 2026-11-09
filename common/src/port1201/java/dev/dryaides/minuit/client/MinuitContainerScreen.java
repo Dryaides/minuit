@@ -25,6 +25,7 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         super(menu, inventory, title, vanilla);
         this.imageWidth = imageWidth;
         this.imageHeight = imageHeight;
+        this.inventoryLabelY = imageHeight - 94;
     }
 
     @Override

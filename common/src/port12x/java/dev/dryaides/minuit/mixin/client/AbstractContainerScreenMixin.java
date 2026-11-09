@@ -7,6 +7,9 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.resources.ResourceLocation;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -64,9 +67,14 @@ public abstract class AbstractContainerScreenMixin {
     private void minuit$shownSlot(double x, double y, CallbackInfoReturnable<Slot> cir) {
         if ((Object) this instanceof MinuitContainerScreen<?> screen) {
             Slot found = null;
+            if (!screen.placement().reachable(x, y)) {
+                cir.setReturnValue(null);
+                return;
+            }
             for (Slot slot : this.menu.slots) {
                 if (slot.isActive() && screen.showsSlot(slot)
-                        && isHovering(slot, x - screen.slotOffsetX(slot), y - screen.slotOffsetY(slot))) {
+                        && isHovering(slot, x - screen.slotOffsetX(slot) - screen.placement().shiftX(slot.index),
+                                y - screen.slotOffsetY(slot) - screen.placement().shiftY(slot.index))) {
                     found = slot;
                     break;
                 }
@@ -83,14 +91,24 @@ public abstract class AbstractContainerScreenMixin {
                 ci.cancel();
                 return;
             }
-            float ox = screen.slotOffsetX(slot);
-            float oy = screen.slotOffsetY(slot);
+            float ox = screen.slotOffsetX(slot) + screen.placement().shiftX(slot.index);
+            float oy = screen.slotOffsetY(slot) + screen.placement().shiftY(slot.index);
             if (ox != 0F || oy != 0F) {
                 graphics.pose().pushPose();
                 graphics.pose().translate(ox, oy, 0F);
                 this.minuit$slotMoved = true;
             }
         }
+    }
+
+    /** The ghost has one owner: a slot part that draws its own empty outline, so the game's grey one is left out. */
+    @Redirect(method = "renderSlot", require = 0, at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/inventory/Slot;getNoItemIcon()Lcom/mojang/datafixers/util/Pair;"))
+    private Pair<ResourceLocation, ResourceLocation> minuit$themeGhost(Slot slot) {
+        if ((Object) this instanceof MinuitContainerScreen<?> screen && screen.placement().drawsGhost(slot.index)) {
+            return null;
+        }
+        return slot.getNoItemIcon();
     }
 
     @Inject(method = "renderSlot", at = @At("RETURN"))

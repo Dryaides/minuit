@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Texts;
+
 import dev.dryaides.minuit.internal.Maths;
 import java.util.function.Consumer;
 import java.util.function.IntPredicate;
@@ -59,21 +61,21 @@ public class TextFieldComponent extends BaseComponent {
 
     public TextFieldComponent(Box box, String initial, Consumer<String> onChange) {
         super(box);
-        this.text = initial;
+        this.text = Texts.clip(initial, this.maxLength);
         this.onChange = onChange;
-        this.cursor = initial.length();
+        this.cursor = this.text.length();
         this.anchor = this.cursor;
     }
 
     public TextFieldComponent placeholder(String value) {
-        this.placeholder = value;
+        this.placeholder = value == null ? "" : value;
         return this;
     }
 
     public TextFieldComponent maxLength(int value) {
-        this.maxLength = value;
-        if (this.text.length() > value) {
-            set(this.text.substring(0, value));
+        this.maxLength = Math.max(0, value);
+        if (this.text.length() > this.maxLength) {
+            set(Texts.clip(this.text, this.maxLength));
         }
         return this;
     }
@@ -96,7 +98,7 @@ public class TextFieldComponent extends BaseComponent {
 
     /** Replaces the text without calling the change listener, the cursor at its end. */
     public void setText(String value) {
-        this.text = value.length() > this.maxLength ? value.substring(0, this.maxLength) : value;
+        this.text = Texts.clip(value, this.maxLength);
         this.cursor = this.text.length();
         this.anchor = this.cursor;
     }
@@ -231,7 +233,7 @@ public class TextFieldComponent extends BaseComponent {
                     replace(sel[0], sel[1], "");
                 }
             }
-            case PASTE -> insert(clipboard.get());
+            case PASTE -> insert(Texts.clip(clipboard.get(), Integer.MAX_VALUE));
             case ENTER -> this.onSubmit.accept(this.text);
             default -> {
                 return false;

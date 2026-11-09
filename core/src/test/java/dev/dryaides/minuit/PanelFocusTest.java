@@ -101,4 +101,59 @@ class PanelFocusTest {
         assertEquals(true, panel.rawKey(r));
         assertEquals(List.of(r), got);
     }
+
+    @Test
+    void spaceAfterCursorToPressesThatWidgetNotTheOneTheKeysWereOn() {
+        // FormSummary.focusFirst puts the keys on a checkbox; Space must tick it, not re-run the summary's jump.
+        List<String> pressed = new ArrayList<>();
+        class Toggle extends BaseComponent {
+            final String id;
+
+            Toggle(String id, int y) {
+                super(new Box(id, 0, y, 50, 20));
+                this.id = id;
+            }
+
+            @Override
+            protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
+            }
+
+            @Override
+            protected boolean navigable() {
+                return true;
+            }
+
+            @Override
+            protected boolean activate() {
+                pressed.add(this.id);
+                return true;
+            }
+        }
+        Toggle summary = new Toggle("summary", 0);
+        Toggle check = new Toggle("check", 40);
+        PanelComponent panel = new PanelComponent(null, null, 0, 0) {
+            {
+                add(summary);
+                add(check);
+            }
+
+            @Override
+            public int width() {
+                return 200;
+            }
+
+            @Override
+            public int height() {
+                return 100;
+            }
+
+            @Override
+            protected void drawBackground(Draw d, int mx, int my) {
+            }
+        };
+        panel.keyPressed(InputKey.TAB, false);
+        panel.cursorTo(check);
+        panel.keyPressed(InputKey.SPACE, false);
+        assertEquals(List.of("check"), pressed);
+    }
 }

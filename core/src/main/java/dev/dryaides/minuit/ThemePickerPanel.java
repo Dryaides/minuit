@@ -46,7 +46,7 @@ public final class ThemePickerPanel extends PanelComponent {
     public static final Box VARIANT_LABEL = new Box("variant label", 14, 203, 92, LINE);
     public static final Box VARIANT_ROW = new Box("variant buttons", 108, 201, 180, 14);
     public static final Box ACCENT_LABEL = new Box("accent label", 14, 221, 92, LINE);
-    /** "None", then one swatch per {@link Accent#PRESETS}. */
+    /** "None", then one swatch per {@link Accent#presets()}. */
     public static final Box ACCENT_ROW = new Box("accent swatches", 108, 219, 180, 14);
     private static final int SWATCH = 14;
 
@@ -182,7 +182,7 @@ public final class ThemePickerPanel extends PanelComponent {
                 this.words.get("minuit.picker.accent_none"), () -> this.pick.accept(this.current.withAccent(""))));
         none.selected(on && accent().isEmpty()).active(on);
         int x = row.x() + 2 * SWATCH + 8;
-        for (Accent a : Accent.PRESETS) {
+        for (Accent a : Accent.presets()) {
             ButtonComponent swatch = add(new ButtonComponent(new Box("accent " + a.id(), x, row.y(), SWATCH, SWATCH), "",
                     () -> this.pick.accept(this.current.withAccent(a.id()))));
             swatch.selected(on && a.id().equals(accent())).active(on)
@@ -260,7 +260,7 @@ public final class ThemePickerPanel extends PanelComponent {
         Palette p = this.theme.palette();
         for (int i = 0; i < this.swatches.size(); i++) {
             Box b = this.swatches.get(i).box();
-            int color = Accent.PRESETS.get(i).on(p);
+            int color = Accent.presets().get(i).on(p);
             if (!this.swatches.get(i).active) {
                 color = Shapes.mix(color, p.disabled(), 0.6F);
             }

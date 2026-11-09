@@ -1,5 +1,3 @@
-# Optional: the scenes (SiteScenes, SlotScenes, McScenes) live in the showcase site repo, not here.
-# Point SITE_DIR at a checkout of it (default: ../site, then ../../site); without it the script stops.
 # Widget benches: compile minuit's core, then draw and check every standard widget (WidgetBench),
 # the radial wheel, colour picker and window (WindowBench), the data-driven screens (FormBench) and the speech bubble (BubbleBench).
 #   bash testbench/run.sh [shots folder] [looks for WidgetBench and SlotBench, e.g. glass/clear,bubbly/default]
@@ -10,10 +8,8 @@ OUT=${1:-build/testbench-shots}
 MC=$(cygpath -w "$HOME/.gradle/caches/fabric-loom/26.1.2/minecraft-merged.jar")
 GSON=$(cygpath -w $(ls $HOME/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson/2.11.0/*/gson-2.11.0.jar | head -1))
 CP="core/build/classes/java/main;protocol/build/classes/java/main;core/src/main/resources;$GSON"
-SCENES=$(for d in ${SITE_DIR:-} ../site ../../site; do [ -f "$d/bench/site/SiteScenes.java" ] && echo "$d/bench/site/SiteScenes.java" && break; done)
-[ -n "$SCENES" ] || { echo "testbench skipped: bench/site/SiteScenes.java not found; set SITE_DIR to the showcase site checkout" >&2; exit 0; }
 mkdir -p build/testbench
-javac -encoding UTF-8 -cp "$CP" -d build/testbench testbench/BenchDraw.java testbench/WidgetBench.java  testbench/BenchMock.java "$SCENES" "${SCENES%SiteScenes.java}SlotScenes.java" "${SCENES%SiteScenes.java}McScenes.java" testbench/WindowBench.java testbench/FormBench.java testbench/ReelBench.java testbench/BubbleBench.java testbench/McBench.java testbench/SlotBench.java 2>&1 | grep -iA2 error | head -20
+javac -encoding UTF-8 -cp "$CP" -d build/testbench testbench/BenchDraw.java testbench/WidgetBench.java  testbench/BenchMock.java testbench/site/SiteScenes.java testbench/site/SlotScenes.java testbench/site/McScenes.java testbench/WindowBench.java testbench/FormBench.java testbench/ReelBench.java testbench/BubbleBench.java testbench/McBench.java testbench/SlotBench.java 2>&1 | grep -iA2 error | head -20
 java -Xmx1G -Dfile.encoding=UTF-8 -Dbench.px=${PX:-3} -cp "build/testbench;$CP;$MC" WidgetBench "$OUT" $2 2>&1 | tail -40
 java -Xmx1G -Dfile.encoding=UTF-8 -Dbench.px=${PX:-3} -cp "build/testbench;$CP;$MC" WindowBench "$OUT/window" 2>&1 | tail -40
 java -Xmx1G -Dfile.encoding=UTF-8 -Dbench.px=${PX:-3} -cp "build/testbench;$CP;$MC" FormBench "$OUT/form" 2>&1 | tail -40

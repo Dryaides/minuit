@@ -137,7 +137,7 @@ public final class Bubble {
                 line.setLength(0);
             }
             while (d.width(word) > maxWidth) {
-                String head = d.prefix(word, maxWidth);
+                String head = d.cut(word, maxWidth);
                 if (head.isEmpty()) {
                     head = word.substring(0, 1);
                 }

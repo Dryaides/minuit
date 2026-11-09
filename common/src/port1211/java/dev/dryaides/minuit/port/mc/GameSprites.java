@@ -33,6 +33,11 @@ public final class GameSprites {
         g.blit(x, y, 0, w, h, new Material(atlas, id).sprite(), 1F, 1F, 1F, alpha);
     }
 
+    /** Marker files are in the 1.21.1 jar: nothing to stand in for. */
+    public static boolean markerFile(GuiGraphics g, String texture, int x, int y, int w, int h, float alpha) {
+        return false;
+    }
+
     /**
      * The game's art for a vanilla part, false when 1.21.1 has none: the GUI atlas of 1.21.1 lacks the
      * tooltip sprites (they came with 1.21.2), every other {@link PartTable#ATLAS} id is in the 1.21.1 jar.

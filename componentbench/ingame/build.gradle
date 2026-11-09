@@ -1,0 +1,90 @@
+// A dev mod: every demo of bench/demos in a MinuitScreen, on a minuit 26.3 Fabric jar.
+// Run it through ../build.py ingame <tasks>, which uses the repo's Gradle wrapper.
+// The new components live in core, so the jar must be built from this branch first:
+// gradlew :fabric:build -Pmc_version=26.3 at the repo root, then -PminuitJar=<that jar>.
+plugins {
+    id "net.fabricmc.fabric-loom" version "1.19.3"
+}
+
+group = "dev.dryaides.minuit.bench"
+version = "0"
+
+// Game, loader and Fabric API versions come from the repo's 26.3 properties.
+def versions = new Properties()
+file("../../gradle/versions/26.3.properties").withInputStream { versions.load(it) }
+
+def minuitJar = file(findProperty("minuitJar") ?: "../../fabric/build/libs/minuit-fabric-26.3-1.0.0.jar")
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${versions.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${versions.fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${versions.fabric_version}"
+    implementation files(minuitJar)
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "src/main/java"
+            srcDir "../bench/api"
+            srcDir "../bench/demos"
+        }
+    }
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 25
+}
+
+// The list of demos the screen shows: the game has no folder to scan.
+def demoList = tasks.register("demoList") {
+    def out = layout.buildDirectory.file("generated/bench-demos.txt")
+    def dir = file("../bench/demos")
+    inputs.dir(dir)
+    outputs.file(out)
+    doLast {
+        def names = dir.listFiles().findAll { it.name.endsWith(".java") }.collect { it.name - ".java" }.sort()
+        out.get().asFile.parentFile.mkdirs()
+        out.get().asFile.text = names.join("\n")
+    }
+}
+
+// bench/images/*.png are not in git: MakeImages draws them.
+def makeImages = tasks.register("makeImages", Exec) {
+    def dir = file("../bench/images")
+    inputs.file("../bench/images/MakeImages.java")
+    outputs.dir(dir)
+    commandLine "${System.getProperty('java.home')}/bin/java", "${dir}/MakeImages.java", dir.path
+}
+
+processResources {
+    dependsOn(makeImages)
+    from(demoList)
+    // The bench's test pictures, at the id the demos use: minuit_components_bench:textures/bench/<file>.
+    from("../bench/images") {
+        include "*.png"
+        into "assets/minuit_components_bench/textures/bench"
+    }
+}
+
+loom {
+    runs {
+        client {
+            // python build.py ingame runClient -Pshots=2  : a screenshot of 2 states per demo, then quits. 0 means every state.
+            if (project.hasProperty("shots")) {
+                vmArg "-Dbench.shots=true"
+                vmArg "-Dbench.perDemo=" + project.property("shots")
+                programArgs "--width", "1280", "--height", "960"
+            }
+        }
+    }
+}

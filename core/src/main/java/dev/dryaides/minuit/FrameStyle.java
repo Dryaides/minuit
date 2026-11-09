@@ -23,6 +23,13 @@ public interface FrameStyle {
         return Insets.NONE;
     }
 
+    /** {@code box} grown by {@code style}'s {@link #bleedOf bleed}: the whole silhouette of a button the family draws there. */
+    static Box withBleed(FrameStyle style, Box box) {
+        Insets b = bleedOf(style);
+        return new Box(box.name(), box.x() - b.left(), box.y() - b.top(), box.w() + b.left() + b.right(),
+                box.h() + b.top() + b.bottom());
+    }
+
     /** {@code style}'s {@link #bleed}, each side cut to {@link #BLEED_SIDE} and each axis to {@link #BLEED_AXIS}. */
     static Insets bleedOf(FrameStyle style) {
         Insets b = style.bleed();
@@ -41,6 +48,26 @@ public interface FrameStyle {
     /** The drop shadow of a {@link #panel} at x, y, w, h: the panel's own outline, filled with {@code color}. */
     default void shadow(Draw d, Palette p, int x, int y, int w, int h, int color) {
         Shapes.rounded(d, x, y, w, h, corner(), color);
+    }
+
+    /** The {@link #shadow} of a box floating {@code depth} pixels over what lies under it, at the {@link #popup}'s strength. */
+    default void dropShadow(Draw d, Palette p, int x, int y, int w, int h, int depth) {
+        if (depth > 0) {
+            shadow(d, p, x, y + depth, w, h, Shapes.alpha(p.shadow(), 0x60));
+        }
+    }
+
+    /**
+     * Where {@link #panel} content starts on each side: the frame's width. A popup's rows start one pixel further
+     * in, so a ring around a row stays off the frame.
+     */
+    default Insets panelInsets() {
+        return new Insets(3, 3, 3, 3);
+    }
+
+    /** How many pixels {@link #panel} and {@link #popup} draw below the box: an arrow under a panel starts past them. */
+    default int panelShadow() {
+        return 0;
     }
 
     /** The whole panel: frame, then the surface inside it. */
@@ -99,7 +126,7 @@ public interface FrameStyle {
         Shapes.rounded(d, x, y, w, h, r, p.track());
         int filled = Math.round(Maths.clamp(value, 0F, 1F) * (w - 2));
         if (filled > 0) {
-            int drawn = Math.max(filled, Math.min(w - 2, h - 2));
+            int drawn = FrameStyles.pillWidth(w, h, filled);
             Shapes.rounded(d, x + 1, y + 1, drawn, h - 2, Math.max(0, r - 1), color);
             if (h >= 5) {
                 d.fill(x + 2, y + 1, x + drawn - 1, y + 2, 0x40FFFFFF);
@@ -172,6 +199,17 @@ public interface FrameStyle {
         return FieldInk.hint(p);
     }
 
+    /**
+     * The game's HUD hotbar bar, 182 by 22 at x, y: nine 20 px cells, an item 3 px in from each cell's corner.
+     * The default is a bar of the family's slot wells, 18 px each, 1 px in from the 20 px cells.
+     */
+    default void hotbar(Draw d, Palette p, int x, int y) {
+        d.fill(x, y, x + 182, y + 22, p.frameDark());
+        for (int i = 0; i < 9; i++) {
+            slot(d, p, x + 2 + i * 20, y + 2, false, false);
+        }
+    }
+
     /** The frame around the held hotbar cell, 18 by 18 at x, y; the default is a double ring in the text colour. */
     default void hotbarSelection(Draw d, Palette p, int x, int y) {
         Shapes.ring(d, x - 1, y - 1, 20, 20, 0, p.text());
@@ -234,10 +272,145 @@ public interface FrameStyle {
         return active ? p.raisedText() : p.disabledText();
     }
 
+    /** The blank columns {@link #scroller} leaves on the right of its box: its track's outer edge lies that far in. */
+    default int scrollerGap() {
+        return 2;
+    }
+
     /** A scroll bar BAR wide at x, its track from y over h, its thumb from {@code thumbY} over {@code thumbH}. */
     default void scroller(Draw d, Palette p, int x, int y, int h, int thumbY, int thumbH, boolean lit) {
-        Shapes.rounded(d, x + 1, y, 3, h, 1, p.track());
-        Shapes.rounded(d, x + 1, thumbY, 3, thumbH, 1, lit ? p.raisedHover() : p.raised());
+        int track = FormLook.solid(p.track());
+        int thumb = FormLook.solid(lit ? p.raisedHover() : p.raised());
+        if (Shapes.contrast(thumb, track) < 1.5D) {
+            thumb = Shapes.mix(track, FormLook.solid(p.text()), lit ? 0.45F : 0.3F);
+        }
+        Shapes.rounded(d, x + 1, y, 3, h, 1, track);
+        Shapes.rounded(d, x + 1, thumbY, 3, thumbH, 1, thumb);
+    }
+
+    /**
+     * A flat box in the family's shape: a badge, a chip at rest, a day cell, a band, a selection ring. A 0
+     * {@code fill} or {@code edge} skips it. Flat by contract: a family never bevels it, so nested parts never
+     * stack bevels.
+     */
+    default void plate(Draw d, Palette p, int x, int y, int w, int h, int fill, int edge) {
+        int r = plateCorner(w, h);
+        if (fill != 0) {
+            Shapes.rounded(d, x, y, w, h, r, fill);
+        }
+        if (edge != 0) {
+            Shapes.ring(d, x, y, w, h, r, edge);
+        }
+    }
+
+    /** A line {@code outset} pixels thick around the {@link #plate} at x, y, w, h, following its corners with no gap. */
+    default void ringAround(Draw d, Palette p, int x, int y, int w, int h, int outset, int color) {
+        Shapes.band(d, x - outset, y - outset, w + 2 * outset, h + 2 * outset, plateCorner(w, h) + outset, outset, color);
+    }
+
+    /** The corner radius {@link #button} draws: a focus ring around a button is this corner grown by its distance. */
+    default int buttonCorner() {
+        return 3;
+    }
+
+    /**
+     * A line {@code thickness} pixels thick inside the {@link #panel}'s own outline at x, y, w, h, following its
+     * corners: a chosen card's ring, so no bevel pixel of the panel shows past it.
+     */
+    default void panelEdge(Draw d, Palette p, int x, int y, int w, int h, int thickness, int color) {
+        Shapes.band(d, x, y, w, h, corner(), thickness, color);
+    }
+
+    /** The edge of a {@link #plate}, {@code thickness} pixels thick inside the box. */
+    default void plateEdge(Draw d, Palette p, int x, int y, int w, int h, int thickness, int color) {
+        Shapes.band(d, x, y, w, h, plateCorner(w, h), thickness, color);
+    }
+
+    /** The corner of a {@link #plate} this size: the panel's corner, kept under a third of the short side. */
+    default int plateCorner(int w, int h) {
+        return Math.min(corner(), Math.min(w, h) / 3);
+    }
+
+    /** A round mark, {@code side} by {@code side}: a status dot, a step marker, a carousel dot, a timeline point. */
+    default void dot(Draw d, Palette p, int x, int y, int side, int fill, int edge) {
+        if (fill != 0) {
+            Shapes.rounded(d, x, y, side, side, side / 2, fill);
+        }
+        if (edge != 0) {
+            Shapes.ring(d, x, y, side, side, side / 2, edge);
+        }
+    }
+
+    /** A list row's highlight in {@code face}; a 0 face draws nothing. */
+    default void row(Draw d, Palette p, int x, int y, int w, int h, int face) {
+        if (face != 0) {
+            plate(d, p, x, y, w, h, face, 0);
+        }
+    }
+
+    /**
+     * A card over other widgets: its shadow, a solid backing under a see-through surface so the widgets
+     * beneath do not show through its words, then the {@link #panel}.
+     */
+    default void popup(Draw d, Palette p, int x, int y, int w, int h) {
+        dropShadow(d, p, x, y, w, h, 2);
+        int surface = p.surface();
+        int c = Math.max(1, corner());
+        if (surface >>> 24 != 0xFF && w > 2 * c && h > 2 * c) {
+            int solid = surface | 0xFF000000;
+            d.fill(x + c, y + 1, x + w - c, y + h - 1, solid);
+            d.fill(x + 1, y + c, x + c, y + h - c, solid);
+            d.fill(x + w - c, y + c, x + w - 1, y + h - c, solid);
+        }
+        panel(d, p, x, y, w, h);
+    }
+
+    /**
+     * A checkbox that can also be mixed. Where {@link #gameWidgets} it is the boolean {@link #checkbox} with a
+     * dash for mixed; otherwise a ring at rest and a {@link #plate} in the primary colour, ticked or dashed.
+     */
+    default void checkbox(Draw d, Palette p, int x, int y, int side, CheckboxComponent.State state, boolean lit,
+                          boolean active) {
+        if (gameWidgets()) {
+            checkbox(d, p, x, y, side, state == CheckboxComponent.State.ON, lit, active);
+            if (state == CheckboxComponent.State.MIXED) {
+                FormLook.dash(d, x, y, side, active ? p.accent() : p.disabledText());
+            }
+        } else if (state == CheckboxComponent.State.OFF) {
+            if (active) {
+                checkbox(d, p, x, y, side, false, lit, true);
+                if (!lit) {
+                    plate(d, p, x, y, side, side, 0, FormLook.edge(p));
+                }
+            } else {
+                plate(d, p, x, y, side, side, 0, FormLook.disabledFace(p));
+            }
+        } else {
+            int face = !active ? FormLook.disabledFace(p) : lit ? p.primaryHover() : p.primary();
+            int ink = active ? p.primaryText() : p.disabledText();
+            plate(d, p, x, y, side, side, face, lit && active ? FormLook.hoverEdge(p) : 0);
+            if (state == CheckboxComponent.State.ON) {
+                FormLook.tick(d, x, y, side, ink);
+            } else {
+                FormLook.dash(d, x, y, side, ink);
+            }
+        }
+    }
+
+    /** A radio button, {@code side} by {@code side}, chosen when {@code on}; the default is pixel art in whole cells. */
+    default void radio(Draw d, Palette p, int x, int y, int side, boolean on, boolean lit, boolean active) {
+        int cell = Math.max(1, side / FormLook.RADIO_ART);
+        if (on) {
+            int face = !active ? FormLook.disabledFace(p) : lit ? p.primaryHover() : p.primary();
+            FormLook.pixels(d, FormLook.RADIO_INSIDE, x, y, cell, face);
+            FormLook.pixels(d, FormLook.RADIO_RING, x, y, cell, lit && active ? FormLook.hoverEdge(p) : face);
+            FormLook.pixels(d, FormLook.RADIO_DOT, x + 2 * cell, y + 2 * cell, cell, active ? p.primaryText() : p.disabledText());
+        } else if (active) {
+            FormLook.pixels(d, FormLook.RADIO_INSIDE, x, y, cell, p.track());
+            FormLook.pixels(d, FormLook.RADIO_RING, x, y, cell, lit ? FormLook.hoverEdge(p) : FormLook.edge(p));
+        } else {
+            FormLook.pixels(d, FormLook.RADIO_RING, x, y, cell, FormLook.disabledFace(p));
+        }
     }
 
     /** A toast's card; the default is the panel. */

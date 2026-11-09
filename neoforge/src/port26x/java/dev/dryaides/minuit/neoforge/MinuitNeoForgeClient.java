@@ -8,6 +8,7 @@ import dev.dryaides.minuit.client.form.FormScreen;
 import dev.dryaides.minuit.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
+import dev.dryaides.minuit.internal.port.Platform;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.resources.Identifier;
@@ -15,6 +16,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforge.client.event.AddClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
@@ -33,6 +35,7 @@ public final class MinuitNeoForgeClient {
 
     public MinuitNeoForgeClient(IEventBus modBus) {
         Bridges.install();
+        Platform.development(!FMLLoader.getCurrent().isProduction());
         modBus.addListener(FMLClientSetupEvent.class, event -> event.enqueueWork((Runnable) MinuitClient::themeChoices));
         modBus.addListener(AddClientReloadListenersEvent.class, event -> event.addListener(
                 Identifier.fromNamespaceAndPath("minuit", ThemeReload.ID), new ThemeReload()));

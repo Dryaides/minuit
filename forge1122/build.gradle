@@ -1,0 +1,130 @@
+// MinecraftForge 1.12.2 on RetroFuturaGradle (MCP names): ModDevGradle and Loom stop at 1.14, and 1.12.2 has
+// no Mojang names for :common. The sources follow the house layout (common/src/port1122 for the adapter,
+// forge/src/port1122 for the entry point); the core comes in as the Java 8 jar of :core-java8, shaded whole.
+
+plugins {
+    id 'java'
+    id 'com.gtnewhorizons.retrofuturagradle' version '2.0.3'
+}
+
+def versionProps = new Properties()
+rootProject.file("gradle/versions/${findProperty('mc_version')}.properties").withInputStream { versionProps.load(it) }
+
+version = "${project.version}+${versionProps.minecraft_version}"
+base { archivesName = "${mod_id}-forge" }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(8)
+        vendor = JvmVendorSpec.AZUL
+    }
+}
+
+sourceSets.main {
+    def sharedMain = rootProject.file('common/src/main/java')
+    java.srcDirs = [rootProject.file('common/src/port1122/java'), rootProject.file('forge/src/port1122/java'), sharedMain]
+    // Of the Mojang-named common sources, only the classes naming no Minecraft type compile here.
+    def shared = ['dev/dryaides/minuit/client/ScreenHost.java', 'dev/dryaides/minuit/client/form/FormScreen.java',
+                  'dev/dryaides/minuit/client/form/package-info.java']
+    java.exclude { element -> !element.directory && element.file.toPath().startsWith(sharedMain.toPath())
+            && !(element.path in shared) }
+    resources.srcDirs = [rootProject.file('forge/src/port1122/resources')]
+}
+
+minecraft {
+    mcVersion = versionProps.minecraft_version
+    mcpMappingChannel = versionProps.mcp_mapping_channel
+    mcpMappingVersion = versionProps.mcp_mapping_version
+    username = 'Developer'
+}
+
+repositories {
+    mavenCentral()
+}
+
+// The core jar is taken from its task, not through a configuration: RFG's deobfuscation transform runs on
+// every resolved configuration, before :core-java8 has built the jar.
+evaluationDependsOn(':core-java8')
+def java8Core = files(project(':core-java8').tasks.named('java8ModJar').flatMap { it.archiveFile })
+
+tasks.named('compileJava', JavaCompile) {
+    classpath += java8Core
+}
+
+// GuiContainer's drawSlot and isMouseOverSlot are private; the container screen overrides them (see the AT file).
+def accessTransformer = rootProject.file('forge/src/port1122/resources/META-INF/minuit_at.cfg')
+tasks.named('applyJST').configure {
+    accessTransformerFiles.from(accessTransformer)
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 1.12.2 reads key=value .lang files, not the json the other versions ship. With #PARSE_ESCAPES first,
+// Forge's LanguageMap unescapes each value as Java text, so newlines and backslashes survive.
+def legacyLangDir = layout.buildDirectory.dir('generated/lang')
+def legacyLang = tasks.register('legacyLang') {
+    def source = rootProject.file('common/src/main/resources/assets/minuit/lang')
+    inputs.dir(source)
+    outputs.dir(legacyLangDir)
+    doLast {
+        def out = legacyLangDir.get().dir('assets/minuit/lang').asFile
+        out.mkdirs()
+        source.listFiles().findAll { it.name.endsWith('.json') }.each { json ->
+            def entries = new groovy.json.JsonSlurper().parse(json, 'UTF-8')
+            def text = new StringBuilder('#PARSE_ESCAPES\n')
+            entries.each { key, value ->
+                def escaped = value.toString().replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                text.append(key).append('=').append(escaped).append('\n')
+            }
+            new File(out, json.name.replace('.json', '.lang')).setText(text.toString(), 'UTF-8')
+        }
+    }
+}
+
+processResources {
+    from(legacyLang)
+    from(rootProject.file('common/src/main/resources')) {
+        include 'META-INF/licenses/**'
+    }
+    def props = [mod_id: mod_id, mod_name: mod_name, version: project.version, description: project.description,
+                 mod_author: mod_author, sources_url: sources_url, minecraft_version: versionProps.minecraft_version]
+    inputs.properties props
+    filesMatching('mcmod.info') { expand props }
+}
+
+// The mod jar: the compiled glue plus the Java 8 core (with its jvmdg stubs and relocated Gson), then
+// reobfuscated to SRG names. RFG's reobfJar reads the jar task's output, so the core is merged there.
+tasks.named('jar', Jar) {
+    dependsOn java8Core
+    manifest.attributes('FMLAT': accessTransformer.name)
+    from({ java8Core.collect { zipTree(it) } }) {
+        exclude 'META-INF/MANIFEST.MF'
+    }
+}
+
+// Oracle tests: LWJGL 3's GLFW class (its constants read from the class file, no natives) for the key
+// table, the vanilla client jar of RFG's cache for the textures the GUI parts point at.
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.lwjgl:lwjgl-glfw:3.3.3'
+    testImplementation 'org.ow2.asm:asm:9.7.1'
+}
+
+tasks.named('compileTestJava', JavaCompile) {
+    classpath += java8Core
+}
+
+tasks.named('test', Test) {
+    dependsOn java8Core, legacyLang
+    systemProperty 'minuit.langJson', rootProject.file('common/src/main/resources/assets/minuit/lang').path
+    systemProperty 'minuit.langLegacy', legacyLangDir.get().dir('assets/minuit/lang').asFile.path
+    // LWJGL 2 is on the compile classpath only; the key test reads its Keyboard class file.
+    classpath += java8Core + sourceSets.main.compileClasspath
+    useJUnitPlatform()
+    systemProperty 'minuit.clientJar',
+            new File(gradle.gradleUserHomeDir, "caches/retro_futura_gradle/mc-vanilla/${versionProps.minecraft_version}/client.jar").path
+}

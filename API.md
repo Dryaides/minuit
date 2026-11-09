@@ -1,6 +1,6 @@
 # minuit API
 
-Mod id `minuit`. Depend on `[1.0,2.0)` in `neoforge.mods.toml` or `">=1.0.0 <2.0.0"` in `fabric.mod.json`.
+Mod id `minuit`. Depend on `[1.1,2.0)` in `neoforge.mods.toml` or `">=1.1.0 <2.0.0"` in `fabric.mod.json`.
 
 ## A first screen
 
@@ -59,6 +59,20 @@ add(new StepperComponent(at(new Box("rounds", 0, 104, 80, 16)), 1, 20, 3, v -> {
 | Pictures | `AsyncImage`, `PlayerHeadComponent`, `PlayerSkins.of(uuid, name)`, `Draw.image` |
 | Minecraft | `ItemPickerComponent`, `RichTextComponent`, `ToastSpec` with `client.Toasts.show(modId, spec)`, `EntityPreviewComponent`, `KeybindFieldComponent` |
 | Inventory | `SlotLayout`, `SlotComponent`, `SlotGridComponent`, `PlayerInventoryComponent`, `HotbarComponent`, `client.MinuitContainerScreen` |
+| Forms | `CheckboxComponent`, `RadioGroupComponent`, `NumberFieldComponent`, `OtpInputComponent`, `TextAreaComponent`, `RangeSliderComponent`, `FormFieldComponent`, `FormSummaryComponent` |
+| Pickers and search | `ComboBoxComponent`, `TagInputComponent`, `DatePickerComponent`, `CalendarComponent`, `CommandPaletteComponent` |
+| Lists and tables | `TableComponent`, `TreeComponent`, `TreeTableComponent`, `ReorderListComponent`, `KanbanComponent`, `ItemRenderers` |
+| Navigation | `BreadcrumbComponent`, `PaginationComponent`, `MenubarComponent`, `ContextMenuComponent`, `SidebarComponent`, `StepsComponent`, `AccordionComponent`, `SplitPaneComponent` |
+| Surfaces | `DialogComponent`, `DrawerComponent`, `PopoverComponent`, `HoverCardComponent` (placed with `SurfaceSide`, `SurfaceAlign`), `CardComponent`, `AlertComponent`, `HudBubble` |
+| Pictures and people | `Picture`, `PictureComponent`, `CarouselComponent`, `LightboxComponent`, `AvatarComponent`, `AvatarGroupComponent`, `BadgeComponent`, `SkeletonComponent` |
+| Data | `ChartComponent`, `DonutChartComponent`, `GaugeComponent`, `HeatmapComponent`, `SparklineComponent`, `TimelineComponent`, `WheelComponent` |
+| Incubating | `MapComponent`, `MapSource`, `MapMarker`, `Scene3DComponent`, `ModelPreviewComponent`, `Mesh3D`, `VoxelModel`, `PictureBytes`, `SlotPlacement`, `SlotLayout.Well` |
+
+A custom component draws through `Draw`. `Draw.scissor` takes its box in the same coordinates as a fill
+at that point: inside a `Draw.push` the clip moves and scales with what it clips, on every game version.
+
+A component's default texts ("Nothing here", "No results") come from the `minuit.*` lang keys; a setter
+gives a mod its own text.
 
 A button takes an item or a texture as its icon (`ItemView`, `SpriteIcon`); the item shrinks to the
 largest crisp size the button fits.
@@ -90,6 +104,18 @@ largest crisp size the button fits.
   centres it, and `build(leftPos, topPos)` gets your corner. `slotOffsetX(Slot)` and
   `slotOffsetY(Slot)` move where the game draws a slot's item, read on every frame; the pointer finds
   the slot where it is drawn. Feed them the `Glide` that slides the slots' wells (below).
+- Slot placement on a `MinuitContainerScreen`: `placedByPanel(Slot)` is true when a slot part of the
+  panel draws that menu slot's well at the menu's place; return it from `showsSlot` to hide the armour,
+  offhand and crafting slots a kit that only lays out the inventory leaves out (`showsSlot` still
+  defaults to true). `@Incubating placement()` gives the frame's `SlotPlacement`: `placed(index)`,
+  `shiftX/shiftY(index)`, `reachable(x, y)` (false under the open overlay, a window or an interactive
+  widget, where the screen finds no slot) and `covers(x, y)` (true over any part of the panel, so a click
+  there does not throw the carried stack). A custom component lists its wells with the `@Incubating`
+  `menuWells()` (`SlotLayout.Well`: a box and a shift). `@Incubating labelsFollowPanel()` returning true
+  puts the inventory title on the panel's `PlayerInventoryComponent` on every `init`. A menu built for the
+  HUD look takes `SlotLayout.playerCellsHud(box)` and `hudHotbar(box)`, both `@Incubating`; the screen
+  moves the hotbar slots onto the bar by itself. In a development environment the kit logs a line for
+  menu slots no component places and for a title drawn under a widget.
 - `drawsBackground()` returning false removes only the dim and blur; the panel, wells, hover and
   dropdowns still draw. `drawsLabels()` returning false hides the title and the inventory title (your
   scene draws its own). The labels pass is `final` because the panel overlay (open dropdowns) draws in
@@ -134,6 +160,10 @@ and `ClientInfo` do not break within 1.x. Not API: anything in a package named `
 `dev.dryaides.minuit.wire` (see `FORMS_WIRE.md`). Reserved for the data-driven screens after 1.0:
 `dev.dryaides.minuit.form`, `.layout`, `.formui` and `.client.form`. Methods added to `Draw` or
 `PanelComponent` within 1.x always have a body, so subclasses keep compiling.
+
+Types marked `@Incubating` may change in a minor release; they leave incubation by losing the mark.
+`FrameStyle` parts added within 1.x (`plate`, `dot`, `row`, `popup`, the mixed `checkbox`, `radio`)
+have a default drawn from the palette and `corner()`, so a family needs no new code.
 
 Themes: see `THEMES.md`.
 

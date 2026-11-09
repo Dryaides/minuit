@@ -10,12 +10,19 @@ import dev.dryaides.minuit.KeyPress;
 import dev.dryaides.minuit.PanelComponent;
 import dev.dryaides.minuit.PlayerInventoryComponent;
 import dev.dryaides.minuit.ScreenAreas;
+import dev.dryaides.minuit.Shapes;
 import dev.dryaides.minuit.SlotComponent;
 import dev.dryaides.minuit.SlotGridComponent;
+import dev.dryaides.minuit.SlotLayout;
+import dev.dryaides.minuit.SlotPlacement;
 import dev.dryaides.minuit.internal.port.KeyStroke;
 import dev.dryaides.minuit.internal.port.Platform;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntPredicate;
 
 /**
  * What {@code client.MinuitContainerScreen} does with its panel. The game keeps every slot rule
@@ -31,6 +38,14 @@ public final class ContainerLogic {
 
         /** The vanilla container box, screen coordinates. */
         Box container();
+
+        /**
+         * The menu slot under the mouse that the screen shows, with its item corner where the screen draws
+         * it (offset included), screen coordinates; null over none.
+         */
+        default SlotLayout.Cell hoveredCell() {
+            return null;
+        }
     }
 
     /** What a key does on a kit screen opened over a menu, after the panel passed on it. */
@@ -54,22 +69,139 @@ public final class ContainerLogic {
 
     private final HostCore host;
     private final MenuView menu;
+    private IntPredicate shown = i -> true;
     /** The mouse at the last frame, screen coordinates. */
     private double mouseX = -1;
     private double mouseY = -1;
+    /** The menu slots at the menu's place, screen coordinates, kept from {@link #init}. */
+    private List<SlotLayout.Cell> slots = List.of();
+    private SlotPlacement placement = SlotPlacement.NONE;
+    /** One bit per game button whose press the panel took. */
+    private int panelPresses;
+    /** Screen classes already given their dev notes, so a screen opened again stays quiet. */
+    private static final Set<String> NOTED = ConcurrentHashMap.newKeySet();
 
     public ContainerLogic(HostCore host, MenuView menu) {
         this.host = host;
         this.menu = menu;
     }
 
-    /** The wells, under the items the game draws a layer up. */
+    /**
+     * The screen's init: keeps the menu slots ({@code slots}, item corners at the menu's place, screen
+     * coordinates), places them, forgets presses from before, and in a development environment writes the
+     * notes for the modder once per screen class. {@code shown} tells which slots the screen shows;
+     * {@code title} is the vanilla title's box, null for none.
+     */
+    public void init(PanelComponent current, List<SlotLayout.Cell> slots, IntPredicate shown, String screen, Box title) {
+        this.slots = List.copyOf(slots);
+        this.shown = shown;
+        this.placement = SlotPlacement.of(current, this.slots);
+        this.panelPresses = 0;
+        if (current != null && Platform.development() && NOTED.add(screen)) {
+            for (String note : notes(current, this.placement, this.slots, shown, screen, title)) {
+                Platform.note(note);
+            }
+        }
+    }
+
+    /**
+     * The first visible widget the title overlaps that a player uses: one with keyboard stops, or a slot part,
+     * found through the wells of the slots it places since {@code menuWells} is not visible from here.
+     */
+    private static BaseComponent underTitle(PanelComponent current, SlotPlacement placement, List<SlotLayout.Cell> slots, Box title) {
+        for (BaseComponent widget : current.widgets()) {
+            if (!widget.visible || !widget.box().intersects(title)) {
+                continue;
+            }
+            if (!widget.stops().isEmpty()) {
+                return widget;
+            }
+            for (SlotLayout.Cell slot : slots) {
+                Box well = new Box("well", slot.x() - 1, slot.y() - 1, SlotLayout.PITCH, SlotLayout.PITCH);
+                if (placement.placed(slot.index()) && well.intersects(title) && widget.box().contains(well)) {
+                    return widget;
+                }
+            }
+        }
+        return null;
+    }
+
+    static List<String> notes(PanelComponent current, SlotPlacement placement, List<SlotLayout.Cell> slots,
+                              IntPredicate shown, String screen, Box title) {
+        List<String> out = new ArrayList<>();
+        List<Integer> loose = new ArrayList<>();
+        for (SlotLayout.Cell slot : slots) {
+            if (shown.test(slot.index()) && !placement.placed(slot.index())) {
+                loose.add(slot.index());
+            }
+        }
+        loose.sort(null);
+        if (!loose.isEmpty()) {
+            out.add("minuit: " + screen + " shows menu slots no panel component places: " + ranges(loose)
+                    + ". Return placedByPanel(slot) from showsSlot to hide them.");
+        }
+        BaseComponent under = title == null ? null : underTitle(current, placement, slots, title);
+        if (under != null) {
+            out.add("minuit: " + screen + " draws its title under " + under.box().name()
+                    + "; move the widget, the title (titleLabelX/Y) or turn labels off (drawsLabels).");
+        }
+        return out;
+    }
+
+    /** Runs of indices as the note prints them: 0-8, 45. */
+    static String ranges(List<Integer> sorted) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < sorted.size(); i++) {
+            int start = sorted.get(i);
+            while (i + 1 < sorted.size() && sorted.get(i + 1) == sorted.get(i) + 1) {
+                i++;
+            }
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append(start == sorted.get(i) ? String.valueOf(start) : start + "-" + sorted.get(i));
+        }
+        return out.toString();
+    }
+
+    /** The placement of the last frame; {@link SlotPlacement#NONE} before {@link #init} or without a panel. */
+    public SlotPlacement placement() {
+        return this.placement;
+    }
+
+    /**
+     * Where the first visible player inventory of the panel draws its label, screen coordinates, as its own
+     * {@code label} does; null when the panel has none.
+     */
+    public Box inventoryLabel(PanelComponent current) {
+        if (current == null) {
+            return null;
+        }
+        for (BaseComponent widget : current.widgets()) {
+            if (widget.visible && widget instanceof PlayerInventoryComponent) {
+                return new Box("inventoryLabel", widget.x + 1, widget.y + 1 - SlotLayout.LABEL_GAP, 0, 0);
+            }
+        }
+        return null;
+    }
+
+    /** Vanilla's answer, unless the point lies on the panel: a click on what the player sees never throws the stack. */
+    public boolean clickedOutside(PanelComponent current, double x, double y, boolean vanilla) {
+        return vanilla && !SlotPlacement.of(current, List.of()).covers(x, y);
+    }
+
+    /** The wells, under the items the game draws a layer up, and the theme's hover on a shown slot no component places; places the kept slots for this frame first. */
     public void drawBase(Draw d, PanelComponent current, int mx, int my) {
+        this.placement = SlotPlacement.of(current, this.slots);
         if (current == null) {
             return;
         }
         this.host.drawTab(d, current.theme(), current.bounds(), mx, my);
         current.drawBase(d, mx, my, this.host.frame());
+        SlotLayout.Cell hovered = this.menu.hoveredCell();
+        if (hovered != null && this.shown.test(hovered.index()) && !this.placement.placed(hovered.index())) {
+            d.fill(hovered.x(), hovered.y(), hovered.x() + 16, hovered.y() + 16, Shapes.SLOT_HOVER_BACK);
+        }
     }
 
     /** After the items, a layer up, so an open dropdown covers them; the carried item still comes after it. */
@@ -137,6 +269,14 @@ public final class ContainerLogic {
         if (current == null) {
             return false;
         }
+        boolean took = takesClick(current, mx, my, gameButton);
+        if (took && gameButton >= 0 && gameButton < 32) {
+            this.panelPresses |= 1 << gameButton;
+        }
+        return took;
+    }
+
+    private boolean takesClick(PanelComponent current, double mx, double my, int gameButton) {
         if (current.capturing() && current.rawKey(KeyPress.mouse(gameButton))) {
             return true;
         }
@@ -148,11 +288,20 @@ public final class ContainerLogic {
         return button >= 0 && this.host.clickTab(current.theme(), current.bounds(), mx, my);
     }
 
-    public void mouseReleased(PanelComponent current, double mx, double my, int gameButton) {
+    /**
+     * Gives the release to the panel; true when the panel took the press before it, and the screen then keeps
+     * the release from the game, which would otherwise act on a press it never saw.
+     */
+    public boolean mouseReleased(PanelComponent current, double mx, double my, int gameButton) {
+        boolean pressed = gameButton >= 0 && gameButton < 32 && (this.panelPresses & 1 << gameButton) != 0;
+        if (pressed) {
+            this.panelPresses &= ~(1 << gameButton);
+        }
         int button = KeyRouter.button(gameButton, Platform.keyCodes());
         if (current != null && button >= 0) {
             current.mouseReleased(mx, my, button);
         }
+        return pressed;
     }
 
     public boolean mouseDragged(PanelComponent current, double mx, double my, int gameButton, double dx, double dy) {
