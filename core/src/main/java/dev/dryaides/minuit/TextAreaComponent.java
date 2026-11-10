@@ -61,6 +61,10 @@ public class TextAreaComponent extends BaseComponent {
     private String text = "";
     private final Consumer<String> onChange;
     private String placeholder = "";
+    private String hintText;
+    private int hintRoom;
+    private int hintFont = -1;
+    private List<String> hintLines = List.of();
     private int maxLength = DEFAULT_MAX_LENGTH;
     private IntPredicate filter = c -> true;
 
@@ -951,7 +955,14 @@ public class TextAreaComponent extends BaseComponent {
     }
 
     private void drawPlaceholder(Draw d, int color, int left, int top) {
-        List<String> lines = TextMeasure.wrapAll(placeholder, textWidth());
+        int room = textWidth();
+        if (room != hintRoom || hintFont != TextMeasure.fontGeneration() || !placeholder.equals(hintText)) {
+            hintRoom = room;
+            hintFont = TextMeasure.fontGeneration();
+            hintText = placeholder;
+            hintLines = TextMeasure.wrapAll(placeholder, room);
+        }
+        List<String> lines = hintLines;
         int fits = viewHeight() / LINE_HEIGHT;
         for (int i = 0; i < lines.size() && i < fits; i++) {
             d.text(lines.get(i), left, top + i * LINE_HEIGHT, color);

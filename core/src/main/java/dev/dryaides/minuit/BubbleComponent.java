@@ -15,6 +15,16 @@ public class BubbleComponent extends BaseComponent {
     public int anchorX;
     public BubbleStyle style = BubbleStyle.CLASSIC;
 
+    private List<String> lines = List.of();
+    private String laidText;
+    private int laidWidth = -1;
+    private Class<?> laidBy;
+    private int laidFont = -1;
+    private Box laidBox;
+    private int laidAnchor;
+    private int laidW = -1;
+    private int laidH = -1;
+
     public BubbleComponent(Box box, String text) {
         super(box);
         this.text = text;
@@ -24,8 +34,22 @@ public class BubbleComponent extends BaseComponent {
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         int maxWidth = Math.min(Bubble.MAX_LINE_WIDTH, this.w - 4 - Bubble.PAD_X * 2);
-        List<String> lines = Bubble.wrap(d, this.text, Math.max(1, maxWidth), Bubble.MAX_LINES);
-        Box placed = Bubble.box(d, lines, this.anchorX - this.x, this.h, this.w, this.h).offset(this.x, this.y);
-        Bubble.draw(d, this.style, lines, placed, this.anchorX, 1F);
+        int width = Math.max(1, maxWidth);
+        int anchor = this.anchorX - this.x;
+        if (width != laidWidth || laidBy != d.getClass() || laidFont != TextMeasure.fontGeneration() || !this.text.equals(laidText)) {
+            laidWidth = width;
+            laidBy = d.getClass();
+            laidFont = TextMeasure.fontGeneration();
+            laidText = this.text;
+            lines = Bubble.wrap(d, this.text, width, Bubble.MAX_LINES);
+            laidBox = null;
+        }
+        if (laidBox == null || anchor != laidAnchor || this.w != laidW || this.h != laidH) {
+            laidAnchor = anchor;
+            laidW = this.w;
+            laidH = this.h;
+            laidBox = Bubble.box(d, lines, anchor, this.h, this.w, this.h);
+        }
+        Bubble.draw(d, this.style, lines, laidBox.offset(this.x, this.y), this.anchorX, 1F);
     }
 }

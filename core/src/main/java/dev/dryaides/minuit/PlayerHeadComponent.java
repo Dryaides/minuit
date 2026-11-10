@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
+
 import java.util.function.Function;
 
 /**
@@ -40,17 +42,19 @@ public class PlayerHeadComponent extends BaseComponent {
      * height less two pixels a side.
      */
     public static <T> ListComponent.RowRenderer<T> row(Function<T, AsyncImage> skin, Function<T, String> name) {
+        FitCache names = new FitCache();
         return (d, theme, item, row, hovered, selected) -> {
             Palette p = theme.palette();
             int size = row.h() - 4;
             draw(d, p, skin.apply(item), row.x(), row.y() + 2, size);
-            d.text(d.ellipsize(name.apply(item), row.w() - size - 4), row.x() + size + 4,
+            d.text(names.fit(d, item, name.apply(item), row.w() - size - 4).cut(), row.x() + size + 4,
                     row.y() + (row.h() - 8) / 2, selected ? p.text() : p.textSoft());
         };
     }
 
     /** A grid card of a head over a name, for a podium or a seeker reel. */
     public static <T> GridComponent.CellRenderer<T> cell(Function<T, AsyncImage> skin, Function<T, String> name) {
+        FitCache names = new FitCache();
         return (d, theme, item, cell, hovered, selected) -> {
             Palette p = theme.palette();
             FrameStyle f = theme.frame();
@@ -61,7 +65,7 @@ public class PlayerHeadComponent extends BaseComponent {
             }
             int size = Math.max(8, Math.min(cell.w() - 8, cell.h() - 18));
             draw(d, p, skin.apply(item), cell.x() + (cell.w() - size) / 2, cell.y() + 4, size);
-            d.centered(d.ellipsize(name.apply(item), cell.w() - 6), cell.x() + cell.w() / 2,
+            d.centered(names.fit(d, item, name.apply(item), cell.w() - 6).cut(), cell.x() + cell.w() / 2,
                     cell.y() + cell.h() - 12, selected ? p.text() : p.textSoft());
         };
     }

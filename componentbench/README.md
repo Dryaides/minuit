@@ -16,6 +16,7 @@ Game textures and the font come from the Minecraft jar in `$BENCH_MC_JAR`, else 
 | Compile core, protocol and the bench | `python build.py compile` |
 | Render the gallery | `python build.py gallery` |
 | Render one demo, some themes, another scale | `python build.py gallery --demo Button --themes soft:grey:light,glass:clear:dark --scale 3` |
+| Count the draw calls, time and allocation per state for each look (`--hash <file>` also digests every picture) | `python build.py perf --frames 200` |
 | Compile the Fabric 26.3 dev mod | `python build.py ingame build` |
 | Run it in game | `python build.py ingame runClient` |
 

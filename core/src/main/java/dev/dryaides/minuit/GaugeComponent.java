@@ -511,6 +511,17 @@ public class GaugeComponent extends BaseComponent {
         double at = colouredAt;
         int zone = Double.isFinite(target) ? zoneOf(shown) : 0;
         int fill = zoneInks[Math.min(zone, zoneInks.length - 1)];
+        int marks = 0;
+        double[] sines = new double[cuts.length];
+        double[] cosines = new double[cuts.length];
+        for (int i = 0; i < cuts.length; i++) {
+            if (cuts[i] <= min || cuts[i] >= max) {
+                continue;
+            }
+            double angle = 2D * Math.PI * (start + span * fractionOf(cuts[i]));
+            sines[marks] = Math.sin(angle);
+            cosines[marks++] = Math.cos(angle);
+        }
         for (int fy = 0; fy < fs; fy++) {
             double dy = (fy + 0.5D) * px - mid;
             for (int fx = 0; fx < fs; fx++) {
@@ -542,13 +553,9 @@ public class GaugeComponent extends BaseComponent {
                 } else if (band) {
                     float ring = clamp01((r - (radius - BAND_W)) / px + 0.5D) * clamp01((radius - r) / px + 0.5D) * angular;
                     if (ring > 0F) {
-                        for (int i = 0; i < cuts.length; i++) {
-                            if (cuts[i] <= min || cuts[i] >= max) {
-                                continue;
-                            }
-                            double angle = 2D * Math.PI * (start + span * fractionOf(cuts[i]));
-                            double ahead = Math.sin(angle) * dx - Math.cos(angle) * dy;
-                            double across = Math.cos(angle) * dx + Math.sin(angle) * dy;
+                        for (int i = 0; i < marks; i++) {
+                            double ahead = sines[i] * dx - cosines[i] * dy;
+                            double across = cosines[i] * dx + sines[i] * dy;
                             if (ahead > 0D) {
                                 ring *= clamp01((Math.abs(across) - SEPARATOR) / px + 0.5D);
                             }

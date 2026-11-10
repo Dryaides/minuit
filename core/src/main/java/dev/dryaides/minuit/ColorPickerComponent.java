@@ -5,7 +5,6 @@ import dev.dryaides.minuit.internal.ColorMath;
 import dev.dryaides.minuit.internal.Maths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.IntConsumer;
 
 /**
@@ -118,8 +117,8 @@ public final class ColorPickerComponent extends BaseComponent {
     }
 
     private String hexText() {
-        return this.alpha ? String.format(Locale.ROOT, "#%08X", color())
-                : String.format(Locale.ROOT, "#%06X", color() & 0xFFFFFF);
+        return this.alpha ? "#" + dev.dryaides.minuit.internal.Fmt.hex(color(), 8)
+                : "#" + dev.dryaides.minuit.internal.Fmt.hex(color() & 0xFFFFFF, 6);
     }
 
     private void showHex() {
@@ -198,8 +197,11 @@ public final class ColorPickerComponent extends BaseComponent {
         }
         int swy = swatchY();
         d.fill(this.x, swy, this.x + SWATCH, swy + SWATCH, p.surfaceEdge());
-        checker(d, this.x + 1, swy + 1, this.x + SWATCH - 1, swy + SWATCH - 1);
-        d.fill(this.x + 1, swy + 1, this.x + SWATCH - 1, swy + SWATCH - 1, color());
+        int swatch = color();
+        if (swatch >>> 24 != 0xFF) {
+            checker(d, this.x + 1, swy + 1, this.x + SWATCH - 1, swy + SWATCH - 1);
+        }
+        d.fill(this.x + 1, swy + 1, this.x + SWATCH - 1, swy + SWATCH - 1, swatch);
         if (!this.focused) {
             this.hex.focused = false;
             showHex();

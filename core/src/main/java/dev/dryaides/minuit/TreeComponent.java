@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -79,6 +81,7 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
         }
     }
 
+    private final FitCache fits = new FitCache();
     private final Function<T, List<T>> children;
     private final Function<T, String> label;
     private final Set<T> expanded = new HashSet<>();
@@ -221,6 +224,7 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
 
     /** New roots. Expanded nodes, selection and scroll stay, matched by equality. Null means none. */
     public final void setRoots(Collection<? extends T> roots) {
+        fits.clear();
         List<T> copy = new ArrayList<>();
         if (roots != null) {
             for (T root : roots) {
@@ -699,7 +703,7 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
             cx += drawArt(d, theme.palette(), art, cx, ry, faint);
         }
         cx += ICON_GAP;
-        d.textFit(textOf(row.node), cx, RowLook.textY(ry, rowHeight), Math.max(0, right - cx - 2), ink);
+        d.text(fits.fit(d, row.node, textOf(row.node), Math.max(0, right - cx - 2)).cut(), cx, RowLook.textY(ry, rowHeight), ink);
     }
 
     /** The box handed to the renderer, kept per row so a still tree allocates none; a clash only costs a new box. */

@@ -1114,33 +1114,49 @@ public final class FrameStyles {
 
         private static final float LIT = 0.55F;
 
-        private static boolean[][] mask(int w, int h, int r) {
-            boolean[][] m = new boolean[h][w];
-            r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
-            for (int row = 0; row < h; row++) {
-                int inset = 0;
-                if (row < r || row >= h - r) {
-                    double dy = r - (row < r ? row : h - 1 - row) - 0.5;
-                    inset = (int) Math.round(r - Math.sqrt(Math.max(0, r * r - dy * dy)));
-                }
-                for (int col = inset; col < w - inset; col++) {
-                    m[row][col] = true;
-                }
+        /**
+         * The shape's pixel mask, one span per row: row {@code row} of a {@code w} by {@code h} blob of radius {@code r}
+         * covers columns {@code inset} to {@code w - inset}. Edges and fills are drawn one span at a time, so a frame
+         * costs a few fills per row near the corners instead of one per pixel.
+         */
+        private static int inset(int h, int r, int row) {
+            if (row >= r && row < h - r) {
+                return 0;
             }
-            return m;
+            double dy = r - (row < r ? row : h - 1 - row) - 0.5;
+            return (int) Math.round(r - Math.sqrt(Math.max(0, r * r - dy * dy)));
         }
 
-        private static boolean at(boolean[][] m, int row, int col) {
-            return row >= 0 && row < m.length && col >= 0 && col < m[0].length && m[row][col];
+        private static int radius(int w, int h, int r) {
+            return Math.max(0, Math.min(r, Math.min(w, h) / 2));
         }
 
         /** The mask pixels whose neighbour {@code depth} rows away in direction {@code dy} is outside, minus the shallower rows. */
-        private static void edge(Draw d, int x, int y, boolean[][] m, int dy, int depth, int color) {
-            for (int row = 0; row < m.length; row++) {
-                for (int col = 0; col < m[0].length; col++) {
-                    if (m[row][col] && !at(m, row + dy * depth, col) && (depth == 1 || at(m, row + dy * (depth - 1), col))) {
-                        d.fill(x + col, y + row, x + col + 1, y + row + 1, color);
+        private static void edge(Draw d, int x, int y, int w, int h, int r, int dy, int depth, int color) {
+            r = radius(w, h, r);
+            for (int row = 0; row < h; row++) {
+                int lo = inset(h, r, row);
+                int hi = w - lo;
+                if (depth > 1) {
+                    int near = row + dy * (depth - 1);
+                    if (near < 0 || near >= h) {
+                        continue;
                     }
+                    int in = inset(h, r, near);
+                    lo = Math.max(lo, in);
+                    hi = Math.min(hi, w - in);
+                }
+                if (lo >= hi) {
+                    continue;
+                }
+                int far = row + dy * depth;
+                int a = far >= 0 && far < h ? inset(h, r, far) : w;
+                int b = w - a;
+                if (a >= b) {
+                    d.fill(x + lo, y + row, x + hi, y + row + 1, color);
+                } else {
+                    d.fill(x + lo, y + row, x + Math.min(hi, a), y + row + 1, color);
+                    d.fill(x + Math.max(lo, b), y + row, x + hi, y + row + 1, color);
                 }
             }
         }
@@ -1158,13 +1174,15 @@ public final class FrameStyles {
             if (relief == 0 || w < 4 || h < 4) {
                 return;
             }
-            boolean[][] m = mask(w - 2, h - 2, Math.max(0, r - 1));
+            int mw = w - 2;
+            int mh = h - 2;
+            int mr = Math.max(0, r - 1);
             int up = relief > 0 ? -1 : 1;
-            edge(d, x + 1, y + 1, m, up, 1, Shapes.mix(face, 0xFFFFFFFF, relief > 0 ? lit : sunkLit));
-            edge(d, x + 1, y + 1, m, -up, 1, Shapes.mix(face, 0xFF000000, relief > 0 ? 0.12F : sunkShade));
+            edge(d, x + 1, y + 1, mw, mh, mr, up, 1, Shapes.mix(face, 0xFFFFFFFF, relief > 0 ? lit : sunkLit));
+            edge(d, x + 1, y + 1, mw, mh, mr, -up, 1, Shapes.mix(face, 0xFF000000, relief > 0 ? 0.12F : sunkShade));
             if (h >= 10) {
-                edge(d, x + 1, y + 1, m, up, 2, Shapes.mix(face, 0xFFFFFFFF, (relief > 0 ? lit : sunkLit) / 10));
-                edge(d, x + 1, y + 1, m, -up, 2, Shapes.mix(face, 0xFF000000, relief > 0 ? 0.06F : sunkShade / 2));
+                edge(d, x + 1, y + 1, mw, mh, mr, up, 2, Shapes.mix(face, 0xFFFFFFFF, (relief > 0 ? lit : sunkLit) / 10));
+                edge(d, x + 1, y + 1, mw, mh, mr, -up, 2, Shapes.mix(face, 0xFF000000, relief > 0 ? 0.06F : sunkShade / 2));
             }
         }
 
@@ -1180,19 +1198,16 @@ public final class FrameStyles {
 
         /** A fill pill whose relief is traced on its own full mask: the top edge lit, the bottom edge shaded, the ends follow the curve. */
         private static void pill(Draw d, int x, int y, int w, int h, int r, int face, float lit) {
-            boolean[][] m = mask(w, h, r);
+            int mr = radius(w, h, r);
             for (int row = 0; row < h; row++) {
-                for (int col = 0; col < w; col++) {
-                    if (m[row][col]) {
-                        d.fill(x + col, y + row, x + col + 1, y + row + 1, face);
-                    }
-                }
+                int in = inset(h, mr, row);
+                d.fill(x + in, y + row, x + w - in, y + row + 1, face);
             }
-            edge(d, x, y, m, -1, 1, Shapes.mix(face, 0xFFFFFFFF, lit));
-            edge(d, x, y, m, 1, 1, Shapes.mix(face, 0xFF000000, 0.12F));
+            edge(d, x, y, w, h, r, -1, 1, Shapes.mix(face, 0xFFFFFFFF, lit));
+            edge(d, x, y, w, h, r, 1, 1, Shapes.mix(face, 0xFF000000, 0.12F));
             if (h >= 10) {
-                edge(d, x, y, m, -1, 2, Shapes.mix(face, 0xFFFFFFFF, lit / 10));
-                edge(d, x, y, m, 1, 2, Shapes.mix(face, 0xFF000000, 0.06F));
+                edge(d, x, y, w, h, r, -1, 2, Shapes.mix(face, 0xFFFFFFFF, lit / 10));
+                edge(d, x, y, w, h, r, 1, 2, Shapes.mix(face, 0xFF000000, 0.06F));
             }
         }
 

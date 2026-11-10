@@ -26,6 +26,10 @@ public class RichTextComponent extends BaseComponent {
     private boolean centered;
     /** The link areas of the last frame, screen coordinates, with their URL. */
     private final List<Area> areas = new ArrayList<>();
+    private List<RichText> wrapped;
+    private int wrappedW = -1;
+    private Class<?> wrappedBy;
+    private int wrappedFont = -1;
 
     private record Area(int x0, int y0, int x1, int y1, String url) {
         boolean contains(double mx, double my) {
@@ -64,7 +68,13 @@ public class RichTextComponent extends BaseComponent {
         Palette p = theme.palette();
         int base = this.color != 0 ? this.color : p.text();
         this.areas.clear();
-        List<RichText> lines = this.text.wrap(d, this.w);
+        if (this.wrapped == null || this.wrappedW != this.w || this.wrappedBy != d.getClass() || this.wrappedFont != TextMeasure.fontGeneration()) {
+            this.wrapped = this.text.wrap(d, this.w);
+            this.wrappedW = this.w;
+            this.wrappedBy = d.getClass();
+            this.wrappedFont = TextMeasure.fontGeneration();
+        }
+        List<RichText> lines = this.wrapped;
         int y = this.y;
         for (int i = 0; i < lines.size() && i < this.maxLines; i++) {
             RichText line = lines.get(i);

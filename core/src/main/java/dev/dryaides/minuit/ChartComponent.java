@@ -4,7 +4,6 @@ import dev.dryaides.minuit.internal.Lists;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.DoubleFunction;
@@ -983,7 +982,7 @@ public class ChartComponent extends BaseComponent {
 
     /** As {@code 2.5e-9} or {@code 1e300}: an axis has no room for more. */
     private static String shortSci(double value) {
-        String text = String.format(Locale.ROOT, "%.1e", value);
+        String text = dev.dryaides.minuit.internal.Fmt.sci(value, 1);
         return text.replace(".0e", "e").replace("e+", "e").replace("e-0", "e-");
     }
 
@@ -1030,7 +1029,7 @@ public class ChartComponent extends BaseComponent {
         double abs = Math.abs(value);
         String number;
         if (abs >= 1e15D || (abs > 0D && abs < 1e-4D)) {
-            number = String.format(Locale.ROOT, "%.3e", value);
+            number = dev.dryaides.minuit.internal.Fmt.sci(value, 3);
         } else {
             number = plain(value, abs >= 1D ? 2 : 4, true);
         }

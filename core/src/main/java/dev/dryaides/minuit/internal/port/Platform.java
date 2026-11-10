@@ -59,6 +59,7 @@ public final class Platform {
         TextFieldComponent.clipboard = now.clipboard();
         RichTextComponent.links = now.links();
         TextMeasure.font = now.font();
+        TextMeasure.fontChanged();
         ItemLookup items = now.items();
         if (items != null) {
             ItemLookup.plugIn(items);

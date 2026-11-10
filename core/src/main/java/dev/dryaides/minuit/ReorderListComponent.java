@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -119,6 +121,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         }
     }
 
+    private final FitCache fits = new FitCache();
     private final Function<T, String> label;
     private List<Entry<T>> rows = new ArrayList<>();
 
@@ -309,6 +312,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
 
     /** New rows. Selection, cursor and scroll stay, matched by equality. An open drag ends. Null means none. */
     public final void setItems(Collection<? extends T> items) {
+        fits.clear();
         T keepSelected = selected == null ? null : selected.item;
         T keepCursor = cursor == null ? null : cursor.item;
         int oldCursor = cursor == null ? 0 : cursor.index;
@@ -926,7 +930,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         if (art != null) {
             cx += drawArt(d, theme.palette(), art, cx, ry, faint) + ICON_GAP;
         }
-        d.textFit(textOf(row.item), cx, RowLook.textY(ry, rowHeight), Math.max(0, right - cx - 2), ink);
+        d.text(fits.fit(d, row.item, textOf(row.item), Math.max(0, right - cx - 2)).cut(), cx, RowLook.textY(ry, rowHeight), ink);
     }
 
     /** Where a row's own content starts; clear of the handle's wash. */

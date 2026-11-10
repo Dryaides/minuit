@@ -14,7 +14,18 @@ public final class TextMeasure {
     /** Pixel width of a string in the font the screens draw with; 6 per character until a host sets it. */
     public static volatile ToIntFunction<String> font = text -> 6 * text.length();
 
+    /** Bumped whenever the font changes (a resource reload, a screen re-reading the game's font); measured-text caches key on it. */
+    private static volatile int fontGeneration;
+
     private TextMeasure() {
+    }
+
+    public static int fontGeneration() {
+        return fontGeneration;
+    }
+
+    public static void fontChanged() {
+        fontGeneration++;
     }
 
     public static int width(String text) {

@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import dev.dryaides.minuit.FrameStyle;
 import dev.dryaides.minuit.FrameStyles;
 import dev.dryaides.minuit.Palette;
+import dev.dryaides.minuit.TextMeasure;
 import dev.dryaides.minuit.ThemeChoice;
 import dev.dryaides.minuit.ThemeFamily;
 
@@ -453,6 +454,7 @@ public final class ThemeFiles {
                         .thenComparing(e -> e.namespace() + ":" + ROOT + "/" + e.path()))
                 .toList();
         Themes.load(assemble(entries, warn));
+        TextMeasure.fontChanged();
         return "minuit: " + Themes.families(null).size() + " theme families from " + entries.size() + " files";
     }
 

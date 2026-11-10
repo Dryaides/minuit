@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
 import dev.dryaides.minuit.internal.Lists;
 
 import dev.dryaides.minuit.internal.Maths;
@@ -54,6 +55,7 @@ public class GridComponent<T> extends BaseComponent {
      */
     public static <T> CellRenderer<T> thumbnails(java.util.function.Function<T, AsyncImage> image,
                                                  java.util.function.Function<T, String> label) {
+        FitCache labels = new FitCache();
         return glowing((d, theme, item, cell, glow, selected) -> {
             Palette p = theme.palette();
             FrameStyle f = theme.frame();
@@ -65,7 +67,7 @@ public class GridComponent<T> extends BaseComponent {
             int thumbW = Math.min(cell.w() - 8, (cell.h() - 18) * 16 / 9);
             int thumbH = thumbW * 9 / 16;
             AsyncImage.draw(d, p, image.apply(item), cell.x() + (cell.w() - thumbW) / 2, cell.y() + 4, thumbW, thumbH);
-            d.centered(d.ellipsize(label.apply(item), cell.w() - 6), cell.x() + cell.w() / 2,
+            d.centered(labels.fit(d, item, label.apply(item), cell.w() - 6).cut(), cell.x() + cell.w() / 2,
                     cell.y() + cell.h() - 12, selected ? p.text() : p.textSoft());
         });
     }
@@ -121,7 +123,16 @@ public class GridComponent<T> extends BaseComponent {
         if (!isOver(mx, my)) {
             return null;
         }
-        for (int i = 0; i < this.items.size(); i++) {
+        int pitch = this.cellHeight + this.gapY;
+        int from = 0;
+        int to = this.items.size();
+        if (this.gapY >= 0 && pitch > 0) {
+            // only rows r-1..r+1 can hold the point, so the first match is the one the full scan finds
+            int row = (int) Math.floor((my - this.y) / pitch);
+            from = Math.max(0, (row - 1) * this.columns);
+            to = (int) Math.min(to, (long) (row + 2) * this.columns);
+        }
+        for (int i = from; i < to; i++) {
             if (cell(i).contains(mx, my)) {
                 return this.items.get(i);
             }

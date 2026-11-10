@@ -678,7 +678,7 @@ public final class FormPanel extends PanelComponent {
             return found;
         }
         try {
-            return String.format(tr.fallback(), args);
+            return dev.dryaides.minuit.internal.Fmt.apply(tr.fallback(), args);
         } catch (RuntimeException e) {
             return tr.fallback();
         }

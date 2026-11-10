@@ -244,7 +244,7 @@ public class PictureComponent extends BaseComponent {
 
     private void drawZoomBadge(Draw d, FrameStyle frame, Palette p, Box b) {
         float z = zoom();
-        String label = (z < 10F ? String.format(java.util.Locale.ROOT, "%.1f", z) : String.valueOf(Math.round(z))) + "x";
+        String label = (z < 10F ? dev.dryaides.minuit.internal.Fmt.fixed(z, 1) : String.valueOf(Math.round(z))) + "x";
         int tw = d.width(label);
         int bx = b.right() - tw - 7;
         int by = b.y() + 3;

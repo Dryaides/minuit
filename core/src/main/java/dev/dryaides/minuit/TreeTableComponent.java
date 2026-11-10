@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.IdentityHashMap;
@@ -38,6 +40,7 @@ public class TreeTableComponent<T> extends TableComponent<T> {
     private static final String[] CLOSED = {"#..", "##.", "###", "##.", "#.."};
     private static final String[] OPEN = {"#####", ".###.", "..#.."};
 
+    private final FitCache fits = new FitCache();
     private final Function<T, ? extends Collection<? extends T>> children;
     private final List<T> roots = new ArrayList<>();
     private final Map<T, Boolean> expanded = new IdentityHashMap<>();
@@ -149,6 +152,7 @@ public class TreeTableComponent<T> extends TableComponent<T> {
 
     /** New top rows. What is open stays open. */
     public final void setRoots(Collection<? extends T> newRoots) {
+        fits.clear();
         roots.clear();
         if (newRoots != null) {
             for (T root : newRoots) {
@@ -317,7 +321,8 @@ public class TreeTableComponent<T> extends TableComponent<T> {
         if (art != null) {
             textX += drawArt(d, theme.palette(), art, textX, cell.y(), ink) + ICON_GAP;
         }
-        d.textFit(textOf(item), textX, RowLook.textY(cell.y(), cell.h()), Math.max(0, cell.right() - textX - 2), ink);
+        d.text(fits.fit(d, item, textOf(item), Math.max(0, cell.right() - textX - 2)).cut(), textX,
+                RowLook.textY(cell.y(), cell.h()), ink);
     }
 
     private String textOf(T item) {

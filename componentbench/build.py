@@ -169,6 +169,17 @@ def run(cmd, args):
         finally:
             shutil.rmtree(d, ignore_errors=True)
         sys.exit(code)
+    elif cmd == "perf":
+        d = run_dir()
+        try:
+            cp = compile_all(d)
+            sys.exit(subprocess.run([find_tool("java"), "-Xms32m", "-Xmx768m", "-Djava.awt.headless=true",
+                                     "-Dfile.encoding=UTF-8", "-Dbench.classes=" + str(cp[0]),
+                                     "-Dbench.assets=" + str(merged_assets(d)), "-Dbench.mcjar=" + mc_jar(),
+                                     "-cp", os.pathsep.join(str(c) for c in cp), "bench.render.PerfBench",
+                                     *args[1:]]).returncode)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
     elif cmd == "ingame":
         wrapper = PROJECT / ("gradlew.bat" if os.name == "nt" else "gradlew")
         sys.exit(subprocess.run([str(wrapper), "--no-daemon", "--console=plain", *(args[1:] or ["build"])],

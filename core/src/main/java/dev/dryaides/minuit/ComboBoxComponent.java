@@ -101,6 +101,8 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     private List<T> items = List.of();
     private String[] labels = new String[0];
     private TextMatch.Folded[] folded = new TextMatch.Folded[0];
+    /** Each option's marks for the current query, filled on first draw; emptied by every refilter. */
+    private int[][] marksCache = new int[0][];
     private Map<String, Integer> byFolded;
 
     private int[] shown = new int[0];
@@ -649,12 +651,22 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     }
 
     private int[] marks(int index) {
+        int[] cached = marksCache[index];
+        if (cached == null) {
+            cached = computeMarks(index);
+            marksCache[index] = cached;
+        }
+        return cached;
+    }
+
+    private int[] computeMarks(int index) {
         return query.isEmpty() || rank(index) == TextMatch.NONE ? new int[0] : TextMatch.marks(folded[index], query);
     }
 
     /** Works out the rows again from the text. Runs when the text or the options change, not on every frame. */
     private void refilter() {
         query = filtering ? TextMatch.foldQuery(field.text()) : "";
+        marksCache = new int[folded.length][];
         if (query.isEmpty()) {
             shownCount = shown.length;
             for (int i = 0; i < shownCount; i++) {

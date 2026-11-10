@@ -101,7 +101,7 @@ public class CalendarComponent extends BaseComponent {
     private Function<LocalDate, List<String>> dayTooltip;
     private long min = NONE;
     private long max = NONE;
-    private long today = LocalDate.now().toEpochDay();
+    private long today = Math.floorDiv(System.currentTimeMillis() - new java.util.Date().getTimezoneOffset() * 60000L, 86400000L);
 
     private int year;
     private int month;

@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.FitCache;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -59,6 +61,7 @@ public class TableComponent<T> extends BaseComponent implements ItemSource {
         private CellRenderer<? super T> renderer;
         private Comparator<? super T> comparator;
         private Function<? super T, IconArt> icon;
+        private final FitCache fits = new FitCache();
 
         private Column(String title) {
             this.title = title == null ? "" : title;
@@ -225,6 +228,9 @@ public class TableComponent<T> extends BaseComponent implements ItemSource {
      */
     public void setItems(List<T> rows) {
         items = rows == null ? new ArrayList<>() : new ArrayList<>(rows);
+        for (Column<T> column : columns) {
+            column.fits.clear();
+        }
         rebuildView();
         clampScroll();
     }
@@ -621,9 +627,13 @@ public class TableComponent<T> extends BaseComponent implements ItemSource {
                 room -= artW + ICON_GAP;
             }
             if (hasText) {
-                String fitted = room > 0 ? d.ellipsize(text, room) : "";
-                int textX = alignedLeft(column.align, textLeft, room, d.width(fitted));
-                d.text(fitted, textX, RowLook.textY(rowY, rowHeight), ink);
+                if (room > 0) {
+                    FitCache.Fit fit = column.fits.fit(d, item, text, room);
+                    d.text(fit.cut(), alignedLeft(column.align, textLeft, room, fit.width()),
+                            RowLook.textY(rowY, rowHeight), ink);
+                } else {
+                    d.text("", alignedLeft(column.align, textLeft, room, d.width("")), RowLook.textY(rowY, rowHeight), ink);
+                }
             }
         }
     }
