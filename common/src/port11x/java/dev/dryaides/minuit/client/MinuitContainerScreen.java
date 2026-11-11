@@ -306,6 +306,13 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
     }
 
     @Override
+    public void onClose() {
+        if (!this.logic.closeOverlay(this.panel)) {
+            super.onClose();
+        }
+    }
+
+    @Override
     public void removed() {
         boolean back = this.handingBack;
         this.handingBack = false;

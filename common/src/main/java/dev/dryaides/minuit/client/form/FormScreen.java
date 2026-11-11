@@ -65,6 +65,9 @@ public final class FormScreen extends MinuitScreen {
 
     @Override
     public void onClose() {
+        if (this.panel != null && this.panel.closeOverlay()) {
+            return;
+        }
         this.state.closedByPlayer();
         super.onClose();
     }

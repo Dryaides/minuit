@@ -109,6 +109,13 @@ abstract class MinuitScreenBody extends Screen {
     }
 
     @Override
+    public void onClose() {
+        if (!this.logic.closeOverlay(this.panel)) {
+            super.onClose();
+        }
+    }
+
+    @Override
     public void removed() {
         this.logic.removed(this.panel);
         super.removed();

@@ -175,6 +175,9 @@ public abstract class MinuitScreen extends GuiScreen {
 
     /** Escape: closes the screen; a screen opened over another one goes back to it instead. */
     public void onClose() {
+        if (this.logic.closeOverlay(this.panel)) {
+            return;
+        }
         show(null);
     }
 

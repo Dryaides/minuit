@@ -150,6 +150,11 @@ public final class ScreenLogic {
         return current != null && this.host.keyPressed(current, stroke);
     }
 
+    /** A controller's back button reaches the screen's {@code onClose} without a key: it closes an open overlay first. */
+    public boolean closeOverlay(PanelComponent current) {
+        return current != null && current.closeOverlay();
+    }
+
     public boolean charTyped(PanelComponent current, int codepoint) {
         return current != null && current.charTyped(codepoint);
     }

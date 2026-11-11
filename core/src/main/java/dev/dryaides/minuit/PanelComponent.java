@@ -233,7 +233,12 @@ public abstract class PanelComponent {
         return this.overlay;
     }
 
-    /** @return true when an overlay was open: Escape then closes it, not the screen */
+    /**
+     * Closes the open overlay; Escape and a controller's back button (which calls the screen's
+     * {@code onClose} directly) both come here before the screen itself closes.
+     *
+     * @return true when an overlay was open: the key then closes it, not the screen
+     */
     public boolean closeOverlay() {
         boolean open = this.overlay != null;
         this.overlay = null;
@@ -343,7 +348,7 @@ public abstract class PanelComponent {
     public boolean keyPressed(InputKey key, boolean shift) {
         if (this.overlay != null) {
             if (key == InputKey.ESCAPE) {
-                this.overlay = null;
+                closeOverlay();
             } else if (!this.overlay.keyPressed(key, shift) && (key == InputKey.ENTER || key == InputKey.SPACE)) {
                 this.overlay.activate();
             }

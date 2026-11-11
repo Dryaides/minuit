@@ -46,6 +46,9 @@ public final class ThemeScreen extends MinuitScreen {
 
     @Override
     public void onClose() {
+        if (this.panel != null && this.panel.closeOverlay()) {
+            return;
+        }
         show(this.parent);
     }
 }

@@ -174,7 +174,7 @@ public final class DropdownComponent extends BaseComponent {
                 } else if (over && !entry.tooltip().isEmpty()) {
                     this.tooltip = entry.tooltip();
                 }
-                drawEntry(d, theme, p, entry, y);
+                drawEntry(d, theme, p, entry, y, over && clickable);
                 if (DropdownComponent.this.lines.indexOf(line) == this.keyed) {
                     theme.frame().plate(d, p, this.x + in.left() - 1, y - 1, this.w - in.left() - in.right() + 2, LINE + 2, 0, p.text());
                 }
@@ -182,9 +182,12 @@ public final class DropdownComponent extends BaseComponent {
             }
         }
 
-        private void drawEntry(Draw d, Theme theme, Palette p, Entry entry, int y) {
+        private void drawEntry(Draw d, Theme theme, Palette p, Entry entry, int y, boolean lit) {
             boolean faint = entry.state() == State.DISABLED;
-            int text = faint ? p.textFaint() : p.text();
+            // the lit row sits on raisedHover, so its ink is the button ink, not the surface text
+            int litInk = Shapes.textFor(p, p.raisedText(), p.raisedHover());
+            int text = faint ? p.textFaint() : lit ? litInk : p.text();
+            int quiet = lit ? Shapes.alpha(litInk, 0xB0) : p.textFaint();
             int mark = this.x + 10;
             int my = y + LINE / 2;
             switch (entry.state()) {
@@ -193,7 +196,7 @@ public final class DropdownComponent extends BaseComponent {
                     // the filled inner square, one pixel clear of the ring all round
                     d.fill(mark - 1, my - 1, mark + 2, my + 2, p.accent());
                 }
-                case SELECTABLE -> ring(d, mark, my, p.textSoft());
+                case SELECTABLE -> ring(d, mark, my, lit ? litInk : p.textSoft());
                 case GET -> icon(d, theme, Icon.DOWNLOAD, mark, my, p.accent());
                 case DOWNLOADING -> icon(d, theme, Icon.CLOSE, mark, my, p.textSoft());
                 case FAILED -> icon(d, theme, Icon.REFRESH, mark, my, p.bad());
@@ -209,13 +212,13 @@ public final class DropdownComponent extends BaseComponent {
                 int barW = Math.min(110, detailW - 36);
                 theme.frame().bar(d, p, detailX, y + 4, barW, 4, Math.max(0F, entry.fraction()), p.accent());
                 d.textIn(entry.detail(), new Box("", detailX + barW + 4, y + 1, detailW - barW - 4, LINE - 2),
-                        p.textSoft());
+                        lit ? quiet : p.textSoft());
             } else {
                 d.textIn(entry.detail(), new Box("", detailX, y + 1, detailW, LINE - 2),
-                        entry.state() == State.FAILED ? p.bad() : p.textFaint());
+                        entry.state() == State.FAILED ? p.bad() : quiet);
             }
-            d.textInRight(entry.size(), new Box("", sizeRight - 48, y + 1, 48, LINE - 2), p.textFaint());
-            d.textInRight(entry.ram(), new Box("", this.x + this.w - 86, y + 1, 80, LINE - 2), p.textFaint());
+            d.textInRight(entry.size(), new Box("", sizeRight - 48, y + 1, 48, LINE - 2), quiet);
+            d.textInRight(entry.ram(), new Box("", this.x + this.w - 86, y + 1, 80, LINE - 2), quiet);
         }
 
         /**

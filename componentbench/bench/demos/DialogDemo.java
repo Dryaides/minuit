@@ -374,6 +374,16 @@ public final class DialogDemo implements Demo {
             s.move(drop[0].x + 40, drop[0].y + 34);
             s.settle(200);
         });
+        // the pointer sits lower here: a family with a bleed under the button shifts the rows down
+        stage.state("dropdown hover row low", W, H, s -> {
+            Rig r = new Rig(s);
+            DropdownComponent[] drop = new DropdownComponent[1];
+            DialogComponent d = r.open(dropdownDialog(r, drop));
+            s.click(drop[0].x + 40, drop[0].y + 8);
+            s.waitMs(SETTLED);
+            s.move(drop[0].x + 40, drop[0].y + 38);
+            s.settle(200);
+        });
     }
 
     private static DialogComponent dropdownDialog(Rig r, DropdownComponent[] out) {
