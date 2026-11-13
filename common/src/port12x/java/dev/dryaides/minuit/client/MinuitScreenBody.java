@@ -51,7 +51,7 @@ abstract class MinuitScreenBody extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partial) {
         super.render(graphics, mouseX, mouseY, partial);
         if (this.panel != null) {
-            this.logic.draw(new GuiDraw(graphics), this.panel, mouseX, mouseY);
+            this.logic.draw(new GuiDraw(graphics), this.panel, mouseX, mouseY, MinuitClient.background(), this.width, this.height);
         }
     }
 
@@ -77,6 +77,9 @@ abstract class MinuitScreenBody extends Screen {
     public void tick() {
         super.tick();
         this.logic.tick(this.panel);
+        if (GamepadPoll.tick(this.host, this.panel)) {
+            onClose();
+        }
     }
 
     @Override
@@ -101,6 +104,12 @@ abstract class MinuitScreenBody extends Screen {
     public boolean keyPressed(int key, int scancode, int modifiers) {
         return this.logic.keyPressed(this.panel, GameInput.stroke(key, scancode))
                 || super.keyPressed(key, scancode, modifiers);
+    }
+
+    @Override
+    public boolean keyReleased(int key, int scancode, int modifiers) {
+        return this.logic.keyReleased(this.panel, GameInput.stroke(key, scancode))
+                || super.keyReleased(key, scancode, modifiers);
     }
 
     @Override

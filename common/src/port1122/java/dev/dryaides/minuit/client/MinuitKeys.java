@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * A game key binding as the kit's {@link KeyBinding}, for a {@code KeybindFieldComponent}. A change is
- * saved to {@code options.txt} at once. One key or mouse button: Forge's key modifier is cleared. Core
+ * saved to {@code options.txt} at once, with Forge's Ctrl, Shift or Alt modifier. Core
  * hands GLFW codes; 1.12.2 stores LWJGL 2 key codes, and mouse buttons as {@code button - 100}. Client only.
  */
 public final class MinuitKeys {
@@ -50,9 +50,14 @@ public final class MinuitKeys {
             }
 
             @Override
+            public boolean supportsModifiers() {
+                return true;
+            }
+
+            @Override
             public void bind(KeyPress key) {
                 int code = key.kind() == KeyPress.Kind.MOUSE ? key.code() + MOUSE_OFFSET : GameInput.lwjgl(key.code());
-                mapping.setKeyModifierAndCode(KeyModifier.NONE, code);
+                mapping.setKeyModifierAndCode(KeyModifier.valueOf(key.modifier().name()), code);
                 saved();
             }
 

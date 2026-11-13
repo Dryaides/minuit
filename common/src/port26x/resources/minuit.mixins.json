@@ -8,8 +8,11 @@
   ],
   "client": [
     "client.AbstractContainerScreenMixin",
+    "client.ClientTextTooltipMixin",
+    "client.GuiGraphicsExtractorMixin",
     "client.GuiMixin",
-    "client.MinecraftMixin"
+    "client.MinecraftMixin",
+    "client.TooltipRenderUtilMixin"
   ],
   "injectors": {
     "defaultRequire": 1

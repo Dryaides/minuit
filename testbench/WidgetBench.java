@@ -1,3 +1,4 @@
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.AsyncImage;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.FrameStyle;
@@ -27,8 +28,9 @@ import dev.dryaides.minuit.Themes;
 import dev.dryaides.minuit.internal.ThemeFiles;
 import dev.dryaides.minuit.Words;
 
-import site.SiteScenes.Scene;
-import static site.SiteScenes.*;
+import dev.dryaides.minuit.internal.showcase.McScenes;
+import dev.dryaides.minuit.internal.showcase.SiteScenes.Scene;
+import static dev.dryaides.minuit.internal.showcase.SiteScenes.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,10 +59,11 @@ public final class WidgetBench {
     /** @param args the shots folder, then optionally the looks to shoot, e.g. {@code glass/green,bubbly/lilac} */
     public static void main(String[] args) throws IOException {
         Themes.load(ThemeFiles.assemble(ThemeFiles.fromDirectory(THEMES, "minuit"), problems::add));
+        dev.dryaides.minuit.ItemLookup.plugIn(McScenes.LOOKUP);
         File out = new File(args[0]);
         out.mkdirs();
         BenchDraw.McFont font = new BenchDraw.McFont();
-        BaseComponent.clock = () -> now;
+        HostState.clock(() -> now);
         int shots = 0;
         checks();
         String looks = args.length > 1 ? args[1] : "bedrock/bedrock,slate/teal";
@@ -112,7 +115,7 @@ public final class WidgetBench {
     /** What Meccha's room screens ask for: a disabled tab with its tip, steppers, a stepped slider, heads. */
     static Scene mecchaScene(Theme theme) {
         Scene s = new Scene(theme, "Room");
-        TabsComponent tabs = s.put(new TabsComponent(s.place(12, 26, 276, 14), List.of("Browser", "Room", "Maps", "Editor"),
+        TabsComponent tabs = s.put(new TabsComponent(s.place(12, 26, 276, theme.frame().tabHeight(14)), List.of("Browser", "Room", "Maps", "Editor"),
                 1, i -> { }));
         tabs.disabled(3, true, "Creative mode or op only");
         s.put(new ButtonComponent(s.place(12, 56, 60, 14), "Start", () -> { }));

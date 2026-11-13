@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,6 +19,9 @@ final class HoverGlows<T> {
 
     float of(T item, boolean hovered) {
         float now = BaseComponent.glow(this.lit.getOrDefault(item, 0F), hovered, this.dt);
+        if (now != (hovered ? 1F : 0F)) {
+            Redraw.ask();
+        }
         if (now == 0F) {
             this.lit.remove(item);
         } else {

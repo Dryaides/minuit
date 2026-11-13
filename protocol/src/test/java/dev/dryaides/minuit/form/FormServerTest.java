@@ -10,6 +10,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The FormServer contract: at most one open form per player, and a newer form replaces an older one. */
@@ -143,5 +144,25 @@ class FormServerTest {
         assertFalse(s.isOpen());
         assertEquals(null, strict.session("vanilla"));
         assertTrue(this.sent.isEmpty());
+    }
+
+    @Test
+    void aFormOverTheScreenCapIsRefusedAndTheShownFormStays() {
+        FormSession shown = this.server.open("p", form("t:shown"), new FormHandler() {
+        });
+        Form.Builder big = Form.custom("t:big").title(Text.lit("T"));
+        // 300 texts of 1000 chars: about 300 KB, over the 256 KiB cap and under the node cap
+        String line = "x".repeat(1000);
+        for (int i = 0; i < 300; i++) {
+            big.text("t" + i, Text.lit(line));
+        }
+        int before = this.sent.size();
+
+        // the builder already encodes the form, so an oversized one never reaches the server
+        assertThrows(dev.dryaides.minuit.wire.WireException.class, big::build);
+
+        assertTrue(shown.isOpen());
+        assertSame(shown, this.server.session("p"));
+        assertEquals(before, this.sent.size());
     }
 }

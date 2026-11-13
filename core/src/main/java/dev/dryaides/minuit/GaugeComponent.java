@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.DoubleFunction;
@@ -386,7 +387,7 @@ public class GaugeComponent extends BaseComponent {
         } else {
             color = p.warn();
         }
-        return Ink.readable(color, DataLook.back(p), Ink.MARK);
+        return Ink.readable(p, color, DataLook.back(p), Ink.MARK);
     }
 
     // ---- drawing ----
@@ -394,13 +395,13 @@ public class GaugeComponent extends BaseComponent {
     private void step() {
         if (!Double.isFinite(target)) {
             shown = min;
-            lastStep = BaseComponent.clock.getAsLong();
+            lastStep = Redraw.quietClock();
             firstFrame = false;
             return;
         }
         double goal = clamp(target);
-        long now = BaseComponent.clock.getAsLong();
-        if (firstFrame || reducedMotion) {
+        long now = Redraw.quietClock();
+        if (firstFrame || reducedMotion()) {
             shown = goal;
         } else if (shown != goal) {
             long elapsed = lastStep == Long.MIN_VALUE ? 0L : Math.max(0L, now - lastStep);
@@ -408,6 +409,9 @@ public class GaugeComponent extends BaseComponent {
             if (Math.abs(goal - shown) < (max - min) / 720D) {
                 shown = goal;
             }
+        }
+        if (shown != goal) {
+            Redraw.ask();
         }
         lastStep = now;
         firstFrame = false;

@@ -35,10 +35,25 @@ repositories {
         name = 'NeoForge'
         url = 'https://maven.neoforged.net/releases'
     }
+    // Recipe viewers, compile only: JEI and REI find minuit's plugins themselves, so neither is needed at runtime.
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com/'
+        content { includeGroup 'mezz.jei' }
+    }
+    maven {
+        name = 'Shedaniel'
+        url = 'https://maven.shedaniel.me/'
+        content { includeGroup 'me.shedaniel'; includeGroup 'me.shedaniel.cloth' }
+    }
 }
 
 dependencies {
     implementation 'org.jetbrains:annotations:24.1.0'
+    // jei_api in gradle/versions/<mc>.properties: the versions whose port dirs hold MinuitJeiPlugin.
+    if (project.findProperty('jei_api')) {
+        compileOnly(project.jei_api.toString()) { transitive = false }
+    }
 }
 
 ['apiElements', 'runtimeElements', 'sourcesElements'].each { variant ->

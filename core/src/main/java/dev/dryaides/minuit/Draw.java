@@ -1,6 +1,9 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.ImageSource;
+import dev.dryaides.minuit.internal.DrawStats;
 import dev.dryaides.minuit.internal.GuiPart;
+import dev.dryaides.minuit.internal.Inspector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +23,23 @@ public abstract class Draw {
 
     public static final String ELLIPSIS = "...";
 
+    private Theme theme;
+
+    /**
+     * The theme of the component being drawn, for art that has no theme of its own ({@link FramedIcon}); the
+     * default theme outside a component's draw.
+     */
+    public Theme theme() {
+        return this.theme != null ? this.theme : Themes.defaultTheme();
+    }
+
+    /** Sets {@link #theme()} and returns the one it replaces, for the caller to restore. */
+    Theme useTheme(Theme theme) {
+        Theme before = this.theme;
+        this.theme = theme;
+        return before;
+    }
+
     protected abstract void rect(int x0, int y0, int x1, int y1, int argb);
 
     protected abstract void string(String text, int x, int y, int argb);
@@ -34,11 +54,10 @@ public abstract class Draw {
     }
 
     /**
-     * An item icon, 16 by 16 at {@code x, y}: the game draws the stack or the id; the base draws a
-     * stand-in token, so a renderer without the item's texture never leaves the slot blank.
+     * An item icon, 16 by 16 at {@code x, y}: the game draws the stack or the id; a renderer without the
+     * item's texture leaves the slot empty rather than invent one.
      */
     public void item(ItemView item, int x, int y) {
-        ItemStandIn.draw(this, item.id(), x, y);
     }
 
     /** What the game draws over an item: here the count when above one, white with the game's shadow. */
@@ -69,6 +88,14 @@ public abstract class Draw {
     }
 
     /**
+     * The game's item tooltip as lines for a themed popup ({@link TipDelay}): the item's text, its colours and
+     * formats as section codes. Null when this renderer has none or every line is blank.
+     */
+    public List<String> itemTooltipLines(ItemView item) {
+        return null;
+    }
+
+    /**
      * A sprite of the game's atlas {@code atlas} ({@link SpriteIcon}) stretched to {@code w} by {@code h}.
      * The base reads the sprite's own file, {@code namespace:textures/path.png}.
      *
@@ -86,10 +113,22 @@ public abstract class Draw {
      * An entity turned by {@code yaw} and {@code pitch} (degrees) in the box from {@code x0, y0} to
      * {@code x1, y1}.
      *
-     * @return false when this renderer draws no entity; the caller then draws its stand-in
+     * The base draws the game's box model from the texture {@link #texels} reads ({@link EntitySketch}); the game
+     * overrides this with its own renderer.
+     *
+     * @return false when this renderer draws no such entity; the caller then draws its stand-in
      */
     public boolean entity(EntityView view, int x0, int y0, int x1, int y1, float yaw, float pitch) {
-        return false;
+        return EntitySketch.draw(this, view, x0, y0, x1, y1, yaw, pitch);
+    }
+
+    /**
+     * The pixels of texture {@code namespace:path.png}, for what the base draws from texels: an entity's box model.
+     *
+     * @return null when this renderer cannot read it, or not yet
+     */
+    public ImageSource.Pixels texels(String texture) {
+        return null;
     }
 
     /**
@@ -161,27 +200,27 @@ public abstract class Draw {
 
     /** Same, links in {@code linkColor} and underlined. */
     public final void rich(RichText text, int x, int y, int defaultColor, int linkColor) {
+        rich(text, x, y, defaultColor, linkColor, 0);
+    }
+
+    /**
+     * Same, on an opaque {@code under} (0 for unknown): a formatting colour (the {@code §} codes) that
+     * falls under 4.5:1 there is nudged toward black or white until it reads, keeping its hue; the default
+     * and link colours are the caller's and stay as given.
+     */
+    public final void rich(RichText text, int x, int y, int defaultColor, int linkColor, int under) {
         int pen = x;
         for (RichText.Run run : text.runs()) {
-            int color = run.link() != null ? linkColor : run.color() == 0 ? defaultColor : run.color();
+            int color = run.link() != null ? linkColor : run.color() == 0 ? defaultColor
+                    : under == 0 ? run.color() : Ink.readable(run.color(), under, Ink.TEXT);
             int style = run.link() != null ? run.style() | RichText.UNDERLINE : run.style();
             styledString(run.text(), pen, y, textColor(color), style);
             pen += styledWidth(run.text(), run.style());
         }
     }
 
-    /** The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide. */
-    protected abstract String cut(String text, int maxWidth);
-
-    /**
-     * The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide, no ellipsis.
-     *
-     * @deprecated forwards to {@link #cut}; use that. To be removed in 2.0.
-     */
-    @Deprecated
-    public final String prefix(String text, int maxWidth) {
-        return cut(text, maxWidth);
-    }
+    /** The longest prefix of {@code text} that is at most {@code maxWidth} pixels wide, no ellipsis. */
+    public abstract String cut(String text, int maxWidth);
 
     /**
      * Part of a texture, {@code texture} written {@code namespace:path/to/file.png}.
@@ -233,9 +272,80 @@ public abstract class Draw {
     public void nextLayer() {
     }
 
-    public abstract void push(float x, float y, float scale);
+    private float atX;
+    private float atY;
+    private float atScale = 1F;
+    private float[] saved = new float[24];
+    private int depth;
+    private OverlayLayer layer;
 
-    public abstract void pop();
+    /**
+     * Moves by ({@code x}, {@code y}) and scales by {@code scale} what follows, until {@link #pop}. The kit keeps
+     * the sum of the open pushes, so a popup queued in {@link #overlay} is drawn later at the same place.
+     */
+    public final void push(float x, float y, float scale) {
+        if (this.depth * 3 + 3 > this.saved.length) {
+            this.saved = java.util.Arrays.copyOf(this.saved, this.saved.length * 2);
+        }
+        int at = this.depth++ * 3;
+        this.saved[at] = this.atX;
+        this.saved[at + 1] = this.atY;
+        this.saved[at + 2] = this.atScale;
+        this.atX += this.atScale * x;
+        this.atY += this.atScale * y;
+        this.atScale *= scale;
+        pushPose(x, y, scale);
+    }
+
+    public final void pop() {
+        if (this.depth > 0) {
+            int at = --this.depth * 3;
+            this.atX = this.saved[at];
+            this.atY = this.saved[at + 1];
+            this.atScale = this.saved[at + 2];
+        }
+        popPose();
+    }
+
+    /** The renderer's own push: translate by ({@code x}, {@code y}), then scale. */
+    protected abstract void pushPose(float x, float y, float scale);
+
+    protected abstract void popPose();
+
+    /** Where the open pushes put this Draw's origin, and their scale. */
+    final float atX() {
+        return this.atX;
+    }
+
+    final float atY() {
+        return this.atY;
+    }
+
+    final float atScale() {
+        return this.atScale;
+    }
+
+    final OverlayLayer layer() {
+        return this.layer;
+    }
+
+    final void layer(OverlayLayer layer) {
+        this.layer = layer;
+    }
+
+    /**
+     * A popup for the {@link OverlayLayer}: queued with the current transform and drawn by the root host on top of
+     * the screen, outside every scissor, and given the input first while it is open. With no host drawing (a widget
+     * drawn alone) it is painted here at once. {@code target} answers the input in the coordinates of this call.
+     */
+    public final OverlayLayer.Entry overlay(BaseComponent target, int mx, int my, OverlayLayer.Painter painter) {
+        if (this.layer != null) {
+            return this.layer.add(this, target, painter);
+        }
+        OverlayLayer.Entry e = new OverlayLayer.Entry(target, painter, 0F, 0F, 1F);
+        OverlayLayer.paint(this, e, mx, my);
+        return e;
+    }
 
     /**
      * Clips what follows to the box from ({@code x0}, {@code y0}) to ({@code x1}, {@code y1}), given in the
@@ -251,27 +361,55 @@ public abstract class Draw {
 
     public final void fill(int x0, int y0, int x1, int y1, int argb) {
         if (x1 > x0 && y1 > y0) {
+            if (DrawStats.ENABLED && DrawStats.target == this) {
+                DrawStats.fills++;
+            }
+            if (Inspector.ENABLED && Inspector.inks != null && Inspector.target == this) {
+                Inspector.inks.add(argb);
+            }
             rect(x0, y0, x1, y1, argb);
         }
     }
 
     /**
      * A rectangle shaded between four corner colours, each channel blended linearly across and
-     * down. The kit's only gradient: one fill per pixel row of each column, so keep it small (a
-     * colour square, a bar), never a whole screen.
+     * down. A renderer with vertex colours sends it as one quad ({@link #shaded}) or one quad per
+     * column ({@link #vertical}); the fallback is one fill per pixel, so keep it small.
      */
     public final void gradient(int x0, int y0, int x1, int y1, int topLeft, int topRight, int bottomLeft,
                                int bottomRight) {
+        if (x1 > x0 && y1 > y0) {
+            if (DrawStats.ENABLED && DrawStats.target == this) {
+                DrawStats.gradients++;
+            }
+            shaded(x0, y0, x1, y1, topLeft, topRight, bottomLeft, bottomRight);
+        }
+    }
+
+    /** Four-corner gradient; the default splits it into one {@link #vertical} band per column. */
+    protected void shaded(int x0, int y0, int x1, int y1, int topLeft, int topRight, int bottomLeft,
+                          int bottomRight) {
+        if (topLeft == topRight && bottomLeft == bottomRight) {
+            vertical(x0, y0, x1, y1, topLeft, bottomLeft);
+            return;
+        }
         int w = x1 - x0;
-        int h = y1 - y0;
         for (int col = 0; col < w; col++) {
             float u = w == 1 ? 0F : col / (float) (w - 1);
-            int top = Shapes.mix(topLeft, topRight, u);
-            int bottom = Shapes.mix(bottomLeft, bottomRight, u);
-            for (int row = 0; row < h; row++) {
-                float v = h == 1 ? 0F : row / (float) (h - 1);
-                rect(x0 + col, y0 + row, x0 + col + 1, y0 + row + 1, Shapes.mix(top, bottom, v));
-            }
+            vertical(x0 + col, y0, x0 + col + 1, y1, Shapes.mix(topLeft, topRight, u),
+                    Shapes.mix(bottomLeft, bottomRight, u));
+        }
+    }
+
+    /** Top-to-bottom gradient; the default sends one fill per pixel row. */
+    protected void vertical(int x0, int y0, int x1, int y1, int top, int bottom) {
+        int h = y1 - y0;
+        if (DrawStats.ENABLED && DrawStats.target == this) {
+            DrawStats.fills += h;
+        }
+        for (int row = 0; row < h; row++) {
+            float v = h == 1 ? 0F : row / (float) (h - 1);
+            rect(x0, y0 + row, x1, y0 + row + 1, Shapes.mix(top, bottom, v));
         }
     }
 
@@ -281,6 +419,12 @@ public abstract class Draw {
     }
 
     public final void text(String text, int x, int y, int color) {
+        if (DrawStats.ENABLED && DrawStats.target == this) {
+            DrawStats.texts++;
+        }
+        if (Inspector.ENABLED && Inspector.inks != null && Inspector.target == this) {
+            Inspector.inks.add(color);
+        }
         string(text, x, y, textColor(color));
     }
 
@@ -314,11 +458,6 @@ public abstract class Draw {
     /** The text in {@code box}: one line, vertically centred, cut with "..." when too long. */
     public final void textIn(String text, Box box, int color) {
         textFit(text, box.x(), box.y() + (box.h() - 8) / 2 + (box.h() > 8 ? 1 : 0), box.w(), color);
-    }
-
-    /** Same, right-aligned in {@code box}. */
-    public final void textInRight(String text, Box box, int color) {
-        textFitRight(text, box.right(), box.y() + (box.h() - 8) / 2 + (box.h() > 8 ? 1 : 0), box.w(), color);
     }
 
     /** The text cut to fit {@code maxWidth} pixels, with "..." when it was too long. */

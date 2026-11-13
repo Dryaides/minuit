@@ -111,6 +111,32 @@ public final class SlotLayout {
         return out;
     }
 
+    /** The game's player menu ({@code InventoryMenu}): the craft result's index; the 2x2 grid follows it. */
+    public static final int PLAYER_MENU_RESULT = 0;
+    /** The game's player menu: the helmet's index; chestplate, leggings and boots follow it. */
+    public static final int PLAYER_MENU_HEAD = 5;
+    /** The game's player menu: the offhand's index. */
+    public static final int PLAYER_MENU_OFFHAND = 45;
+
+    /**
+     * The game's player menu equipment slots at its place, container-local item corners, the same on every
+     * version since 1.9: the craft result (0), the 2x2 grid (1 to 4), the armour head to feet (5 to 8) and the
+     * offhand (45).
+     */
+    @Incubating
+    public static List<Cell> playerMenuEquipment() {
+        List<Cell> out = new ArrayList<>(10);
+        out.add(new Cell(PLAYER_MENU_RESULT, 154, 28));
+        for (int i = 0; i < 4; i++) {
+            out.add(new Cell(1 + i, 98 + (i % 2) * PITCH, 18 + (i / 2) * PITCH));
+        }
+        for (int i = 0; i < 4; i++) {
+            out.add(new Cell(PLAYER_MENU_HEAD + i, 8, 8 + i * PITCH));
+        }
+        out.add(new Cell(PLAYER_MENU_OFFHAND, 77, 62));
+        return out;
+    }
+
     /** The first item row of the player inventory under a grid of {@code rows} starting at {@code gridTop}. */
     public static int inventoryTop(int gridTop, int rows) {
         return gridTop + rows * PITCH + 13;

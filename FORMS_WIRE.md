@@ -1,7 +1,7 @@
 # minuit wire format
 
 The bytes minuit sends between client and server. Read this to write your own client or server.
-The Java codec (`dev.dryaides.minuit.wire`) is internal and may change in any 1.x release; these
+The Java codec (`dev.dryaides.minuit.wire`) is internal and may change in any release; these
 bytes do not.
 
 ## Channels
@@ -44,8 +44,9 @@ no build sends one yet. The server keeps each player's hello until they leave: a
 `MinuitServer.client(player)`, a Paper plugin with `PaperForms.client(player)`.
 
 Capabilities are named `area/level` or `area.feature`, and a level includes the lower ones. New
-features add a capability; the protocol number changes only in 2.0. 1.x defines `hello/1` and
-`form/1` (the node kinds below and the three form kinds).
+features add a capability; the protocol number changes only in a major release. 2.x defines `hello/1` and
+`form/1` (the node kinds below and the three form kinds). `form.shop` adds the `product`, `balance`
+and `cart` kinds; a client without it draws their fallback text.
 
 ## Screen
 
@@ -105,6 +106,22 @@ kind as its fallback text plus its children.
 | `progress` | 16 per mille `svarint`, negative when unknown | |
 | `image` | 17 `image` | |
 | `grid` | 16 columns `varint`; children are image buttons | |
+| `product` | label = name, 16 price `varlong`, 17 `image`, 18 sale price `varlong`, 19 stock `svarint` (-1 no limit), 20 category `str` (64), 21 quantity `varint` (0 to 999, at most the stock) on a cart line | a press (card), quantity `varint` (line) |
+| `balance` | label = currency name, 16 amount `varlong`, 17 currency `image` | |
+| `cart` | label = checkout button, 16 purchases `varint` (checkouts accepted; the client shows a purchase toast when it grows), 17 refusals `varint` (checkouts refused; the client shows field 18 when it grows), 18 reason `text` (why the last checkout was refused, empty once the cart moves on); children are `product` lines with a quantity | a press with the confirmed total (checkout, after the client's confirm dialog) |
+
+A `grid` whose children are `product` cards lays them out as cards, with category tabs (All first) when any card has a category.
+
+`varlong` is a varint over 64 bits, at most 9 bytes, never negative. A press on a product card asks
+the server to add one to the cart; the server then patches the cart's children. The server, not the
+client, checks stock and balance on checkout, then patches the balance, the cards' price and stock
+and an empty cart. The checkout press carries the total the confirm dialog showed; when the
+catalogue's total for the same lines differs (a sale ended, a price moved), the server charges
+nothing, sends the lines and cards at their new prices and raises refusals with the reason. A mod
+whose payment fails gets the same refused path: no purchase is counted. Product card ids are at
+most 27 characters so that the line id `line.<id>` fits; the builder throws above that. In the
+vanilla dialog fallback the checkout opens a `minecraft:confirmation` dialog (lines, total, balance
+before and after) whose yes button sends the press with that total.
 
 The root is a `column`. If its last child is a `row` with id `footer`, the client pins that row
 below the scrolling body.
@@ -120,7 +137,7 @@ Slider `volume` moved to 50, session 1, input 3:
 Each message is `varint session`, `varint seq` (counts up per session), `byte op`, then:
 
 - `0 change`: `str nodeId` (32), the value in the kind's "sent back" type.
-- `1 press`: `str nodeId` (32).
+- `1 press`: `str nodeId` (32), then on a cart's checkout `varlong confirmed`, the total the player confirmed (absent on any other press).
 - `2 closed`: `byte reason`, the `close` codes. Clients send 0 to 2.
 
 ## Size caps

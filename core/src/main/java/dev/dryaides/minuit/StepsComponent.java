@@ -507,7 +507,7 @@ public class StepsComponent extends BaseComponent {
             return Shapes.alpha(DataLook.opaque(p.disabledText()), REST_EDGE);
         }
         if (step < current && errors.get(step) == null) {
-            return Ink.readable(p.primary(), p.surface(), Ink.MARK);
+            return Ink.readable(p, p.markInk(), p.surface(), Ink.MARK);
         }
         return Shapes.alpha(DataLook.opaque(Ink.on(p, p.surface())), LINE_REST);
     }
@@ -518,7 +518,7 @@ public class StepsComponent extends BaseComponent {
         }
         State state = state(step);
         if (state == State.ERROR) {
-            return Ink.readable(p.bad(), p.surface(), Ink.MARK);
+            return Ink.readable(p, p.bad(), p.surface(), Ink.MARK);
         }
         return state == State.CURRENT || over ? Ink.on(p, p.surface()) : Ink.soft(p, p.surface());
     }
@@ -550,7 +550,7 @@ public class StepsComponent extends BaseComponent {
                 drawGlyph(d, step, state, mx, my, size, p.destructiveText());
             }
             case CURRENT -> {
-                int ink = Ink.readable(p.primary(), p.surface(), Ink.MARK);
+                int ink = Ink.readable(p, p.markInk(), p.surface(), Ink.MARK);
                 frame.plate(d, p, mx, my, size, size, Shapes.alpha(ink, 0x30), 0);
                 frame.plate(d, p, mx, my, size, size, 0, ink);
                 drawGlyph(d, step, state, mx, my, size, Ink.on(p, p.surface()));

@@ -206,6 +206,21 @@ public final class GuiDraw extends Draw {
         GuiComponent.fill(this.pose, x0, y0, x1, y1, argb);
     }
 
+    /** One vertex-coloured quad instead of the base's fill per pixel row. */
+    @Override
+    protected void vertical(int x0, int y0, int x1, int y1, int top, int bottom) {
+        Gradients.INSTANCE.fill(this.pose, x0, y0, x1, y1, top, bottom);
+    }
+
+    /** {@code fillGradient} is an instance method only a subclass may call. */
+    private static final class Gradients extends GuiComponent {
+        static final Gradients INSTANCE = new Gradients();
+
+        void fill(PoseStack pose, int x0, int y0, int x1, int y1, int top, int bottom) {
+            fillGradient(pose, x0, y0, x1, y1, top, bottom);
+        }
+    }
+
     @Override
     protected void string(String text, int x, int y, int argb) {
         this.font.draw(this.pose, text, x, y, argb);
@@ -217,7 +232,7 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    protected String cut(String text, int maxWidth) {
+    public String cut(String text, int maxWidth) {
         return this.font.plainSubstrByWidth(text, maxWidth);
     }
 
@@ -280,14 +295,14 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    public void push(float x, float y, float scale) {
+    protected void pushPose(float x, float y, float scale) {
         this.pose.pushPose();
         this.pose.translate(x, y, 0F);
         this.pose.scale(scale, scale, 1F);
     }
 
     @Override
-    public void pop() {
+    protected void popPose() {
         this.pose.popPose();
     }
 

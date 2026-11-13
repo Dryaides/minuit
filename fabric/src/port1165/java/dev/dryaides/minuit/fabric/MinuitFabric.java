@@ -19,6 +19,7 @@ public final class MinuitFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        FabricBundling.check();
         ServerForms.sender((player, bytes) -> ServerPlayNetworking.send(player, WirePayload.SCREEN,
                 new WirePayload(WirePayload.SCREEN, bytes).buf()));
         ServerPlayNetworking.registerGlobalReceiver(WirePayload.HELLO, (server, player, handler, buf, sender) -> {

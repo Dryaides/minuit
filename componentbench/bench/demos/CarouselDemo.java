@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -86,11 +87,11 @@ public final class CarouselDemo implements Demo {
 
         stage.state("reduced motion jumps", W, H, s -> {
             CarouselComponent<String> c = make(s);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 clickBox(s, BenchAccess.arrowBox(c, true));
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
@@ -183,15 +184,15 @@ public final class CarouselDemo implements Demo {
         });
 
         stage.state("auto play never under reduced motion", W, H, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             CarouselComponent<String> c = make(s).autoPlay(100);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
                 s.waitMs(500);
-                BaseComponent.reducedMotion = true;
+                HostState.reducedMotion(true);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

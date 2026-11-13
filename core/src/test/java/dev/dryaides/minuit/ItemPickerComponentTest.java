@@ -86,4 +86,26 @@ class ItemPickerComponentTest {
         again.search("@demo");
         assertEquals("demo:wrench", again.shown().get(0));
     }
+
+    /** 80 px wide: 3 columns of 18 px beside the rims and bar, so 40 ids make 14 rows; 96 px of grid show 5 of them. */
+    @Test
+    void scrollBarPagesOnTheTrackAndDragsToTheEnd() {
+        int maxScroll = 14 - 5;
+        int barX = ScrollBar.wellX(FrameStyles.VANILLA, 0, 80) + 1;
+        int trackTop = 16 + 4 + 2;
+        int trackH = 120 - 16 - 4 - 4;
+
+        ItemPickerComponent paged = new ItemPickerComponent(new Box("paged", 0, 0, 80, 120), (key, args) -> key, LOOKUP, id -> {});
+        paged.mouseClicked(barX, trackTop + trackH - 1, 0);
+        paged.mouseReleased(barX, trackTop + trackH - 1, 0);
+        assertEquals(5, paged.scrolledRows());
+
+        ItemPickerComponent dragged = new ItemPickerComponent(new Box("dragged", 0, 0, 80, 120), (key, args) -> key, LOOKUP, id -> {});
+        dragged.mouseClicked(barX, trackTop + 1, 0);
+        dragged.mouseDragged(barX, trackTop + 1 + trackH, 0, 0, trackH);
+        dragged.mouseReleased(barX, trackTop + 1 + trackH, 0);
+        assertEquals(maxScroll, dragged.scrolledRows());
+        dragged.mouseDragged(barX, trackTop + 1, 0, 0, -trackH);
+        assertEquals(maxScroll, dragged.scrolledRows());
+    }
 }

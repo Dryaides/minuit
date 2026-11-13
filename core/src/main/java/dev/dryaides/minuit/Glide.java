@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.Maths;
 
 /**
@@ -31,14 +32,9 @@ public final class Glide {
         public float apply(float t) {
             switch (this) {
                 case OUT_CUBIC:
-                    float r = 1F - t;
-                    return 1F - r * r * r;
+                    return (float) Ease.outCubic(t);
                 case IN_OUT_CUBIC:
-                    if (t < 0.5F) {
-                        return 4F * t * t * t;
-                    }
-                    float s = -2F * t + 2F;
-                    return 1F - s * s * s / 2F;
+                    return (float) Ease.inOutCubic(t);
                 default:
                     return t;
             }
@@ -58,7 +54,7 @@ public final class Glide {
     public Glide(Slide from, int durationMs) {
         this.from = from;
         this.durationMs = Math.max(1, durationMs);
-        this.at = BaseComponent.clock.getAsLong();
+        this.at = BaseComponent.clock().getAsLong();
     }
 
     public Slide from() {
@@ -91,7 +87,7 @@ public final class Glide {
     public void snap(boolean shown) {
         this.shown = shown;
         this.phase = shown ? 1F : 0F;
-        this.at = BaseComponent.clock.getAsLong();
+        this.at = BaseComponent.clock().getAsLong();
     }
 
     /** The target: true while shown or showing. */
@@ -133,21 +129,25 @@ public final class Glide {
             return;
         }
         this.phase = phase();
-        this.at = BaseComponent.clock.getAsLong();
+        this.at = BaseComponent.clock().getAsLong();
         this.shown = to;
     }
 
     private float phase() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = Redraw.quietClock();
         if (this.at < 0) {
             this.at = now;
         }
         float step = (now - this.at) / (float) this.durationMs;
-        return Maths.clamp(this.phase + (this.shown ? step : -step), 0F, 1F);
+        float p = Maths.clamp(this.phase + (this.shown ? step : -step), 0F, 1F);
+        if (p != (this.shown ? 1F : 0F)) {
+            Redraw.ask();
+        }
+        return p;
     }
 
     private static boolean still() {
-        return MotionStyle.resolve(BaseComponent.reducedMotion, BaseComponent.playerMotion, null,
-                BaseComponent.screenMotion) == MotionStyle.NONE;
+        return MotionStyle.resolve(BaseComponent.reducedMotion(), BaseComponent.playerMotion(), null,
+                BaseComponent.screenMotion()) == MotionStyle.NONE;
     }
 }

@@ -14,6 +14,11 @@ public record AtlasIcon(String texture, int u, int v, int width, int height, int
         return new AtlasIcon(texture, (index % 16) * 16, (index / 16) * 16, 16, 16, 256, 256);
     }
 
+    /** A whole PNG of {@code size} by {@code size} pixels as one icon, such as {@code mymod:textures/gui/tab_home.png}. */
+    public static AtlasIcon whole(String texture, int size) {
+        return new AtlasIcon(texture, 0, 0, size, size, size, size);
+    }
+
     @Override
     public void draw(Draw d, int x, int y, int color, float alpha) {
         d.blit(this.texture, x, y, this.u, this.v, this.width, this.height, this.texW, this.texH, alpha);

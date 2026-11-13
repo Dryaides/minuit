@@ -21,6 +21,21 @@ dependencies {
         implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
         implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
     }
+    // REI's Fabric jar carries its API; intermediary names on obfuscated versions, hence mod*.
+    if (project.findProperty('rei_fabric')) {
+        "${obfuscated ? 'modCompileOnly' : 'compileOnly'}"(project.rei_fabric.toString()) { transitive = false }
+        // REI's Rectangle (exclusion zones) lives in cloth basic-math, the version cloth-config pulls in for REI; never bundled.
+        "${obfuscated ? 'modCompileOnly' : 'compileOnly'}"('me.shedaniel.cloth:basic-math:0.6.1') { transitive = false }
+    }
+}
+
+// The viewer entrypoints, only on the versions whose jar holds the plugin classes (fabric.mod.json is shared).
+def viewerEntrypoints = ''
+if (project.findProperty('jei_api')) {
+    viewerEntrypoints += ',\n    "jei_mod_plugin": ["dev.dryaides.minuit.client.MinuitJeiPlugin"]'
+}
+if (project.findProperty('rei_fabric')) {
+    viewerEntrypoints += ',\n    "rei_client": ["dev.dryaides.minuit.client.MinuitReiPlugin"]'
 }
 
 if (obfuscated) {
@@ -37,6 +52,13 @@ if (obfuscated) {
     }
 }
 
+// Mod Menu's two API interfaces as compile stand-ins, so MinuitModMenu builds with no Mod Menu
+// dependency. No jar carries them: with Mod Menu installed the game links its real ones.
+sourceSets.main.java.srcDir 'src/modmenu-api/java'
+tasks.withType(Jar).configureEach {
+    exclude 'com/terraformersmc/**'
+}
+
 base {
     archivesName = "${mod_id}-fabric-${minecraft_version}"
 }
@@ -51,11 +73,21 @@ processResources {
             "mod_license"            : project.license,
             "minecraft_version_range": project.minecraft_version_range_alt.toString(),
             "java_version"           : project.java_version.toString(),
+            "fabric_loader_version"  : project.fabric_loader_version.toString(),
             "sources_url"            : project.sources_url,
             "issues_url"             : project.issues_url,
             // Fabric API's mod id was "fabric" until the 1.19 era; 1.16.5 sets fabric_api_id=fabric.
             "fabric_api_id"          : (project.findProperty('fabric_api_id') ?: 'fabric-api').toString(),
+            "viewer_entrypoints"     : viewerEntrypoints,
     ]
+    // Mod Menu's API package on 1.16.5 is not checked yet: no Config button there for now.
+    def modMenu = project.minecraft_version.toString() != '1.16.5'
+    inputs.property("mod_menu", modMenu)
+    if (!modMenu) {
+        filesMatching("fabric.mod.json") {
+            filter { line -> line.contains('"modmenu": ["') ? null : line }
+        }
+    }
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand props }
 }

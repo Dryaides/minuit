@@ -21,6 +21,10 @@ import java.util.Map;
  * button and the exit send a {@code minecraft:custom} click with id {@link #ACTION}, the session and
  * every input; the server applies them through the session's own checks, runs the press, then shows
  * the dialog again with the stored values, or clears it once the session is over.
+ *
+ * <p>A cart's checkout does not press at once: its click asks for {@link #confirm}, a
+ * {@code minecraft:confirmation} dialog with the lines, the total and the balance before and after.
+ * Its yes button sends the press with the total it showed; its no button shows the form again.
  */
 public final class Fallback {
 
@@ -32,6 +36,10 @@ public final class Fallback {
     public static final String PRESS = "minuit_press";
     /** Payload key set by the exit button and by Escape. */
     public static final String CLOSED = "minuit_closed";
+    /** Payload key of a cart whose checkout asks for the confirm dialog. */
+    public static final String CHECKOUT = "minuit_checkout";
+    /** Payload key of the total the confirm dialog showed, as a decimal string. */
+    public static final String TOTAL = "minuit_total";
 
     /** The vanilla side of a server, for the player type {@code P}. */
     public interface Dialogs<P> {
@@ -74,9 +82,12 @@ public final class Fallback {
         } else {
             List<String> actions = new ArrayList<>();
             for (WireNode b : walk.actions) {
-                actions.add(button(Fields.readText(b.field(Fields.LABEL).orElseThrow()),
+                Text label = b.kind().equals("product") && b.fallback().isPresent() ? b.fallback().get()
+                        : Fields.readText(b.field(Fields.LABEL).orElseThrow());
+                String key = b.kind().equals("cart") ? CHECKOUT : PRESS;
+                actions.add(button(label,
                         b.field(Fields.TOOLTIP).map(Fields::readText).orElse(null),
-                        "{\"" + PRESS + "\":" + str(b.id()) + extra + "}"));
+                        "{\"" + key + "\":" + str(b.id()) + extra + "}"));
             }
             out.append(",\"actions\":").append(list(actions));
             out.append(",\"columns\":").append(Math.min(2, actions.size()));
@@ -107,9 +118,92 @@ public final class Fallback {
             }
         }
         if (payload.get(PRESS) instanceof String press) {
-            out.add(new InputMessage.Press(session.id(), ++seq, press));
+            long total = InputMessage.NONE;
+            if (payload.get(TOTAL) instanceof String t && t.matches("[0-9]{1,18}")) {
+                total = Long.parseLong(t);
+            }
+            out.add(new InputMessage.Press(session.id(), ++seq, press, total));
         }
         return out;
+    }
+
+    /**
+     * The confirm step of a cart's checkout as a {@code minecraft:confirmation} dialog: the lines, the
+     * total and, when the form shows a balance, the balance before and after. Null when {@code cartId}
+     * is not a shown cart.
+     */
+    public static String confirm(FormSession session, String cartId) {
+        WireNode cart = find(session.now(), cartId);
+        if (cart == null || !cart.kind().equals("cart") || !flag(cart, Fields.VISIBLE) || !flag(cart, Fields.ENABLED)) {
+            return null;
+        }
+        List<String> body = new ArrayList<>();
+        long total = 0;
+        for (WireNode line : cart.children()) {
+            if (!line.kind().equals("product") || !flag(line, Fields.VISIBLE) || line.field(Fields.QUANTITY).isEmpty()) {
+                continue;
+            }
+            int quantity = Fields.readVarint(line.field(Fields.QUANTITY).orElseThrow());
+            if (quantity == 0) {
+                continue;
+            }
+            long price = Fields.readVarlong(line.field(Fields.PRICE).orElseThrow());
+            long unit = line.field(Fields.SALE).map(Fields::readVarlong).filter(s -> s < price).orElse(price);
+            total = plus(total, unit > Long.MAX_VALUE / quantity ? Long.MAX_VALUE : unit * quantity);
+            body.add(plain(Text.tr("minuit.shop.line", "%s x%s", label(line), Text.lit(Integer.toString(quantity)))));
+        }
+        body.add(plain(amount(Text.tr("minuit.shop.total", "Total"), total)));
+        WireNode wallet = first(session.now(), "balance");
+        if (wallet != null) {
+            long balance = Fields.readVarlong(wallet.field(Fields.AMOUNT).orElseThrow());
+            body.add(plain(amount(Text.tr("minuit.shop.balance", "Balance"), balance)));
+            body.add(plain(amount(Text.tr("minuit.shop.after", "After"), balance - total)));
+        }
+        String extra = ",\"" + SESSION + "\":" + session.id();
+        Text yes = cart.field(Fields.LABEL).map(Fields::readText).orElse(Text.tr("minuit.shop.checkout", "Checkout"));
+        return "{\"type\":\"minecraft:confirmation\",\"title\":" + text(Text.tr("minuit.shop.confirm", "Buy these?"))
+                + ",\"body\":" + list(body)
+                + ",\"can_close_with_escape\":false,\"pause\":false,\"after_action\":\"wait_for_response\""
+                + ",\"yes\":" + button(yes, null, "{\"" + PRESS + "\":" + str(cartId) + ",\"" + TOTAL + "\":\"" + total + "\"" + extra + "}")
+                + ",\"no\":" + button(Text.tr("gui.cancel", "Cancel"), null, "{" + extra.substring(1) + "}") + "}";
+    }
+
+    private static Text amount(Text name, long amount) {
+        return Text.tr("minuit.shop.priced", "%s: %s", name, Text.lit(Long.toString(amount)));
+    }
+
+    private static long plus(long a, long b) {
+        return a > Long.MAX_VALUE - b ? Long.MAX_VALUE : a + b;
+    }
+
+    private static String plain(Text text) {
+        return "{\"type\":\"minecraft:plain_message\",\"contents\":" + text(text) + ",\"width\":260}";
+    }
+
+    private static WireNode find(WireNode node, String id) {
+        if (node.id().equals(id)) {
+            return node;
+        }
+        for (WireNode child : node.children()) {
+            WireNode found = find(child, id);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    private static WireNode first(WireNode node, String kind) {
+        if (node.kind().equals(kind) && flag(node, Fields.VISIBLE)) {
+            return node;
+        }
+        for (WireNode child : node.children()) {
+            WireNode found = first(child, kind);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     private static Value value(WireNode node, Object raw) {
@@ -169,6 +263,23 @@ public final class Fallback {
                     }
                 }
                 case "button" -> {
+                    if (enabled) {
+                        this.actions.add(node);
+                    }
+                }
+                case "product" -> {
+                    if (node.field(Fields.QUANTITY).isPresent()) {
+                        node.fallback().ifPresent(t -> message(Text.tr("minuit.shop.line", "%s x%s", t,
+                                Text.lit(Integer.toString(Fields.readVarint(node.field(Fields.QUANTITY).orElseThrow()))))));
+                    } else if (enabled) {
+                        this.actions.add(node);
+                    }
+                }
+                case "cart" -> {
+                    node.field(Fields.REASON).map(Fields::readText)
+                            .filter(t -> !(t instanceof Text.Lit lit && lit.text().isEmpty()))
+                            .ifPresent(t -> message(t instanceof Text.Tr tr ? new Text.Tr(tr.key(), tr.fallback(), tr.args(), Text.Style.WARN) : t));
+                    children(node, enabled);
                     if (enabled) {
                         this.actions.add(node);
                     }

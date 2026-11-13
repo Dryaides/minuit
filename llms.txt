@@ -1,0 +1,34 @@
+# minuit
+
+> Themed UI components for Minecraft mod screens (Fabric, Forge, NeoForge; forms for Paper). The player picks
+> one theme; every mod built with minuit follows it. Mod id `minuit`, API 2.x, Java packages under
+> `dev.dryaides.minuit`.
+
+Rules for code that uses minuit:
+
+- Depend on minuit, never bundle it. Gradle: Modrinth Maven `https://api.modrinth.com/maven`, coordinates
+  `maven.modrinth:minuit:2.0.0+<mc>-<loader>` (loader `fabric`, `forge`, `neoforge`). Version range `[2.0,3.0)`.
+- API: public types in `dev.dryaides.minuit`, `.client`, `.server`, `.form`. Never use `internal` packages or `wire`.
+  `@Incubating` types may change in a minor release.
+- Register a theme at client init: `Themes.register(Themes.defaultTheme().as("mymod"), "My Mod")`.
+  Read it with `Themes.byId("mymod")` each time a screen builds.
+- A screen: a `PanelComponent` subclass (plain Java) adds widgets with `add(new XComponent(at(new Box(name, x, y, w, h)), ...))`,
+  overrides `width()`, `height()`, `drawBackground`; a `MinuitScreen` returns it from `build(w, h)`.
+  Open with `MinuitScreen.show(screen)`, close with `MinuitScreen.show(null)`.
+- Menus: `MinuitContainerScreen<M>` with `build(leftPos, topPos)`; slots from `SlotLayout`, drawn by
+  `SlotGridComponent`, `PlayerInventoryComponent`, `SlotComponent`.
+- HUD: `HudLayer.main().add(new HudBar(modId, id, HudAnchor.X, width))`, also `HudPanel`, `HudComponent`.
+- Popups go through `Draw.overlay(...)` / `OverlayLayer`; `PopoverComponent(anchor, panel)` for small floating panels.
+- Segmented controls (`TabsComponent`, `ToggleGroupComponent`, `SideRailComponent`) take `style(PressStyle.OVERLAP | RAISED_SELECTED | SEPARATE)`.
+- `ScrollComponent`: declared height is a maximum; content past it drops the box to 80% and scrolls; `fit = false` for fixed regions.
+- Key bindings: `new KeybindFieldComponent(box, words, MinuitKeys.binding(keyMapping))`.
+- Server forms: `MinuitServer.forms().open(player, Form.custom(id)...build(), handler)`; Paper: `PaperForms.of(plugin).forms()`.
+- Colours come from `Palette` roles via `theme.palette()`; never hard-code colours in a component.
+
+## Docs
+
+- [API.md](API.md): component list and the API contract
+- [THEMES.md](THEMES.md): chromas, families, palette roles, layout rules
+- [Getting started](docs/getting-started/README.md): Fabric, Forge, NeoForge, Paper
+- [Guides](docs/guides/README.md): simple screen, container screen, HUD, theme, press styles, popups, keybind field, scroll
+- [FORMS_WIRE.md](FORMS_WIRE.md): the forms wire format (internal)

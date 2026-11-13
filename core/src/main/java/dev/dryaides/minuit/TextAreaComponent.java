@@ -398,7 +398,7 @@ public class TextAreaComponent extends BaseComponent {
     }
 
     private void touch() {
-        caretSince = clock.getAsLong();
+        caretSince = clock().getAsLong();
     }
 
     /** Scrolls just enough to show the caret's line. */
@@ -698,10 +698,10 @@ public class TextAreaComponent extends BaseComponent {
     /** Takes only the undo and redo keys, which have no InputKey. Every other key goes on to {@link #keyPressed}. */
     @Override
     public boolean keyCaptured(KeyPress press) {
-        if (!focused || !active || press.kind() != KeyPress.Kind.KEY || !keys.ctrl()) {
+        if (!focused || !active || press.kind() != KeyPress.Kind.KEY || !heldKeys().ctrl()) {
             return false;
         }
-        boolean shift = keys.shift();
+        boolean shift = heldKeys().shift();
         if (press.code() == RAW_Z) {
             if (shift) {
                 redo();
@@ -728,7 +728,7 @@ public class TextAreaComponent extends BaseComponent {
             drag = Drag.BAR;
             return true;
         }
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         boolean again = now - lastClickAt <= DOUBLE_CLICK_MS
                 && Math.abs(mx - lastClickX) <= CLICK_SLOP && Math.abs(my - lastClickY) <= CLICK_SLOP;
         clickCount = again ? clickCount % 3 + 1 : 1;
@@ -738,7 +738,7 @@ public class TextAreaComponent extends BaseComponent {
         dragLastX = lastClickX;
         dragLastY = lastClickY;
         if (clickCount == 1) {
-            placeAt(mx, my, keys.shift());
+            placeAt(mx, my, heldKeys().shift());
             drag = Drag.CHARS;
         } else {
             placeAt(mx, my, false);
@@ -824,7 +824,7 @@ public class TextAreaComponent extends BaseComponent {
         if (!focused || !active) {
             return false;
         }
-        boolean ctrl = keys.ctrl();
+        boolean ctrl = heldKeys().ctrl();
         switch (key) {
             case LEFT -> moveSideways(false, shift, ctrl);
             case RIGHT -> moveSideways(true, shift, ctrl);
@@ -995,10 +995,10 @@ public class TextAreaComponent extends BaseComponent {
     }
 
     private boolean caretShown() {
-        if (reducedMotion) {
+        if (reducedMotion()) {
             return true;
         }
-        long since = clock.getAsLong() - caretSince;
+        long since = clock().getAsLong() - caretSince;
         return since < 0 || since % (2 * TextFieldComponent.BLINK_MS) < TextFieldComponent.BLINK_MS;
     }
 }

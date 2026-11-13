@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.FitCache;
 import dev.dryaides.minuit.internal.Lists;
 
@@ -143,7 +144,7 @@ public class GridComponent<T> extends BaseComponent {
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         T over = this.active && hovered ? itemAt(mx, my) : null;
-        this.glows.frame(clock.getAsLong());
+        this.glows.frame(Redraw.quietClock());
         for (int i = 0; i < this.items.size(); i++) {
             T item = this.items.get(i);
             boolean on = item.equals(over);
@@ -158,6 +159,7 @@ public class GridComponent<T> extends BaseComponent {
             return false;
         }
         this.cursor = this.items.indexOf(item);
+        this.selected = item;
         click();
         this.onClick.accept(item);
         return true;
@@ -198,8 +200,9 @@ public class GridComponent<T> extends BaseComponent {
         if (this.items.isEmpty()) {
             return false;
         }
+        this.selected = this.items.get(Maths.clamp(this.cursor, 0, this.items.size() - 1));
         click();
-        this.onClick.accept(this.items.get(Maths.clamp(this.cursor, 0, this.items.size() - 1)));
+        this.onClick.accept(this.selected);
         return true;
     }
 

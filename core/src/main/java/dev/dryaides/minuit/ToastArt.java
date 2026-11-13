@@ -22,6 +22,7 @@ public final class ToastArt {
     public static void draw(Draw d, Theme theme, ToastSpec toast, int x, int y, long shownMs) {
         Palette p = theme.palette();
         theme.frame().toast(d, p, x, y, W, H);
+        int title = Ink.readable(p, p.accent(), Ink.seen(p, p.surface()), Ink.TEXT);
         if (toast.icon() != null) {
             toast.icon().draw(d, x + 8, y + 8, p.text(), 1F);
         }
@@ -29,11 +30,11 @@ public final class ToastArt {
         int room = x + W - 5 - tx;
         List<String> body = toast.body().isEmpty() ? List.of() : d.wrap(toast.body(), room);
         if (body.isEmpty()) {
-            d.textFit(toast.title(), tx, y + 12, room, p.accent());
+            d.textFit(toast.title(), tx, y + 12, room, title);
             return;
         }
         if (body.size() == 1) {
-            d.textFit(toast.title(), tx, y + 7, room, p.accent());
+            d.textFit(toast.title(), tx, y + 7, room, title);
             d.text(body.get(0), tx, y + 18, p.text());
             return;
         }
@@ -42,7 +43,7 @@ public final class ToastArt {
         float out = Maths.clamp(1F - 2F * fade, 0F, 1F);
         float in = Maths.clamp(2F * fade - 1F, 0F, 1F);
         if (out > 0F) {
-            d.textFit(toast.title(), tx, y + 11, room, Shapes.alpha(p.accent(), Math.round(255 * out)));
+            d.textFit(toast.title(), tx, y + 11, room, Shapes.alpha(title, Math.round(255 * out)));
         }
         if (in > 0F) {
             // The card stays 32 high, as the game's: two lines, the second cut with an ellipsis when more follow.

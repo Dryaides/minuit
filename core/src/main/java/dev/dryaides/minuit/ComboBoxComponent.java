@@ -27,18 +27,15 @@ import java.util.function.Function;
  *                 .emptyText(words.get("mymod.no_block"))
  *                 .onSelect(this::use));
  *         add(new ButtonComponent(at(new Box("ok", 10, 34, 80, 20)), words.get("gui.done"), this::save));
- *         // Last, so that the list is drawn over the button and offered every input first.
- *         add(block.popup());
  *     }
  * }
  * }</pre>
  *
  * <h2>Putting it in a panel</h2>
- * Add {@link #popup()} <b>after every other widget</b> of the panel, one for each combo box. Without
- * that call the combo box draws the list itself, which only works when the combo box comes after what
- * the list can cover. A panel's {@code overlay} is not used because it gets no wheel turns and no drags,
- * which a list of 10,000 needs. {@link #area(Box)} is the box the list has to stay in: the panel by
- * default, or pass the screen's box for a list that may leave the panel.
+ * Add it like any widget, anywhere in the panel, in a {@link ScrollComponent} or a window too: the open list
+ * goes to the {@link OverlayLayer}, drawn over every widget and outside every scissor, and gets the clicks,
+ * wheel turns and drags first. {@link #area(Box)} is the box the list has to stay in: the panel by default, or
+ * pass the screen's box for a list that may leave the panel.
  *
  * <h2>Keys</h2>
  * <ul>
@@ -57,8 +54,7 @@ import java.util.function.Function;
  * While the list is open, the first click outside only closes it, so it presses nothing beneath.
  *
  * <p>{@code active = false} or {@code visible = false} closes an open list. The widgets beneath still
- * show their hover, because a panel gives them the real pointer position. Only a direct child of a
- * panel has been tried: not one inside a {@link ScrollComponent}, a {@link WindowComponent} or a dialog.
+ * show their hover, because a panel gives them the real pointer position.
  */
 public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     /** Height of a row of the list, the same as the rows of a context menu. */
@@ -116,7 +112,6 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     private boolean clearable = true;
     private boolean fuzzy = true;
     private boolean openOnClick = true;
-    private boolean layered;
     private int maxRows = 8;
     private int popupWidth;
     private Box area;
@@ -279,15 +274,6 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     public ComboBoxComponent<T> tooltip(String... lines) {
         super.tooltip(lines);
         return this;
-    }
-
-    /**
-     * The list as a widget of its own: add it after every other widget of the panel, so that it is drawn
-     * on top and offered every input first.
-     */
-    public BaseComponent popup() {
-        layered = true;
-        return layer;
     }
 
     // ---- content ----
@@ -475,7 +461,7 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
             list.lit(direction > 0 ? 0 : shownCount - 1);
         }
         revealLit();
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(true);
         } else {
             glide.replay();
@@ -793,8 +779,11 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
         }
         drawButtons(d, t, p, frame, active && inField(mx, my) ? buttonAt(mx, my) : NO_BUTTON);
         itemTipShown = false;
-        if (open && !layered) {
-            layer.draw(d, t, mx, my, delta);
+        if (open) {
+            d.overlay(layer, mx, my, (on, x, y) -> layer.draw(on, t, x, y, delta)).onClose(() -> {
+                BaseComponent.click();
+                close();
+            });
         } else if (hovered && active && itemTooltips && !hasOwnTip() && overValueArt(mx, my)) {
             itemTipShown = ItemArt.hoverTooltip(d, valueArt(), mx, my);
         }
@@ -888,7 +877,7 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     private void drawPopup(Draw d, Theme t, int mx, int my) {
         place();
         drawnRows = 0;
-        boolean moving = !reducedMotion && glide.moving();
+        boolean moving = !reducedMotion() && glide.moving();
         String empty = BaseComponent.text(emptyText, words, "minuit.no_results", "No results");
         list.draw(d, t, mx, my, layer, empty, moving ? Math.min(1F, glide.progress()) : 1F);
         int hoverRow = moving || list.dragging() ? -1 : list.rowAt(mx, my);
@@ -960,12 +949,6 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
         if (!visible) {
             return null;
         }
-        if (open && !layered) {
-            ItemView row = layer.itemAt(mx, my);
-            if (row != null) {
-                return row;
-            }
-        }
         return overValueArt(mx, my) && valueArt() instanceof ItemView item ? item : null;
     }
 
@@ -1014,9 +997,7 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
 
     @Override
     public List<String> tooltipAt(double mx, double my) {
-        if (sync() && !layered) {
-            return layer.tooltipAt(mx, my);
-        }
+        sync();
         return fieldTooltip(mx, my);
     }
 
@@ -1042,10 +1023,9 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
         return visible && active && settled();
     }
 
-    /** While the list is open, every click belongs to it when it draws itself. */
     @Override
     public boolean isOver(double mx, double my) {
-        return inField(mx, my) || (open && !layered);
+        return inField(mx, my);
     }
 
     @Override
@@ -1066,9 +1046,6 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         sync();
-        if (open && !layered) {
-            return layer.mouseClicked(mx, my, button);
-        }
         if (!accepts() || button != 0 || !inField(mx, my)) {
             return false;
         }
@@ -1107,9 +1084,6 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (list.dragging() && !layered) {
-            return layer.mouseDragged(mx, my, button, dx, dy);
-        }
         return field.mouseDragged(mx, my, button, dx, dy);
     }
 
@@ -1117,15 +1091,7 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
     public boolean mouseReleased(double mx, double my, int button) {
         heldButton = NO_BUTTON;
         field.mouseReleased(mx, my, button);
-        if (!layered) {
-            return layer.mouseReleased(mx, my, button);
-        }
         return false;
-    }
-
-    @Override
-    public boolean mouseScrolled(double mx, double my, double amount) {
-        return open && !layered && layer.mouseScrolled(mx, my, amount);
     }
 
     @Override
@@ -1194,7 +1160,7 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
         this.words = words;
     }
 
-    /** The list as the panel's widget: draws it and takes the clicks, wheel turns and drags while it is open. */
+    /** The open list in the {@link OverlayLayer}: draws it and takes the clicks, wheel turns and drags first. */
     private final class Layer extends BaseComponent implements ItemSource, PopupList.Rows {
         Layer() {
             super(0, 0, 0, 0);
@@ -1262,7 +1228,10 @@ public class ComboBoxComponent<T> extends BaseComponent implements ItemSource {
                 return null;
             }
             int row = list.rowAt(mx, my);
-            return row >= 0 && artOf(shownAt(row)) instanceof ItemView item ? item : null;
+            if (row >= 0) {
+                return artOf(shownAt(row)) instanceof ItemView item ? item : null;
+            }
+            return overValueArt(mx, my) && valueArt() instanceof ItemView item ? item : null;
         }
 
         @Override

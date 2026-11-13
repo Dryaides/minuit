@@ -13,6 +13,14 @@ public interface FormHandler {
     default void pressed(FormSession session, String id) {
     }
 
+    /**
+     * A press that carries the total the player confirmed, as a cart's checkout does; {@code confirmed}
+     * is {@link dev.dryaides.minuit.wire.InputMessage#NONE} when the client sent none.
+     */
+    default void pressed(FormSession session, String id, long confirmed) {
+        pressed(session, id);
+    }
+
     default void closed(FormSession session, CloseReason why) {
     }
 }

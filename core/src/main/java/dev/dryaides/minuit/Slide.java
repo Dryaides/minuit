@@ -33,7 +33,7 @@ public enum Slide {
 
     /** How far the panel still is from its place {@code elapsedMs} into the glide, as {x, y}. */
     public int[] offset(long elapsedMs, int width, int height) {
-        if (BaseComponent.reducedMotion || elapsedMs >= TabsComponent.SLIDE_MS) {
+        if (BaseComponent.reducedMotion() || elapsedMs >= TabsComponent.SLIDE_MS) {
             return new int[]{0, 0};
         }
         float left = remaining(elapsedMs);

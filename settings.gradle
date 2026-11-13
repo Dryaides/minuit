@@ -66,6 +66,10 @@ rootProject.name = "minuit"
 include("core")
 // The wire format of the data-driven screens and the hello, plain Java like core.
 include("protocol")
+// Bench renders for the showcase site (SiteExport, in the site worktree): plain Java plus AWT, no Minecraft code.
+if (providers.gradleProperty('site_dir').isPresent()) {
+    include("testbench")
+}
 def mcVersion = providers.gradleProperty('mc_version').getOrElse('26.1.2')
 def versionProps = new Properties()
 file("gradle/versions/${mcVersion}.properties").withInputStream { versionProps.load(it) }
@@ -89,6 +93,12 @@ include(versionProps.containsKey('forge_version') ? "forge" : "neoforge")
 // Forge before 1.17 has no Mojang-named MCP config, which ModDevGradle needs: Architectury Loom builds that :forge.
 if (versionProps.getProperty('forge_loom') == 'true') {
     project(':forge').buildFileName = 'build-loom.gradle'
+}
+// The 1.20.1 Fabric frame bench (componentbench/ingame1201, dev only), built beside :fabric with -Pingame_bench
+// so one remote build returns both jars. Its own settings.gradle still builds it alone.
+if (providers.gradleProperty('ingame_bench').isPresent() && mcVersion == '1.20.1') {
+    include("ingameBench")
+    project(':ingameBench').projectDir = file("componentbench/ingame1201")
 }
 // The plugin side for Paper servers: the transport over Bukkit's Messenger and the dialog fallback.
 // Only for the Minecraft versions whose gradle/versions file names a Paper API (26.x).

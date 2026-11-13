@@ -1,5 +1,6 @@
 package bench.render;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import dev.dryaides.minuit.BaseComponent;
@@ -10,6 +11,7 @@ import dev.dryaides.minuit.ThemeChoice;
 import dev.dryaides.minuit.Themes;
 import dev.dryaides.minuit.Words;
 import java.awt.image.BufferedImage;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
@@ -24,7 +26,8 @@ import java.util.Map;
 /**
  * Draw cost per family with no renderer behind the calls: every demo state drawn N times into a Draw that only
  * counts. In game each fill is one quad, so the fill count stands for the frame's draw cost.
- * {@code --hash <file>} also writes a digest of each state's bench picture, to prove a change draws the same pixels.
+ * {@code --hash <file>} also writes a digest of each state's bench picture, to prove a change draws the same pixels;
+ * {@code --hash -} prints them as {@code HASH <state> <digest>} lines, for a build machine that only returns its log.
  */
 public final class PerfBench {
     static final class CountingDraw extends Draw {
@@ -42,10 +45,10 @@ public final class PerfBench {
         @Override protected void rect(int x0, int y0, int x1, int y1, int argb) { rects++; }
         @Override protected void string(String text, int x, int y, int argb) { strings++; }
         @Override public int width(String text) { return font.width(text); }
-        @Override protected String cut(String text, int maxWidth) { return font.cut(text, maxWidth); }
+        @Override public String cut(String text, int maxWidth) { return font.cut(text, maxWidth); }
         @Override public void blit(String texture, int x, int y, int u, int v, int w, int h, int texW, int texH, float alpha) { blits++; }
-        @Override public void push(float x, float y, float scale) { pushes++; }
-        @Override public void pop() { }
+        @Override protected void pushPose(float x, float y, float scale) { pushes++; }
+        @Override protected void popPose() { }
         @Override public void scissor(int x0, int y0, int x1, int y1) { scissors++; }
         @Override public void endScissor() { }
         @Override public void tooltip(List<String> lines, int x, int y) { strings += lines.size(); }
@@ -69,6 +72,10 @@ public final class PerfBench {
         String hashOut = null;
         String demoFilter = null;
         String themeArg = null;
+        // "--opt=value" equals "--opt value": a -P value holds no space once a remote shell has split it.
+        args = java.util.Arrays.stream(args).flatMap(a -> a.startsWith("--") && a.contains("=")
+                ? java.util.stream.Stream.of(a.substring(0, a.indexOf('=')), a.substring(a.indexOf('=') + 1))
+                : java.util.stream.Stream.of(a)).toArray(String[]::new);
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--frames" -> frames = Integer.parseInt(args[++i]);
@@ -89,15 +96,18 @@ public final class PerfBench {
         List<Demo> demos = Main.discover(Path.of(System.getProperty("bench.classes")));
 
         Scene.Sim sim = new Scene.Sim();
-        BaseComponent.clock = sim;
-        BaseComponent.keys = sim;
-        BaseComponent.reducedMotion = false;
+        HostState.clock(sim);
+        HostState.keys(sim);
+        HostState.reducedMotion(false);
         com.sun.management.ThreadMXBean mx = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
         long tid = Thread.currentThread().getId();
 
         Map<String, Row> perSpec = new LinkedHashMap<>();
         Map<String, Row> perDemo = new LinkedHashMap<>();
-        PrintWriter hashes = hashOut == null ? null : new PrintWriter(Files.newBufferedWriter(Path.of(hashOut), StandardCharsets.UTF_8));
+        boolean hashLines = "-".equals(hashOut);
+        PrintWriter hashes = hashOut == null ? null : hashLines
+                ? new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8))
+                : new PrintWriter(Files.newBufferedWriter(Path.of(hashOut), StandardCharsets.UTF_8));
         for (Demo demo : demos) {
             if (demoFilter != null && !demo.name().toLowerCase().contains(demoFilter.toLowerCase())) {
                 continue;
@@ -108,7 +118,7 @@ public final class PerfBench {
                 for (Main.Spec spec : specs) {
                     if (hashes != null) {
                         BufferedImage img = Main.render(s, spec, 2, sim, words, font, textures);
-                        hashes.println(demo.name() + "/" + s.name() + "/" + spec.label() + " " + digest(img));
+                        hashes.println((hashLines ? "HASH " : "") + demo.name() + "/" + s.name() + "/" + spec.label() + " " + digest(img));
                     }
                     sim.now = 1_000_000L;
                     sim.ctrl = false;
@@ -144,7 +154,9 @@ public final class PerfBench {
                 }
             }
         }
-        if (hashes != null) {
+        if (hashLines) {
+            hashes.flush();
+        } else if (hashes != null) {
             hashes.close();
         }
         System.out.println("frames per state: " + frames);

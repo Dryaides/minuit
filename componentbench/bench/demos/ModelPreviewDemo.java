@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -133,15 +134,15 @@ public final class ModelPreviewDemo implements Demo {
 
         stage.state("reduced_motion_never_turns", W, H, s -> {
             int[] presses = new int[1];
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             ModelPreviewComponent c = card(s, presses).spin(ModelPreviewComponent.Spin.ALWAYS);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
                 s.move(60, 60);
                 s.waitMs(320);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
     }

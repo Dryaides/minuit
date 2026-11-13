@@ -1,12 +1,13 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.FitCache;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -140,6 +141,10 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     private Consumer<T> onActivate;
     private String emptyText;
     private int rowHeight = ROW_H;
+    /** False keeps the box at its declared height and scrolls on any overflow (see {@link ScrollComponent}). */
+    public boolean fit = true;
+    /** The declared height: the most the box takes. */
+    public int max;
     private boolean rowHeightSet;
     private boolean itemTooltips = true;
     private boolean itemTipShown;
@@ -180,6 +185,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
 
     public ReorderListComponent(Box box, Collection<? extends T> items, Function<T, String> label) {
         super(box);
+        this.max = box.h();
         this.label = Objects.requireNonNull(label, "label");
         setItems(items);
     }
@@ -490,6 +496,8 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     private int viewX() { return x + 1; }
     private int viewY() { return y + 1; }
     private int viewH() { return Math.max(0, h - 2); }
+    /** Sizes the box by the scroll rule ({@link ScrollComponent#fitted}), never under one row plus the well's edges. */
+    private void fitHeight() { h = ScrollComponent.fitted(Math.max(rowHeight, contentH()) + 2, max, fit); }
     private int contentH() { return (int) Math.min(Integer.MAX_VALUE, (long) rows.size() * rowHeight); }
     private boolean overflows() { return contentH() > viewH(); }
     private int viewW() { return Math.max(0, w - 2 - (overflows() ? BAR : 0)); }
@@ -617,13 +625,13 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
 
     /** Runs a change of the order, then slides each row seen before it from where it was to its new place. */
     private void slide(Runnable change) {
-        if (reducedMotion) {
+        if (reducedMotion()) {
             change.run();
             stopSliding();
             return;
         }
-        long now = clock.getAsLong();
-        Map<Entry<T>, Integer> before = new IdentityHashMap<>();
+        long now = clock().getAsLong();
+        Map<Entry<T>, Integer> before = new LinkedHashMap<>();
         for (int i = firstInView(); i < endOfView(); i++) {
             Entry<T> row = rowShownAt(i);
             before.put(row, visualY(row, now));
@@ -657,7 +665,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     }
 
     private void prune(long now) {
-        if (reducedMotion) {
+        if (reducedMotion()) {
             stopSliding();
             return;
         }
@@ -694,7 +702,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         liftY = armY;
         liftScroll = bar.offset();
         autoCarry = 0D;
-        lastStep = clock.getAsLong();
+        lastStep = clock().getAsLong();
         edgeSince = NEVER;
         row.animAt = NEVER;
         moving.remove(row);
@@ -743,7 +751,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
 
     /** Scrolls when the pointer holds near an edge it has moved towards; a row grabbed at the edge stays still. */
     private void stepDrag() {
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         long elapsed = Math.max(0L, Math.min(MAX_STEP_MS, now - lastStep));
         lastStep = now;
         int vy = viewY();
@@ -792,9 +800,9 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
             bar.offset(liftScroll);
         }
         reveal(row.index);
-        if (!reducedMotion) {
+        if (!reducedMotion()) {
             row.fromY = glideFrom + bar.offset();
-            row.animAt = clock.getAsLong();
+            row.animAt = clock().getAsLong();
             settling = row;
         }
         if (changed) {
@@ -817,12 +825,16 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         lastTheme = theme;
         itemTipShown = false;
+        fitHeight();
         Palette p = theme.palette();
         if (!active) {
             dropGestures();
         }
-        long now = clock.getAsLong();
+        long now = Redraw.quietClock();
         prune(now);
+        if (!moving.isEmpty() || settling != null) {
+            Redraw.ask();
+        }
         theme.frame().well(d, p, x, y, w, h, focused && active);
         if (rows.isEmpty()) {
             hover.step(-1);
@@ -947,7 +959,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         boolean isLocked = isLocked(row.item);
         if (isLocked) {
             // A colour, not a motion, so reduced motion keeps it.
-            boolean refusing = refused == row && clock.getAsLong() - refusedAt < REFUSED_MS;
+            boolean refusing = refused == row && clock().getAsLong() - refusedAt < REFUSED_MS;
             if (refusing) {
                 // The delete button's red: a red padlock alone is lost on some themes' selected rows.
                 d.fill(hx, ry + 1, hx + HANDLE, ry + rowHeight - 1, p.destructive());
@@ -1249,14 +1261,14 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         choose(row);
         if (overHandle(mx) && isLocked(row.item)) {
             refused = row;
-            refusedAt = clock.getAsLong();
+            refusedAt = clock().getAsLong();
         } else if (overHandle(mx)) {
             armed = row;
             armY = (int) my;
             lastClicked = null;
             return true;
         }
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         boolean twice = lastClicked == row && now - lastClickAt <= DOUBLE_CLICK_MS;
         if (twice) {
             lastClicked = null;
@@ -1374,7 +1386,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     private void moveCursorRow(int step, boolean toEnd) {
         if (isLocked(cursor.item)) {
             refused = cursor;
-            refusedAt = clock.getAsLong();
+            refusedAt = clock().getAsLong();
             return;
         }
         int[] free = freeSlots();
@@ -1398,13 +1410,13 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
     }
 
     private boolean moveKeyHeld() {
-        if (keys.ctrl()) {
+        if (heldKeys().ctrl()) {
             return true;
         }
         if (altHeld != null) {
             return altHeld.getAsBoolean();
         }
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         if (now - altAt < ALT_LATCH_MS) {
             altAt = now;
             return true;
@@ -1448,7 +1460,7 @@ public class ReorderListComponent<T> extends BaseComponent implements ItemSource
         int code = press.code();
         switch (code) {
             case RAW_ALT, RAW_RIGHT_ALT -> {
-                altAt = clock.getAsLong();
+                altAt = clock().getAsLong();
                 return false;
             }
             case RAW_ESCAPE -> {

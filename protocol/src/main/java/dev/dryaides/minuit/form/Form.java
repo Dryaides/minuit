@@ -114,7 +114,7 @@ public final class Form {
             return fields;
         }
 
-        private static List<WireNode> children(Consumer<Column> body) {
+        static List<WireNode> children(Consumer<Column> body) {
             Column column = new Column();
             body.accept(column);
             return column.nodes;
@@ -185,6 +185,88 @@ public final class Form {
 
         public B image(String id, Image image) {
             return add("image", id, fields(Fields.IMAGE, Fields.image(image)), List.of());
+        }
+
+        /**
+         * A product of a shop: a card whose button asks the server to add one to the cart, or a line
+         * of a {@link #cart} once {@link #quantity} is set. Prices are whole units of the shop's
+         * currency. A client without {@code form.shop} shows the name and price as text.
+         */
+        public B product(String id, Text name, Image image, long price) {
+            if (price < 0) {
+                throw new IllegalArgumentException("product " + id + ": price " + price);
+            }
+            if (!id.startsWith(Shop.LINE) && id.length() > Shop.MAX_PRODUCT_ID) {
+                throw new IllegalArgumentException("product id " + id + " is " + id.length() + " characters, at most "
+                        + Shop.MAX_PRODUCT_ID + " so that its cart line id " + Shop.LINE + id + " fits");
+            }
+            List<WireNode.Field> list = fields(Fields.LABEL, Fields.text(name), Fields.PRICE, Fields.varlong(price),
+                    Fields.FALLBACK, Fields.text(priced(name, price)));
+            if (image != null) {
+                list.add(new WireNode.Field(Fields.IMAGE, Fields.image(image)));
+            }
+            return add("product", id, list, List.of());
+        }
+
+        /** The last product's price while on sale, below its full price. */
+        public B sale(long salePrice) {
+            long price = Fields.readVarlong(last("product").field(Fields.PRICE).orElseThrow());
+            if (salePrice < 0 || salePrice >= price) {
+                throw new IllegalArgumentException("sale " + salePrice + " of " + price);
+            }
+            Text name = Fields.readText(last("product").field(Fields.LABEL).orElseThrow());
+            modify(Fields.SALE, Fields.varlong(salePrice));
+            return modify(Fields.FALLBACK, Fields.text(priced(name, salePrice)));
+        }
+
+        /** How many of the last product are left; -1 for no limit. */
+        public B stock(int stock) {
+            last("product");
+            return modify(Fields.STOCK, Fields.svarint(Math.max(-1, stock)));
+        }
+
+        /** The tab or filter the last product belongs to. */
+        public B category(String category) {
+            last("product");
+            return modify(Fields.CATEGORY, Fields.str(category, Limits.CATEGORY));
+        }
+
+        /** Makes the last product a cart line holding {@code quantity}, which the player can change. */
+        public B quantity(int quantity) {
+            if (quantity < 0 || quantity > Limits.QUANTITY) {
+                throw new IllegalArgumentException("quantity " + quantity);
+            }
+            last("product");
+            return modify(Fields.QUANTITY, Fields.varint(quantity));
+        }
+
+        /** What the player has, in whole units of {@code currency}; {@code icon} may be null for the theme's coin. */
+        public B balance(String id, Text currency, long amount, Image icon) {
+            List<WireNode.Field> list = fields(Fields.LABEL, Fields.text(currency), Fields.AMOUNT, Fields.varlong(amount),
+                    Fields.FALLBACK, Fields.text(priced(currency, amount)));
+            if (icon != null) {
+                list.add(new WireNode.Field(Fields.IMAGE, Fields.image(icon)));
+            }
+            return add("balance", id, list, List.of());
+        }
+
+        /**
+         * A cart: its children are {@link #product} lines with a {@link #quantity}. The checkout
+         * button, labelled {@code checkout}, sends a press on the cart's id.
+         */
+        public B cart(String id, Text checkout, Consumer<Column> lines) {
+            return add("cart", id, fields(Fields.LABEL, Fields.text(checkout)), children(lines));
+        }
+
+        private WireNode last(String kind) {
+            if (this.nodes.isEmpty() || !this.nodes.get(this.nodes.size() - 1).kind().equals(kind)) {
+                throw new IllegalStateException("the last node is not a " + kind);
+            }
+            return this.nodes.get(this.nodes.size() - 1);
+        }
+
+        static Text priced(Text name, long amount) {
+            return Text.tr("minuit.shop.priced", "%s: %s", name, Text.lit(Long.toString(amount)));
         }
 
         /** A part the player folds and unfolds by its title. */

@@ -52,6 +52,13 @@ public class MapComponent extends BaseComponent {
     private int labelledZoom;
     private String zoomLabel = "";
     private Consumer<MapMarker> onMarker;
+    private List<MapWaypoint> route = List.of();
+    private List<MapMarker> routeSprites = List.of();
+    private int reached;
+    private String routeText;
+    private int routeColor;
+    private int labelledBlocks = -1;
+    private String routeLabel = "";
 
     private int zoom = 1;
     private float cx = 64F;
@@ -143,6 +150,50 @@ public class MapComponent extends BaseComponent {
         return this;
     }
 
+    /**
+     * An itinerary drawn over the map: a line through the stops in order, in the theme's accent with a dark edge so
+     * it reads on any terrain, travelled legs solid and the legs still to go dashed with a chevron pointing the way,
+     * and the distance still to go in blocks in the bottom left corner. The first stop is usually the player
+     * ({@link MapWaypoint#of(MapMarker)}), the last the destination. It follows zoom and pan and is cut at the
+     * map's edge. Null or fewer than two stops clears it.
+     */
+    public MapComponent route(List<MapWaypoint> stops) {
+        route = stops == null || stops.size() < 2 ? List.of() : List.copyOf(stops);
+        List<MapMarker> sprites = new ArrayList<>();
+        for (MapWaypoint w : route) {
+            if (w.sprite() != null) {
+                sprites.add(MapMarker.at(w.sprite(), w.x(), w.y(), w.name()));
+            }
+        }
+        routeSprites = List.copyOf(sprites);
+        reached = Math.min(reached, Math.max(0, route.size() - 1));
+        labelledBlocks = -1;
+        return this;
+    }
+
+    /**
+     * How many legs are travelled: legs before stop {@code index} are drawn solid, the rest dashed, and the distance
+     * label counts only the rest. 0 (the default) shows the whole route as still to go.
+     */
+    public MapComponent routeReached(int index) {
+        reached = Math.max(0, Math.min(index, Math.max(0, route.size() - 1)));
+        labelledBlocks = -1;
+        return this;
+    }
+
+    /** The route line's colour (ARGB); 0 (the default) picks the theme's accent, or white when the accent is a terrain hue. */
+    public MapComponent routeColor(int argb) {
+        routeColor = argb;
+        return this;
+    }
+
+    /** The distance label's text with {@code %s} for the number of blocks; null (the default) takes the lang entry. */
+    public MapComponent routeText(String format) {
+        routeText = format;
+        labelledBlocks = -1;
+        return this;
+    }
+
     /** Zoom 1, 2, 4 or 8, centred on a map pixel. */
     public MapComponent view(int zoom, float centerX, float centerY) {
         this.zoom = clampZoom(zoom);
@@ -168,6 +219,16 @@ public class MapComponent extends BaseComponent {
     /** Rectangles the colour path filled for the whole map (before culling), and the block size it sampled. */
     int runCount() { return runCount; }
     int runBlock() { return runBlock; }
+
+    /** The route's stops, empty when none is set. */
+    public List<MapWaypoint> route() { return route; }
+
+    /** The length of the legs still to go, in blocks: map pixels times 2^scale of the current map (1 without one). */
+    public double routeBlocks() {
+        MapSource.MapData data = data();
+        int scale = data == null ? 0 : data.scale();
+        return pathLength(route, reached) * (1 << scale);
+    }
 
     public MapSource.MapData data() {
         return source == null ? null : source.picture(mapId);
@@ -200,16 +261,23 @@ public class MapComponent extends BaseComponent {
     private void layout(int gs) {
         int side = Math.min(w, h);
         int area = side - 2 * border(side);
+        int whole = area / MapColors.SIZE;
         int n = area * gs / MapColors.SIZE;
-        float base = n >= 1 ? n / (float) gs : area / (float) MapColors.SIZE;
+        // whole GUI pixels per map pixel when that costs at most an eighth of the side; otherwise whole device pixels
+        boolean snapped = whole >= 1 && whole * MapColors.SIZE * 8 >= area * 7;
+        float base = snapped ? whole : n >= 1 ? n / (float) gs : area / (float) MapColors.SIZE;
         float drawn = base * MapColors.SIZE;
         viewW = Math.max(1, (int) Math.floor(drawn));
         viewH = viewW;
         viewX = x + (w - viewW) / 2;
         viewY = y + (h - viewH) / 2;
         unit = base * zoom;
-        originX = viewX + viewW / 2F - cx * unit;
-        originY = viewY + viewH / 2F - cy * unit;
+        originX = snap(viewX + viewW / 2F - cx * unit, gs);
+        originY = snap(viewY + viewH / 2F - cy * unit, gs);
+    }
+
+    private float snap(float v, int gs) {
+        return unit == (int) unit ? Math.round(v) : Math.round(v * gs) / (float) gs;
     }
 
     // ---- drawing ----
@@ -245,9 +313,16 @@ public class MapComponent extends BaseComponent {
             drawRuns(d, data);
         }
         d.pop();
+        if (!route.isEmpty()) {
+            drawRoute(d, ROUTE_EDGE, 2);
+            drawRoute(d, routeColor != 0 ? routeColor : routeInk(p.accent()), 0);
+        }
         MapMarker hot = markerAt(data, mx, my);
         for (MapMarker m : data.markers()) {
             drawMarker(d, m, m == hot);
+        }
+        for (MapMarker m : routeSprites) {
+            drawMarker(d, m, false);
         }
         d.endScissor();
         if (data.locked() && viewW >= 40) {
@@ -263,6 +338,20 @@ public class MapComponent extends BaseComponent {
             d.fill(viewX + 2, viewY + 2, viewX + tw + 6, viewY + 12, 0xAA000000);
             d.text(z, viewX + 4, viewY + 3, 0xFFFFFFFF);
         }
+        if (!route.isEmpty() && viewW >= 40) {
+            int blocks = (int) Math.round(routeBlocks());
+            if (labelledBlocks != blocks) {
+                labelledBlocks = blocks;
+                String n = Integer.toString(blocks);
+                // the lang entry goes through Words.get(key, args), which formats it; a mod's own text is only filled in
+                routeLabel = routeText != null ? routeText.replace("%s", n)
+                        : words != null ? words.get("minuit.map.route.blocks", n) : n + " blocks";
+            }
+            int tw = d.width(routeLabel);
+            int ly = viewY + viewH - 12;
+            d.fill(viewX + 2, ly, viewX + tw + 6, ly + 10, 0xAA000000);
+            d.text(routeLabel, viewX + 4, ly + 1, 0xFFFFFFFF);
+        }
         if (!active) {
             d.fill(viewX, viewY, viewX + viewW, viewY + viewH, 0x88808080);
         }
@@ -273,9 +362,174 @@ public class MapComponent extends BaseComponent {
         }
     }
 
+    // ---- route ----
+
+    private static final int ROUTE_EDGE = 0xC0000000;
+    private static final int DASH_ON = 4;
+    private static final int DASH_PERIOD = 7;
+
+    /**
+     * The accent, or white when it is a saturated green, cyan or blue (hue 70 to 250 degrees), the hues of grass,
+     * forest, water and ice on a map, where it would read only through its dark edge.
+     */
+    static int routeInk(int accent) {
+        int r = accent >> 16 & 0xFF;
+        int g = accent >> 8 & 0xFF;
+        int b = accent & 0xFF;
+        int max = Math.max(r, Math.max(g, b));
+        int span = max - Math.min(r, Math.min(g, b));
+        float hue = span == 0 ? 0F : max == r ? 60F * (((g - b) / (float) span + 6F) % 6F)
+                : max == g ? 60F * ((b - r) / (float) span + 2F) : 60F * ((r - g) / (float) span + 4F);
+        boolean terrain = max > 0 && span >= max * 0.25F && hue >= 70F && hue <= 250F;
+        return terrain ? 0xFFFFFFFF : 0xFF000000 | accent;
+    }
+
+    /** Sum of the straight legs from stop {@code from} to the last, in map pixels. */
+    static double pathLength(List<MapWaypoint> stops, int from) {
+        double sum = 0;
+        for (int i = Math.max(0, from); i + 1 < stops.size(); i++) {
+            sum += Math.hypot(stops.get(i + 1).x() - stops.get(i).x(), stops.get(i + 1).y() - stops.get(i).y());
+        }
+        return sum;
+    }
+
+    /**
+     * The part of the segment inside the box (Liang-Barsky), as {t0, t1} along it, or null when none is. The box
+     * bounds are inclusive pixel centres.
+     */
+    static float[] clip(float x0, float y0, float x1, float y1, float minX, float minY, float maxX, float maxY) {
+        float t0 = 0F;
+        float t1 = 1F;
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        float[] p = {-dx, dx, -dy, dy};
+        float[] q = {x0 - minX, maxX - x0, y0 - minY, maxY - y0};
+        for (int i = 0; i < 4; i++) {
+            if (p[i] == 0F) {
+                if (q[i] < 0F) {
+                    return null;
+                }
+                continue;
+            }
+            float r = q[i] / p[i];
+            if (p[i] < 0F) {
+                t0 = Math.max(t0, r);
+            } else {
+                t1 = Math.min(t1, r);
+            }
+            if (t0 > t1) {
+                return null;
+            }
+        }
+        return new float[] {t0, t1};
+    }
+
+    /** One pass of the route: {@code grow} 2 draws the dark edge under the line, 0 the line itself. */
+    private void drawRoute(Draw d, int color, int grow) {
+        float minX = viewX;
+        float minY = viewY;
+        float maxX = viewX + viewW - 1;
+        float maxY = viewY + viewH - 1;
+        float phase = 0F;
+        for (int i = 0; i + 1 < route.size(); i++) {
+            float ax = originX + route.get(i).x() * unit;
+            float ay = originY + route.get(i).y() * unit;
+            float bx = originX + route.get(i + 1).x() * unit;
+            float by = originY + route.get(i + 1).y() * unit;
+            float len = (float) Math.hypot(bx - ax, by - ay);
+            boolean ahead = i >= reached;
+            float[] t = clip(ax, ay, bx, by, minX, minY, maxX, maxY);
+            if (t != null) {
+                stroke(d, Math.round(ax + (bx - ax) * t[0]), Math.round(ay + (by - ay) * t[0]),
+                        Math.round(ax + (bx - ax) * t[1]), Math.round(ay + (by - ay) * t[1]),
+                        phase + t[0] * len, ahead, 2 + grow, color);
+            }
+            if (ahead && len >= 20F) {
+                float ux = (bx - ax) / len;
+                float uy = (by - ay) / len;
+                int tx = Math.round((ax + bx) / 2F + ux * 2F);
+                int ty = Math.round((ay + by) / 2F + uy * 2F);
+                if (tx >= minX && ty >= minY && tx <= maxX && ty <= maxY) {
+                    for (int side = -1; side <= 1; side += 2) {
+                        int ex = Math.round(tx - ux * 4F - uy * 4F * side);
+                        int ey = Math.round(ty - uy * 4F + ux * 4F * side);
+                        stroke(d, tx, ty, ex, ey, 0F, false, 2 + grow, color);
+                    }
+                }
+            }
+            phase = ahead ? phase + len : 0F;
+        }
+        int s = 4 + grow;
+        for (int i = 1; i < route.size(); i++) {
+            MapWaypoint w = route.get(i);
+            if (w.sprite() != null) {
+                continue;
+            }
+            int px = Math.round(originX + w.x() * unit);
+            int py = Math.round(originY + w.y() * unit);
+            if (px >= minX && py >= minY && px <= maxX && py <= maxY) {
+                d.fill(px - s / 2, py - s / 2, px - s / 2 + s, py - s / 2 + s, color);
+            }
+        }
+    }
+
+    /**
+     * A line of whole GUI pixels from one pixel to another (Bresenham), {@code width} thick, pixels on the same row
+     * (or column, for a steep line) merged into one fill. Dashed lines start {@code phase} pixels into the pattern,
+     * so dashes run on across legs and across the view's edge.
+     */
+    private static void stroke(Draw d, int x0, int y0, int x1, int y1, float phase, boolean dashed, int width, int color) {
+        int dx = Math.abs(x1 - x0);
+        int dy = Math.abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1;
+        int sy = y0 < y1 ? 1 : -1;
+        boolean xMajor = dx >= dy;
+        int steps = Math.max(dx, dy);
+        float per = steps == 0 ? 0F : (float) Math.hypot(dx, dy) / steps;
+        int off = width / 2;
+        int err = dx - dy;
+        int x = x0;
+        int y = y0;
+        boolean open = false;
+        int rx0 = 0;
+        int ry0 = 0;
+        int rx1 = 0;
+        int ry1 = 0;
+        for (int i = 0; i <= steps; i++) {
+            boolean on = !dashed || (phase + i * per) % DASH_PERIOD < DASH_ON;
+            if (open && (!on || (xMajor ? y != ry1 : x != rx1))) {
+                d.fill(Math.min(rx0, rx1) - off, Math.min(ry0, ry1) - off,
+                        Math.max(rx0, rx1) - off + width, Math.max(ry0, ry1) - off + width, color);
+                open = false;
+            }
+            if (on) {
+                if (!open) {
+                    rx0 = x;
+                    ry0 = y;
+                    open = true;
+                }
+                rx1 = x;
+                ry1 = y;
+            }
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y += sy;
+            }
+        }
+        if (open) {
+            d.fill(Math.min(rx0, rx1) - off, Math.min(ry0, ry1) - off,
+                    Math.max(rx0, rx1) - off + width, Math.max(ry0, ry1) - off + width, color);
+        }
+    }
+
     /** Loading: faint stripes moving across the paper. */
     private void drawLoading(Draw d, int gs) {
-        long now = clock == null ? 0L : clock.getAsLong();
+        long now = clock() == null ? 0L : clock().getAsLong();
         int step = 12;
         int shift = (int) ((now / 60L) % step);
         for (int i = -step; i < viewW; i += step) {
@@ -388,7 +642,10 @@ public class MapComponent extends BaseComponent {
     }
 
     private int markerSize() {
-        return Math.max(5, Math.min(16, Math.round(8F * unit)));
+        if (unit == (int) unit && unit >= 1F) {
+            return unit >= 2F ? 16 : 8;
+        }
+        return Math.max(5, Math.round(8F * unit));
     }
 
     private void drawMarker(Draw d, MapMarker m, boolean hot) {
@@ -457,6 +714,20 @@ public class MapComponent extends BaseComponent {
         return best;
     }
 
+    private MapWaypoint waypointAt(double mx, double my) {
+        if (mx < viewX || my < viewY || mx >= viewX + viewW || my >= viewY + viewH) {
+            return null;
+        }
+        int half = markerSize() / 2 + 1;
+        MapWaypoint best = null;
+        for (MapWaypoint w : route) {
+            if (Math.abs(mx - (originX + w.x() * unit)) <= half && Math.abs(my - (originY + w.y() * unit)) <= half) {
+                best = w;
+            }
+        }
+        return best;
+    }
+
     @Override
     public List<String> tooltipAt(double mx, double my) {
         MapSource.MapData data = data();
@@ -467,6 +738,11 @@ public class MapComponent extends BaseComponent {
         List<String> out = new ArrayList<>(2);
         if (m != null && !m.name().isEmpty()) {
             out.add(m.name());
+        } else if (m == null) {
+            MapWaypoint w = waypointAt(mx, my);
+            if (w != null && !w.name().isEmpty()) {
+                out.add(w.name());
+            }
         }
         if (coordinates && mx >= viewX && my >= viewY && mx < viewX + viewW && my < viewY + viewH) {
             out.add("X " + data.blockX(mapX(mx)) + "  Z " + data.blockZ(mapY(my)));

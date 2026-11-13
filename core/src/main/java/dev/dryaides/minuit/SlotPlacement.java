@@ -65,19 +65,40 @@ public final class SlotPlacement {
         return this.shifts.containsKey(slotIndex);
     }
 
-    /** True when the part that places this slot draws its empty outline, so the game's own is left out. */
+    /**
+     * True when the pointer finds this menu slot and the screen shows it by default: a slot part places it,
+     * or the screen has no panel. A slot no part places is never under the pointer: no hover, tooltip,
+     * click, drag or key reaches it, whatever {@code showsSlot} says.
+     */
+    public boolean finds(int slotIndex) {
+        return this.panel == null || placed(slotIndex);
+    }
+
+    /** True when the part that places this slot draws its own empty outline ({@code SlotComponent.empty}). */
     public boolean drawsGhost(int slotIndex) {
         int[] shift = this.shifts.get(slotIndex);
         return shift != null && shift[2] == 1;
     }
 
-    /** How far the panel shows this slot's item from the menu's place, across: non-zero only on a HUD hotbar. */
+    /**
+     * Draws a menu slot's empty outline, {@code icon} (the game's armour or offhand sprite), as the theme draws
+     * a slot part's {@code empty}, its 16 px item area at {@code x, y}. A kit screen calls it from the slot draw
+     * in place of the game's grey one, which it never draws; nothing when the slot's part draws its own, or
+     * on a screen without a panel ({@link #NONE}), where the screen leaves the game's.
+     */
+    public void drawGhost(Draw d, int slotIndex, IconArt icon, int x, int y) {
+        if (this.panel != null && !drawsGhost(slotIndex)) {
+            SlotComponent.ghost(d, this.panel.theme(), icon, x, y);
+        }
+    }
+
+    /** How far the panel shows this slot's item from the menu's place, across: non-zero on a HUD hotbar and an expandable one. */
     public int shiftX(int slotIndex) {
         int[] shift = this.shifts.get(slotIndex);
         return shift == null ? 0 : shift[0];
     }
 
-    /** How far the panel shows this slot's item from the menu's place, down: non-zero only on a HUD hotbar. */
+    /** How far the panel shows this slot's item from the menu's place, down: non-zero on a HUD hotbar and an expandable one. */
     public int shiftY(int slotIndex) {
         int[] shift = this.shifts.get(slotIndex);
         return shift == null ? 0 : shift[1];

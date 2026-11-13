@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.List;
 import java.util.Objects;
 
@@ -197,7 +198,7 @@ public class HoverCardComponent extends BaseComponent {
             dirty = true;
             layout();
             glide = new Glide(anchor.slideFrom(), OPEN_MS);
-            if (reducedMotion) {
+            if (reducedMotion()) {
                 glide.snap(true);
             } else {
                 glide.replay();
@@ -206,7 +207,7 @@ public class HoverCardComponent extends BaseComponent {
                 onOpen.run();
             }
         } else {
-            if (reducedMotion) {
+            if (reducedMotion()) {
                 glide.snap(false);
             } else {
                 glide.hide();
@@ -236,7 +237,7 @@ public class HoverCardComponent extends BaseComponent {
     }
 
     private void follow(int mx, int my) {
-        long now = clock.getAsLong();
+        long now = Redraw.quietClock();
         boolean live = active && anchor.shown();
         boolean onAnchor = live && (anchor.contains(mx, my) || anchorRinged());
         boolean onCard = open && live && overCard(mx, my);
@@ -251,6 +252,9 @@ public class HoverCardComponent extends BaseComponent {
             }
             if (!open && now - overSince >= openDelay) {
                 setOpen(true);
+            }
+            if (!open) {
+                Redraw.ask();
             }
             return;
         }
@@ -267,6 +271,8 @@ public class HoverCardComponent extends BaseComponent {
         }
         if (now - awaySince >= closeDelay) {
             setOpen(false);
+        } else {
+            Redraw.ask();
         }
     }
 

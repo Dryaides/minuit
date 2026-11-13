@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -206,12 +207,12 @@ public final class CalendarDemo implements Demo {
         });
         stage.state("reduced motion has no slide", W, H, s -> {
             CalendarComponent c = cal(s, new ArrayList<>());
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.click(X + CalendarComponent.WIDTH - NAV_W + 5, Y + 5);
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("disabled calendar", W, H, s -> {

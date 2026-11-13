@@ -160,7 +160,7 @@ public class PictureComponent extends BaseComponent {
     }
 
     private void go(float z, float cx, float cy, boolean ease) {
-        if (ease && !reducedMotion) {
+        if (ease && !reducedMotion()) {
             zoomNow.go(z);
             cxNow.go(cx);
             cyNow.go(cy);
@@ -349,7 +349,7 @@ public class PictureComponent extends BaseComponent {
         if (dragged || !visible || !active || !pictureBox().contains(mx, my)) {
             return true;
         }
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         // Without zoom a double click means nothing, so each click of a fast pair counts.
         boolean twice = zoomable && now - lastClick <= DOUBLE_MS;
         lastClick = twice ? Long.MIN_VALUE / 2 : now;

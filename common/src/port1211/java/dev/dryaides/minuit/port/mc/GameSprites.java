@@ -6,12 +6,13 @@ import dev.dryaides.minuit.internal.GuiPart;
 import dev.dryaides.minuit.internal.NineSlice;
 import dev.dryaides.minuit.internal.PartTable;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.resources.model.Material;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
 
 /**
  * Atlas sprites on 1.21.1: the GUI atlas through {@code blitSprite} (its .mcmeta nine-slices, so packs
- * restyle it), any other atlas through its {@code Material}. 1.20.1 has no GUI atlas. Client only, not API.
+ * restyle it), any other atlas through {@code ModelManager.getAtlas}. 1.20.1 has no GUI atlas. Client only, not API.
  */
 public final class GameSprites {
 
@@ -20,6 +21,10 @@ public final class GameSprites {
 
     /** {@code blitSprite} has no colour argument: alpha goes through the shader colour, with blending on. */
     public static void gui(GuiGraphics g, ResourceLocation id, int x, int y, int w, int h, float alpha) {
+        if (id.getNamespace().equals("minecraft") && id.getPath().startsWith("container/slot/")) {
+            emptySlot(g, id.getPath().substring("container/slot/".length()), x, y, w, h, alpha);
+            return;
+        }
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         g.setColor(1F, 1F, 1F, alpha);
@@ -30,7 +35,11 @@ public final class GameSprites {
 
     public static void atlas(GuiGraphics g, ResourceLocation atlas, ResourceLocation id, int x, int y, int w, int h,
                              float alpha) {
-        g.blit(x, y, 0, w, h, new Material(atlas, id).sprite(), 1F, 1F, 1F, alpha);
+        TextureAtlas found = atlasOf(atlas);
+        if (found == null) {
+            return;
+        }
+        g.blit(x, y, 0, w, h, found.getSprite(id), 1F, 1F, 1F, alpha);
     }
 
     /** Marker files are in the 1.21.1 jar: nothing to stand in for. */
@@ -56,5 +65,29 @@ public final class GameSprites {
         }
         gui(g, id, x, y, w, h, alpha);
         return true;
+    }
+
+    /**
+     * The empty-slot outlines joined the GUI atlas in 1.21.2; on 1.21.1 the armour and shield ones are
+     * {@code item/empty_armor_slot_*} in the blocks atlas, and the others do not exist (drawn as nothing,
+     * not as the missing texture).
+     */
+    private static void emptySlot(GuiGraphics g, String name, int x, int y, int w, int h, float alpha) {
+        switch (name) {
+            case "helmet", "chestplate", "leggings", "boots", "shield" -> atlas(g, TextureAtlas.LOCATION_BLOCKS,
+                    ResourceLocation.withDefaultNamespace("item/empty_armor_slot_" + name), x, y, w, h, alpha);
+            default -> {
+            }
+        }
+    }
+
+    /**
+     * The atlas a sprite lives in, null when the game has none by that id. Before 26.1 items and blocks
+     * share one atlas, under its texture path ({@code minecraft:items} names nothing there).
+     */
+    private static TextureAtlas atlasOf(ResourceLocation atlas) {
+        boolean shared = atlas.getNamespace().equals("minecraft")
+                && (atlas.getPath().equals("items") || atlas.getPath().equals("blocks"));
+        return Minecraft.getInstance().getModelManager().getAtlas(shared ? TextureAtlas.LOCATION_BLOCKS : atlas);
     }
 }

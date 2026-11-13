@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +17,8 @@ class ReelComponentTest {
     private int lands;
 
     private ReelComponent<String> reel(List<String> landedOn) {
-        BaseComponent.clock = () -> this.now;
-        BaseComponent.sound = new UiSound() {
+        HostState.clock(() -> this.now);
+        HostState.sound(new UiSound() {
             @Override
             public void tick(float frac) {
                 ticks.add(frac);
@@ -27,16 +28,16 @@ class ReelComponentTest {
             public void land() {
                 lands++;
             }
-        };
+        });
         return new ReelComponent<>(new Box("r", 0, 0, 300, 80), List.of("A", "B", "C", "D", "E"), s -> s)
                 .onLand(landedOn::add);
     }
 
     @AfterEach
     void reset() {
-        BaseComponent.clock = System::currentTimeMillis;
-        BaseComponent.sound = UiSound.NONE;
-        BaseComponent.reducedMotion = false;
+        HostState.clock(System::currentTimeMillis);
+        HostState.sound(UiSound.NONE);
+        HostState.reducedMotion(false);
     }
 
     @Test
@@ -61,7 +62,7 @@ class ReelComponentTest {
     @Test
     void reducedMotionLandsAtOnceWithoutTicks() {
         List<String> landed = new ArrayList<>();
-        BaseComponent.reducedMotion = true;
+        HostState.reducedMotion(true);
         ReelComponent<String> r = reel(landed).spin(4, 7L);
         r.update();
         assertEquals(0, ticks.size());

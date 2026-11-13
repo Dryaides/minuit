@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.internal.Maths;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,7 +17,7 @@ import java.util.function.Predicate;
  * name or the id, {@code @mod} keeps one namespace, {@code #tag} one item tag ({@code #logs} tries
  * {@code minecraft:} and {@code c:}). A sort button cycles game order, name and mod, plus any mode
  * the author adds with {@link #sortBy}; a second button flips the order. Both are remembered under the
- * picker's box name for the session ({@link #sorts}).
+ * picker's box name for the session (a store the host may put on disk).
  *
  * <p>For item list mods (JEI, REI, EMI): {@link #itemAt} answers the hovered item, {@link #dropTargets}
  * and {@link #acceptDrop} take an item dropped from their list.
@@ -45,11 +46,10 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
         }
     }
 
-    /** Lives as long as the game session; a host may plug a store on disk. */
-    public static volatile SortStore sorts = SortStore.memory();
-
     public static final int CELL = 18;
     private static final int FIELD = 16;
+    /** Between the search row and the grid: past a button's lip, which reads as part of the gap otherwise. */
+    private static final int ROW_GAP = 4;
     private static final String REGISTRY = "registry";
 
     /** The picked id, or null. */
@@ -70,11 +70,13 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
     private boolean blocksOnly;
     private Predicate<String> keep = id -> true;
     private List<String> shown;
+    private final ScrollBar bar = new ScrollBar();
+    private FrameStyle frame = FrameStyles.VANILLA;
     /** Rows scrolled off the top. */
     private int scroll;
     /** The keyboard's cell in {@link #shown}, or -1 while the keyboard is in the field. */
     private int cursor = -1;
-    private boolean gameTooltip;
+    private List<String> itemLines;
 
     public ItemPickerComponent(Box box, Words words, ItemLookup items, Consumer<String> onPick) {
         super(box);
@@ -92,7 +94,7 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
         this.modeNames.put(REGISTRY, words.get("minuit.items.sort.registry"));
         this.modeNames.put("name", words.get("minuit.items.sort.name"));
         this.modeNames.put("mod", words.get("minuit.items.sort.mod"));
-        String saved = sorts.get(this.name);
+        String saved = HostState.sorts().get(this.name);
         if (saved != null) {
             restore(saved);
         }
@@ -131,7 +133,7 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
     public ItemPickerComponent sortBy(String key, String label, Comparator<ItemView> order) {
         this.modes.put(key, order);
         this.modeNames.put(key, label);
-        String saved = sorts.get(this.name);
+        String saved = HostState.sorts().get(this.name);
         if (saved != null) {
             restore(saved);
         }
@@ -190,15 +192,36 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
     }
 
     private Box gridBox() {
-        return new Box("grid", this.x, this.y + FIELD + 2, this.w, this.h - FIELD - 2);
+        return new Box("grid", this.x, this.y + FIELD + ROW_GAP, this.w, this.h - FIELD - ROW_GAP);
     }
 
+    /** The well drawn round the columns: as wide as they are plus the family's scroll bar, so no empty band sits before it. */
+    private Box wellBox(FrameStyle frame) {
+        Box grid = gridBox();
+        return new Box("well", grid.x(), grid.y(), Math.min(grid.w(), columns() * CELL + 4 + ScrollBar.room(frame)), grid.h());
+    }
+
+    /** As many cells as fit beside the 2 px rims and the widest scroll bar (a family with no gap before it). */
     private int columns() {
-        return Math.max(1, (this.w - 6) / CELL);
+        return Math.max(1, (this.w - 4 - ScrollBar.WIDTH - 1) / CELL);
+    }
+
+    int scrolledRows() {
+        return this.scroll;
+    }
+
+    private void syncBar() {
+        this.bar.content(maxScroll() + visibleRows(), visibleRows());
+        this.bar.offset(this.scroll);
+    }
+
+    private int barX(FrameStyle frame) {
+        Box grid = gridBox();
+        return ScrollBar.wellX(frame, grid.x(), grid.w());
     }
 
     private int visibleRows() {
-        return Math.max(1, (this.h - FIELD - 2 - 4) / CELL);
+        return Math.max(1, (this.h - FIELD - ROW_GAP - 4) / CELL);
     }
 
     private int maxScroll() {
@@ -210,7 +233,7 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
         Box grid = gridBox();
         double lx = mx - grid.x() - 2;
         double ly = my - grid.y() - 2;
-        if (!this.visible || lx < 0 || ly < 0 || lx >= columns() * CELL || ly >= visibleRows() * CELL) {
+        if (!this.visible || lx < 0 || ly < 0 || lx >= columns() * CELL || ly >= grid.h() - 4) {
             return -1;
         }
         int index = ((int) ly / CELL + this.scroll) * columns() + (int) lx / CELL;
@@ -292,7 +315,7 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
     }
 
     private void sorted() {
-        sorts.put(this.name, this.mode + (this.descending ? ":down" : ":up"));
+        HostState.sorts().put(this.name, this.mode + (this.descending ? ":down" : ":up"));
         this.scroll = 0;
         refilter();
     }
@@ -330,19 +353,20 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
         this.field.draw(d, theme, mx, my, this.delta);
         this.sortButton.draw(d, theme, mx, my, this.delta);
         this.orderButton.draw(d, theme, mx, my, this.delta);
-        Box grid = gridBox();
+        Box grid = wellBox(theme.frame());
         theme.frame().well(d, p, grid.x(), grid.y(), grid.w(), grid.h(), this.focused && this.cursor >= 0);
         List<String> items = shown();
         if (items.isEmpty()) {
             d.centered(this.words.get("minuit.items.none"), grid.x() + grid.w() / 2, grid.y() + (grid.h() - 8) / 2,
                     p.textFaint());
-            this.gameTooltip = false;
+            this.itemLines = null;
             return;
         }
         int over = hovered ? indexAt(mx, my) : -1;
         int cols = columns();
         d.scissor(grid.x() + 1, grid.y() + 1, grid.x() + grid.w() - 1, grid.y() + grid.h() - 1);
-        for (int row = 0; row < visibleRows(); row++) {
+        // The row cut by the grid's bottom rim is drawn too, clipped: it shows that the list goes on.
+        for (int row = 0; row <= visibleRows(); row++) {
             for (int col = 0; col < cols; col++) {
                 int index = (row + this.scroll) * cols + col;
                 if (index >= items.size()) {
@@ -357,16 +381,14 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
             }
         }
         d.endScissor();
-        int max = maxScroll();
-        if (max > 0) {
-            int track = grid.h() - 4;
-            int rows = max + visibleRows();
-            int thumb = Math.max(10, track * visibleRows() / rows);
-            int ty = grid.y() + 2 + (track - thumb) * this.scroll / max;
-            Shapes.rounded(d, grid.x() + grid.w() - 5, grid.y() + 2, 3, track, 1, p.track());
-            Shapes.rounded(d, grid.x() + grid.w() - 5, ty, 3, thumb, 1, p.accent());
-        }
-        this.gameTooltip = over >= 0 && d.itemTooltip(ItemView.of(items.get(over)), mx, my);
+        // Rows are the bar's unit; the family's own scroller draws it, as in every other scrolling area.
+        this.frame = theme.frame();
+        syncBar();
+        int barX = barX(this.frame);
+        boolean lit = this.bar.dragging() || this.active && this.bar.overThumb(mx, my, barX, grid.y() + 2, grid.h() - 4);
+        this.bar.draw(d, theme, barX, grid.y() + 2, grid.h() - 4, lit);
+        // The game's lines go to tooltipAt, so the page's TipDelay draws them in the theme's popup.
+        this.itemLines = over < 0 ? null : d.itemTooltipLines(ItemView.of(items.get(over)));
     }
 
     @Override
@@ -378,10 +400,14 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
             return this.orderButton.tooltip;
         }
         int index = indexAt(mx, my);
-        if (index < 0 || this.gameTooltip) {
+        if (index < 0) {
             return super.tooltipAt(mx, my);
         }
-        return List.of(this.lookup.name(shown().get(index)));
+        if (this.itemLines != null) {
+            return this.itemLines;
+        }
+        String name = this.lookup.name(shown().get(index));
+        return name == null || name.isBlank() ? null : List.of(name);
     }
 
     // --- input ---------------------------------------------------------------------------------
@@ -404,6 +430,12 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
             this.field.focused = true;
             return this.field.mouseClicked(mx, my, button);
         }
+        Box grid = gridBox();
+        syncBar();
+        if (button == 0 && this.bar.press(mx, my, barX(this.frame), grid.y() + 2, grid.h() - 4)) {
+            this.scroll = this.bar.offset();
+            return true;
+        }
         int index = indexAt(mx, my);
         if (index >= 0 && button == 0) {
             this.cursor = index;
@@ -415,6 +447,10 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
+        if (this.bar.dragging()) {
+            this.bar.release();
+            return true;
+        }
         this.sortButton.mouseReleased(mx, my, button);
         this.orderButton.mouseReleased(mx, my, button);
         return this.field.mouseReleased(mx, my, button);
@@ -422,6 +458,10 @@ public class ItemPickerComponent extends BaseComponent implements ItemSource, It
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (this.bar.drag(my)) {
+            this.scroll = this.bar.offset();
+            return true;
+        }
         return this.field.focused && this.field.mouseDragged(mx, my, button, dx, dy);
     }
 

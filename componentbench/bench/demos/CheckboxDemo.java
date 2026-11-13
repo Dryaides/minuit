@@ -17,11 +17,7 @@ public final class CheckboxDemo implements Demo {
 
     @Override
     public void states(Stage stage) {
-        stage.state("all states", W, 58, s -> {
-            s.add(new CheckboxComponent(new Box("off", X, 6, 150, 12), "Off", false, v -> { }));
-            s.add(new CheckboxComponent(new Box("on", X, 22, 150, 12), "On", true, v -> { }));
-            s.add(new CheckboxComponent(new Box("mixed", X, 38, 150, 12), "Mixed", false, v -> { }).state(State.MIXED));
-        });
+        stage.state("all states", W, 74, s -> selectAll(s, "Select all", new String[] {"Plains", "Desert", "Forest"}, new boolean[] {false, true, false}));
         stage.state("disabled states", W, 58, s -> {
             s.add(new CheckboxComponent(new Box("off", X, 6, 150, 12), "Off", false, v -> { }).active(false));
             s.add(new CheckboxComponent(new Box("on", X, 22, 150, 12), "On", true, v -> { }).active(false));
@@ -106,5 +102,26 @@ public final class CheckboxDemo implements Demo {
             }
             s.click(X + 16, 28);
         });
+    }
+
+    /** A parent over children: the children set it off, on or mixed, a click on it sets them all. */
+    private static void selectAll(bench.api.Scene s, String parent, String[] names, boolean[] on) {
+        CheckboxComponent[] items = new CheckboxComponent[names.length];
+        CheckboxComponent all = s.add(new CheckboxComponent(new Box("all", X, 6, 150, 12), parent, false, v -> {
+            for (CheckboxComponent i : items) {
+                i.checked(v);
+            }
+        }));
+        Runnable sum = () -> {
+            int count = 0;
+            for (CheckboxComponent i : items) {
+                count += i.checked() ? 1 : 0;
+            }
+            all.state(count == 0 ? State.OFF : count == items.length ? State.ON : State.MIXED);
+        };
+        for (int i = 0; i < names.length; i++) {
+            items[i] = s.add(new CheckboxComponent(new Box("i" + i, X + 12, 22 + i * 16, 138, 12), names[i], on[i], v -> sum.run()));
+        }
+        sum.run();
     }
 }

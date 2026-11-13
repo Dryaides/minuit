@@ -18,13 +18,13 @@ public class ToastComponent extends BaseComponent {
     /** Starts the time as if the toast came in {@code ms} ago: a preview of its fade. */
     public ToastComponent shownFor(long ms) {
         this.timed = this.toast;
-        this.since = clock.getAsLong() - ms;
+        this.since = clock().getAsLong() - ms;
         return this;
     }
 
     /** Milliseconds since the toast came in, for a bench that draws one moment of it. */
     public long shownMs() {
-        return this.since < 0 ? 0 : clock.getAsLong() - this.since;
+        return this.since < 0 ? 0 : clock().getAsLong() - this.since;
     }
 
     @Override
@@ -34,7 +34,7 @@ public class ToastComponent extends BaseComponent {
         }
         if (this.toast != this.timed || this.since < 0) {
             this.timed = this.toast;
-            this.since = clock.getAsLong();
+            this.since = clock().getAsLong();
         }
         ToastArt.draw(d, theme, this.toast, this.x, this.y, shownMs());
     }

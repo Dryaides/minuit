@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.internal;
 
+import dev.dryaides.minuit.ScreenBackground;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.Draw;
 import dev.dryaides.minuit.Glide;
@@ -43,10 +44,29 @@ public final class ScreenLogic {
     }
 
     /** Tab, panel, then the tooltips once the panel has landed. */
+    /** {@link #draw(Draw, PanelComponent, int, int)} over {@code behind}, painted across the whole screen first. */
+    public void draw(Draw d, PanelComponent current, int mouseX, int mouseY, ScreenBackground behind, int screenWidth,
+                     int screenHeight) {
+        if (current != null && behind != null && !behind.id().equals(ScreenBackground.NONE)) {
+            behind.paint(d, current.theme().palette(), screenWidth, screenHeight);
+        }
+        draw(d, current, mouseX, mouseY);
+    }
+
     public void draw(Draw d, PanelComponent current, int mouseX, int mouseY) {
         if (current == null) {
             return;
         }
+        if (DrawStats.ENABLED) {
+            long began = DrawStats.begin(d);
+            drawPanel(d, current, mouseX, mouseY);
+            DrawStats.end(d, began);
+        } else {
+            drawPanel(d, current, mouseX, mouseY);
+        }
+    }
+
+    private void drawPanel(Draw d, PanelComponent current, int mouseX, int mouseY) {
         int[] off = slideOffset(current);
         boolean moved = off[0] != 0 || off[1] != 0;
         if (moved) {
@@ -63,7 +83,7 @@ public final class ScreenLogic {
             return;
         }
         current.drawTooltip(d, mouseX, mouseY);
-        this.host.drawTabTip(d, current.bounds(), mouseX, mouseY);
+        this.host.drawTabTip(d, current.theme(), current.bounds(), mouseX, mouseY);
     }
 
     /** Where the panel still is from its place while it glides in; {0, 0} once it has landed. */
@@ -148,6 +168,10 @@ public final class ScreenLogic {
 
     public boolean keyPressed(PanelComponent current, KeyStroke stroke) {
         return current != null && this.host.keyPressed(current, stroke);
+    }
+
+    public boolean keyReleased(PanelComponent current, KeyStroke stroke) {
+        return current != null && this.host.keyReleased(current, stroke);
     }
 
     /** A controller's back button reaches the screen's {@code onClose} without a key: it closes an open overlay first. */

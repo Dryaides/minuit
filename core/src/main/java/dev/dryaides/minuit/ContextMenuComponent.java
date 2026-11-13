@@ -43,7 +43,7 @@ import java.util.function.Consumer;
  *
  * <p>A right click in a region given to {@link #on(Box)} or {@link #on(BaseComponent)} opens the menu.
  * Other clicks there go to the widgets beneath as usual. {@link #openBelow(Box)} is for a button or a
- * key: it opens under a box with the first item lit.
+ * key: it opens under a box with the first item lit; {@link MenuComponent} is a button that does it.
  *
  * <h2>Input while open</h2>
  * The menu takes all input until it closes, and gives the panel's focus back when it does. The first
@@ -59,12 +59,11 @@ import java.util.function.Consumer;
  * the pointer can cross other rows on its way in.</li>
  * </ul>
  *
- * <p>{@code active = false} or {@code visible = false} closes an open menu and lets input through. A
- * panel's {@code drawForeground} and its {@code overlay} draw above the menu, and opening closes that
- * overlay for this reason. A container screen draws its slot items over the panel's widgets, so they
- * show above the menu there. A panel also draws its Tab ring after every widget, so a menu opened by a
- * program over a widget ringed that way has the ring on it, and the widgets beneath still show their
- * hover, because a panel gives them the real pointer position.
+ * <p>{@code active = false} or {@code visible = false} closes an open menu and lets input through. The open
+ * menu goes to the {@link OverlayLayer}: it is drawn over every widget, the slot items of a container screen and
+ * the panel's {@code drawForeground}, outside every scissor, and gets the input first, so it works inside a
+ * {@link ScrollComponent} or a window. Opening closes the panel's open overlay. The widgets beneath still show
+ * their hover, because a panel gives them the real pointer position.
  */
 public final class ContextMenuComponent extends BaseComponent {
     /** What the menu holds for a click at a point: read each time it opens. Null or empty means nothing to show. */
@@ -348,6 +347,8 @@ public final class ContextMenuComponent extends BaseComponent {
     private static final double READABLE_DISABLED = 2.2D;
 
     private final PanelComponent host;
+    /** Drawn and fed by another widget (a {@link MenuComponent}) instead of being one of the panel's. */
+    boolean owned;
     private final List<BiPredicate<Double, Double>> regions = new ArrayList<>();
     private ItemsAt source = (px, py) -> List.of();
     private final Map<String, Veto> overrides = new HashMap<>();
@@ -576,6 +577,9 @@ public final class ContextMenuComponent extends BaseComponent {
     }
 
     private void checkPlace() {
+        if (owned) {
+            return;
+        }
         List<BaseComponent> widgets = host.widgets();
         int at = widgets.indexOf(this);
         if (at < 0) {
@@ -729,7 +733,7 @@ public final class ContextMenuComponent extends BaseComponent {
     }
 
     private static void start(Level l) {
-        if (reducedMotion) {
+        if (reducedMotion()) {
             l.glide.snap(true);
         } else {
             l.glide.replay();
@@ -748,11 +752,11 @@ public final class ContextMenuComponent extends BaseComponent {
         pendingLevel = level;
         pendingRow = row;
         pendingWait = wait;
-        pendingAt = clock.getAsLong();
+        pendingAt = clock().getAsLong();
     }
 
     private void runPending() {
-        if (pendingLevel < 0 || clock.getAsLong() - pendingAt < pendingWait || pendingLevel >= levels.size()) {
+        if (pendingLevel < 0 || clock().getAsLong() - pendingAt < pendingWait || pendingLevel >= levels.size()) {
             return;
         }
         int level = pendingLevel;
@@ -891,6 +895,13 @@ public final class ContextMenuComponent extends BaseComponent {
         if (host.focus() != this) {
             host.focus(this); // a button that opened the menu takes the focus after its press
         }
+        d.overlay(this, mx, my, (on, px, py) -> paintMenu(on, t, px, py)).openWhile(this::isOpen).onClose(this::close);
+    }
+
+    private void paintMenu(Draw d, Theme t, int mx, int my) {
+        if (!open) {
+            return;
+        }
         if (pointerKnown && (mx != lastMx || my != lastMy) && dragged == null) {
             pointer(mx, my);
         }
@@ -907,7 +918,7 @@ public final class ContextMenuComponent extends BaseComponent {
     private void drawLevel(Draw d, Theme t, Level l, int index) {
         Palette p = t.palette();
         FrameStyle frame = t.frame();
-        boolean moving = !reducedMotion && l.glide.moving();
+        boolean moving = !reducedMotion() && l.glide.moving();
         int clipTop = l.y;
         int clipBottom = l.y + l.h;
         if (moving) {
@@ -1294,7 +1305,7 @@ public final class ContextMenuComponent extends BaseComponent {
     }
 
     private boolean typingNow() {
-        return !typed.isEmpty() && clock.getAsLong() - typedAt <= TYPE_RESET_MS;
+        return !typed.isEmpty() && clock().getAsLong() - typedAt <= TYPE_RESET_MS;
     }
 
     @Override
@@ -1312,7 +1323,7 @@ public final class ContextMenuComponent extends BaseComponent {
             typed = "";
         }
         typed += new String(Character.toChars(codePoint));
-        typedAt = clock.getAsLong();
+        typedAt = clock().getAsLong();
         clearPending();
         truncate(current + 1);
         Level l = levels.get(current);

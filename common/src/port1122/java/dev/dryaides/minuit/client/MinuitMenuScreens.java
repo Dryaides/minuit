@@ -1,9 +1,11 @@
 package dev.dryaides.minuit.client;
 
+import dev.dryaides.minuit.internal.Bundling;
 import dev.dryaides.minuit.internal.ContainerLogic;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.gui.inventory.GuiContainer;
+import net.minecraft.client.gui.inventory.GuiContainerCreative;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.inventory.Container;
@@ -50,7 +52,9 @@ public final class MinuitMenuScreens {
 
     /** The screen to open in place of {@code next}. */
     public static GuiScreen swap(GuiScreen next) {
-        if (!(next instanceof GuiContainer) || next instanceof MinuitContainerScreen<?> || FACTORIES.isEmpty()) {
+        Bundling.onScreen();
+        if (!(next instanceof GuiContainer) || next instanceof MinuitContainerScreen<?>
+                || next instanceof GuiContainerCreative || FACTORIES.isEmpty()) {
             return next;
         }
         Container menu = ((GuiContainer) next).inventorySlots;

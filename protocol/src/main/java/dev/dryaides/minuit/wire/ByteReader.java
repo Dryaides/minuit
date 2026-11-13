@@ -24,6 +24,19 @@ public final class ByteReader {
         throw new WireException("varint longer than 5 bytes");
     }
 
+    /** A varint over 64 bits, at most 9 bytes so the value stays 0 or more. */
+    public long varlong() {
+        long value = 0;
+        for (int shift = 0; shift < 63; shift += 7) {
+            int b = u8();
+            value |= (long) (b & 0x7F) << shift;
+            if ((b & 0x80) == 0) {
+                return value;
+            }
+        }
+        throw new WireException("varlong longer than 9 bytes");
+    }
+
     public int svarint() {
         int raw = varint();
         return (raw >>> 1) ^ -(raw & 1);

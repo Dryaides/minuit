@@ -13,7 +13,6 @@ import java.util.Objects;
  *     public ColoursPanel(Theme theme, Words words, int left, int top) {
  *         super(theme, words, left, top);
  *         ButtonComponent more = add(new ButtonComponent(at(new Box("more", 10, 10, 60, 20)), words.get("mymod.more"), () -> pop.toggle()));
- *         // Last, so that it is drawn on top and offered every input first.
  *         pop = add(new PopoverComponent(more, this).title(words.get("mymod.more")).text(words.get("mymod.more.body")));
  *         pop.add(new ToggleComponent(new Box("t", 0, 0, 120, 12), words.get("mymod.grid"), true, on -> { }), 8, 34);
  *     }
@@ -21,15 +20,16 @@ import java.util.Objects;
  * }</pre>
  *
  * <h2>Putting it in a panel</h2>
- * Add it <b>after every other widget</b>, and have the anchor's own action call {@link #toggle()}. While it
- * is open, the first click outside only closes it, so it presses nothing beneath; a click on the anchor
+ * Add it like any widget and have the anchor's own action call {@link #toggle()}. The card goes to the
+ * {@link OverlayLayer}: drawn over every widget, outside every scissor, and given the input first, so an anchor
+ * inside a {@link ScrollComponent} or a window works. While it is open, the first click outside only closes it, so it presses nothing beneath; a click on the anchor
  * closes it too, and does not reopen it. {@link #passClicks(boolean)} lets a click outside go on to what
  * is beneath. Escape closes it and gives the focus back. Tab cycles inside it when it holds a widget that
  * takes the keyboard; with none, Tab closes it and moves on.
  *
  * <p>A child's position is relative to the card's top left; the card moves it as it flips. Widgets beneath
  * still show their hover, because a panel gives them the real pointer position. {@code active = false} keeps
- * it open with its widgets off. Only a direct child of a panel has been tried.
+ * it open with its widgets off.
  */
 public class PopoverComponent extends BaseComponent {
     private static final int PAD = 7;
@@ -193,7 +193,7 @@ public class PopoverComponent extends BaseComponent {
         dirty = true;
         layout();
         glide = new Glide(anchor.slideFrom(), OPEN_MS);
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(true);
         } else {
             glide.replay();
@@ -215,7 +215,7 @@ public class PopoverComponent extends BaseComponent {
             return;
         }
         open = false;
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(false);
         } else {
             glide.hide();
@@ -337,7 +337,15 @@ public class PopoverComponent extends BaseComponent {
         if (open && host.focus() == null) {
             host.focus(this);
         }
-        d.nextLayer(); // the text beneath may sort above a rectangle otherwise
+        OverlayLayer.Entry entry = d.overlay(this, mx, my, (on, px, py) -> paintCard(on, t, px, py)).openWhile(this::isOpen);
+        if (passClicks) {
+            entry.passClicks().onClose(() -> closeKeeping(false));
+        } else {
+            entry.onClose(this::close);
+        }
+    }
+
+    private void paintCard(Draw d, Theme t, int mx, int my) {
         boolean moving = glide.moving();
         if (moving) {
             int pad = SurfaceAnchor.ARROW_H;
@@ -435,6 +443,11 @@ public class PopoverComponent extends BaseComponent {
     @Override
     public boolean keyCaptured(KeyPress press) {
         return open && body.rawKey(press);
+    }
+
+    @Override
+    public boolean keyReleasedCaptured(KeyPress press) {
+        return open && body.rawKeyReleased(press);
     }
 
     @Override

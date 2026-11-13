@@ -18,6 +18,7 @@ Game textures and the font come from the Minecraft jar in `$BENCH_MC_JAR`, else 
 | Render one demo, some themes, another scale | `python build.py gallery --demo Button --themes soft:grey:light,glass:clear:dark --scale 3` |
 | Count the draw calls, time and allocation per state for each look (`--hash <file>` also digests every picture) | `python build.py perf --frames 200` |
 | Compile the Fabric 26.3 dev mod | `python build.py ingame build` |
+| Compile the 1.20.1 Fabric frame bench (Bubbly vs Bedrock frame time, fills per frame) | `python build.py ingame1201 build`, run as in `ingame1201/README.md` |
 | Run it in game | `python build.py ingame runClient` |
 
 Run `setup` once before the first `gallery`: the picture demos read the test pictures it makes. The gallery is

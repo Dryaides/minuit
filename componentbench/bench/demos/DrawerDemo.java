@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -26,7 +27,7 @@ public final class DrawerDemo implements Demo {
         final ButtonComponent button;
         Rig(Scene s) {
             this.s = s;
-            button = s.add(new ButtonComponent(new Box("b", 8, 8, 70, 20), "Behind", () -> behind[0]++));
+            button = s.fixture(new ButtonComponent(new Box("b", 8, 8, 70, 20), "Settings", () -> behind[0]++));
             s.add(new TextFieldComponent(new Box("f", 8, 34, 70, 16), "Words", v -> { }));
         }
         DrawerComponent drawer(SurfaceSide side, int size) {
@@ -63,13 +64,13 @@ public final class DrawerDemo implements Demo {
 
         stage.state("reduced motion arrives at once", W, H, s -> {
             DrawerComponent d = new Rig(s).drawer(SurfaceSide.RIGHT, 140);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 d.open(s.panel());
                 d.close();
                 d.open(s.panel());
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

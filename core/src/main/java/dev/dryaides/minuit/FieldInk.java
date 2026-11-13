@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.OfficialPalettes;
+
 /**
  * The colours of a text field, whatever the family: a dark face and light text, so typed text
  * reads on a light palette too, and a mod's vanilla edit box, which always adds the game's
@@ -19,11 +21,11 @@ final class FieldInk {
         if (well == p.well()) {
             return p;
         }
-        return new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(), p.surface(), p.surfaceEdge(),
+        return OfficialPalettes.derive(p, new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(), p.surface(), p.surfaceEdge(),
                 p.section(), well, p.wellEdge(), p.text(), p.textSoft(), p.textFaint(), p.raised(),
                 p.raisedHover(), p.raisedText(), p.primary(), p.primaryHover(), p.primaryText(), p.accent(),
                 p.accentDeep(), p.good(), p.warn(), p.bad(), p.destructive(), p.destructiveHover(),
-                p.destructiveText(), p.track(), p.disabled(), p.disabledText(), p.shadow());
+                p.destructiveText(), p.track(), p.disabled(), p.disabledText(), p.shadow(), p.link(), p.backdrop(), p.line(), p.mark(), p.slot()));
     }
 
     /** The field's face: the well when it is already dark and opaque, else the darker of text and surface, deepened. */

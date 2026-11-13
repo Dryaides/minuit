@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.client;
 
+import dev.dryaides.minuit.Internal;
 import dev.dryaides.minuit.internal.ThemeFiles;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
@@ -19,6 +20,7 @@ import java.util.Map;
  * Reads the theme files of every mod and resource pack on each resource reload and hands the
  * entries to {@link ThemeFiles#reload}. The loader entry points register it as a client reload listener.
  */
+@Internal
 public final class ThemeReload implements ResourceManagerReloadListener {
 
     /** The listener's id, {@code minuit:themes}. */

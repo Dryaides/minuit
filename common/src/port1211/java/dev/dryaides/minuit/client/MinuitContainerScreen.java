@@ -14,6 +14,13 @@ import net.minecraft.world.inventory.Slot;
  * wells ({@code SlotGridComponent}, {@code PlayerInventoryComponent} on the menu's {@code SlotLayout}),
  * the labels and the hover in the theme, and its other widgets work as on a {@link MinuitScreen}.
  *
+ * <p>Over a crafting or furnace menu the kit gives up the recipe book: the screen listens to no recipe
+ * update and draws no recipe book button; the vanilla screen behind {@code toVanilla()} keeps it. A recipe
+ * viewer (JEI, REI, EMI) still fills the craft slots through the menu, hidden or not, and draws its slot
+ * highlights at the slot's vanilla place, not at {@code slotOffsetX/Y} (not tested). Its plugin reads
+ * {@code itemUnderMouse} for its R and U keys, {@code extraAreas} for its exclusion zones and
+ * {@code dropTargets} for items dragged from its list; minuit ships no such plugin.
+ *
  * <p>Client only.
  */
 public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> extends MinuitContainerScreenBody<M> {

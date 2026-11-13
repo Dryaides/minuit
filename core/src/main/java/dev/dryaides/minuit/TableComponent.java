@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.FitCache;
 
 import java.util.ArrayList;
@@ -426,17 +427,19 @@ public class TableComponent<T> extends BaseComponent implements ItemSource {
     }
 
     private void easeScroll() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = Redraw.quietClock();
         long elapsed = lastFrame < 0L ? 0L : Math.max(0L, now - lastFrame);
         lastFrame = now;
         int target = bar.offset();
-        if (BaseComponent.reducedMotion || bar.dragging()) {
+        if (BaseComponent.reducedMotion() || bar.dragging()) {
             shownScroll = target;
             return;
         }
         shownScroll += (target - shownScroll) * (1D - Math.exp(-elapsed / (double) SCROLL_EASE_MS));
         if (Math.abs(target - shownScroll) < 0.5D) {
             shownScroll = target;
+        } else {
+            Redraw.ask();
         }
     }
 
@@ -805,7 +808,7 @@ public class TableComponent<T> extends BaseComponent implements ItemSource {
         if (row < 0) {
             return true;
         }
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         boolean twice = row == lastClickRow && now - lastClickAt <= DOUBLE_CLICK_MS;
         lastClickRow = twice ? -1 : row;
         lastClickAt = now;

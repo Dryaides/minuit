@@ -1,5 +1,8 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
+import dev.dryaides.minuit.internal.DarkTwin;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -516,7 +519,7 @@ public class TagInputComponent extends BaseComponent {
     /** How far the shake has moved what it moves, in pixels, right now. Always 0 under reduced motion. */
     int shakeOffset() {
         long age = age();
-        if (reducedMotion || age >= SHAKE_MS) {
+        if (reducedMotion() || age >= SHAKE_MS) {
             return 0;
         }
         float at = age / (float) SHAKE_MS;
@@ -662,7 +665,7 @@ public class TagInputComponent extends BaseComponent {
         layer.visible = true;
         list.reset();
         place();
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(true);
         } else {
             glide.replay();
@@ -778,7 +781,7 @@ public class TagInputComponent extends BaseComponent {
     }
 
     private void edited() {
-        caretSince = BaseComponent.clock.getAsLong();
+        caretSince = BaseComponent.clock().getAsLong();
         dirty = true;
         boolean wasOpen = open;
         refilter();
@@ -800,7 +803,7 @@ public class TagInputComponent extends BaseComponent {
     }
 
     private void refuse(String tag, Refusal why, int chip) {
-        refusedAt = BaseComponent.clock.getAsLong();
+        refusedAt = BaseComponent.clock().getAsLong();
         refusedChip = chip;
         refusedAll = why == Refusal.FULL;
         refusedInput = why == Refusal.INVALID;
@@ -946,7 +949,7 @@ public class TagInputComponent extends BaseComponent {
         if (!extend) {
             anchor = caret;
         }
-        caretSince = BaseComponent.clock.getAsLong();
+        caretSince = BaseComponent.clock().getAsLong();
         dirty = true;
         revealInput();
     }
@@ -1178,11 +1181,15 @@ public class TagInputComponent extends BaseComponent {
     }
 
     private long age() {
-        return BaseComponent.clock.getAsLong() - refusedAt;
+        long age = Redraw.quietClock() - refusedAt;
+        if (age < refuseSpan()) {
+            Redraw.ask();
+        }
+        return age;
     }
 
     private int refuseSpan() {
-        return reducedMotion ? STILL_MS : SHAKE_MS;
+        return reducedMotion() ? STILL_MS : SHAKE_MS;
     }
 
     // ---- the list's geometry ----
@@ -1420,23 +1427,37 @@ public class TagInputComponent extends BaseComponent {
         return Shapes.textOn(p, over(p, frame, face));
     }
 
-    /** The palette's red, nudged until it reads on the field: some reds are too dark for it. */
+    /**
+     * The red of an alert inside the dark field. A light palette's red is made for its light surface, so it goes
+     * halfway or more toward its dark variant's red, as far as 4.5:1 on the field: still saturated, no pale pink.
+     */
     private static int alertInk(Palette p, FrameStyle frame) {
-        return Ink.readable(p.bad(), FormLook.fieldBack(p, frame), Ink.TEXT);
+        int field = FormLook.fieldBack(p, frame) | 0xFF000000;
+        Palette dark = DarkTwin.of(p);
+        if (dark == p) {
+            return Ink.readable(p, p.bad(), field, Ink.TEXT);
+        }
+        for (int step = 5; step < 10; step++) {
+            int red = Shapes.mix(p.bad() | 0xFF000000, dark.bad() | 0xFF000000, step / 10F);
+            if (Shapes.contrast(red, field) >= Ink.TEXT) {
+                return red;
+            }
+        }
+        return dark.bad();
     }
 
     private boolean caretShown() {
-        if (reducedMotion) {
+        if (reducedMotion()) {
             return true;
         }
-        long since = BaseComponent.clock.getAsLong() - caretSince;
+        long since = BaseComponent.clock().getAsLong() - caretSince;
         return since < 0 || since % (2 * TextFieldComponent.BLINK_MS) < TextFieldComponent.BLINK_MS;
     }
 
     private void drawPopup(Draw d, Theme t, int mx, int my) {
         place();
         drawnRows = 0;
-        boolean moving = !reducedMotion && glide.moving();
+        boolean moving = !reducedMotion() && glide.moving();
         list.draw(d, t, mx, my, layer, "", moving ? Math.min(1F, glide.progress()) : 1F);
     }
 
@@ -1583,7 +1604,7 @@ public class TagInputComponent extends BaseComponent {
         }
         if (selectingText && active) {
             caret = indexAtX(mx);
-            caretSince = BaseComponent.clock.getAsLong();
+            caretSince = BaseComponent.clock().getAsLong();
             return true;
         }
         return false;
@@ -1691,7 +1712,7 @@ public class TagInputComponent extends BaseComponent {
     }
 
     private void backspace() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         if (selected >= 0) {
             removeByPlayer(selected, selected > 0 ? selected - 1 : 0);
             return;

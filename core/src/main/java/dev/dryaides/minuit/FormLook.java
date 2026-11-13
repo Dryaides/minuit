@@ -174,10 +174,10 @@ final class FormLook {
 
     /** True while a caret that was moved at {@code since} shows. Steady under reduced motion. */
     static boolean caretShown(long since) {
-        if (BaseComponent.reducedMotion) {
+        if (BaseComponent.reducedMotion()) {
             return true;
         }
-        long age = BaseComponent.clock.getAsLong() - since;
+        long age = BaseComponent.clock().getAsLong() - since;
         return age < 0 || age % (2 * TextFieldComponent.BLINK_MS) < TextFieldComponent.BLINK_MS;
     }
 }

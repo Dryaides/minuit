@@ -1,12 +1,15 @@
 package dev.dryaides.minuit.forge;
 
+import dev.dryaides.minuit.internal.Bundling;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.internal.game.ServerForms;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.network.NetHandlerPlayServer;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.ModContainer;
 import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -19,6 +22,10 @@ import net.minecraftforge.fml.relauncher.Side;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,7 +33,7 @@ import java.util.Map;
  * form input on the server side. Either side may lack minuit, so any remote mod list is accepted. The
  * client half is {@link MinuitForgeClient}, which this class calls on the client alone.
  */
-@Mod(modid = "minuit", name = "minuit", acceptableRemoteVersions = "*")
+@Mod(modid = "minuit", name = "minuit", acceptableRemoteVersions = "*", guiFactory = "dev.dryaides.minuit.forge.MinuitGuiFactory")
 public final class MinuitForge {
 
     private static final Logger LOG = LogManager.getLogger("minuit");
@@ -37,6 +44,7 @@ public final class MinuitForge {
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
+        bundling(event);
         hello = NetworkRegistry.INSTANCE.newEventDrivenChannel(WirePayload.HELLO);
         screen = NetworkRegistry.INSTANCE.newEventDrivenChannel(WirePayload.SCREEN);
         input = NetworkRegistry.INSTANCE.newEventDrivenChannel(WirePayload.INPUT);
@@ -49,6 +57,21 @@ public final class MinuitForge {
         if (event.getSide().isClient()) {
             MinuitForgeClient.preInit();
         }
+    }
+
+    /** ContainedDeps: Forge extracts a mod's nested jars out of the mods folder, then loads them as mods. */
+    private static void bundling(FMLPreInitializationEvent event) {
+        File mods = new File(event.getModConfigurationDirectory().getParentFile(), "mods");
+        if (!Bundling.extractedDep(event.getSourceFile().toPath(), mods.toPath(), Loader.MC_VERSION)) {
+            return;
+        }
+        List<ModContainer> containers = new ArrayList<>(Loader.instance().getActiveModList());
+        List<Path> jars = new ArrayList<>();
+        for (ModContainer container : containers) {
+            jars.add(container.getSource() == null || "minuit".equals(container.getModId()) ? null : container.getSource().toPath());
+        }
+        int parent = Bundling.containedDepsParent(jars);
+        Bundling.found(parent < 0 ? null : containers.get(parent).getName() + " (" + containers.get(parent).getModId() + ")");
     }
 
     @Mod.EventHandler

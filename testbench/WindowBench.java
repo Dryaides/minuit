@@ -1,9 +1,13 @@
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.Icon;
 import dev.dryaides.minuit.ColorPickerComponent;
 import dev.dryaides.minuit.Draw;
 import dev.dryaides.minuit.PanelComponent;
 import dev.dryaides.minuit.FrameStyles;
+import dev.dryaides.minuit.FrameStyle;
+import dev.dryaides.minuit.GlassFrame;
+import dev.dryaides.minuit.GlassPalette;
 import dev.dryaides.minuit.RadialComponent;
 import dev.dryaides.minuit.SliderComponent;
 import dev.dryaides.minuit.ToggleComponent;
@@ -29,14 +33,14 @@ public class WindowBench {
     public static void main(String[] args) {
         File out = new File(args.length > 0 ? args[0] : "out");
         BenchMock.McFont font = new BenchMock.McFont();
-        BaseComponent.clock = () -> now;
+        HostState.clock(() -> now);
         List<String> taps = new ArrayList<>();
-        BaseComponent.sound = new UiSound() {
+        HostState.sound(new UiSound() {
             @Override
             public void tap() {
                 taps.add("tap@" + now);
             }
-        };
+        });
         for (String family : List.of("slate", "leather")) {
             for (ThemeChoice.Variant v : List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK)) {
                 Theme theme = Themes.resolve(Themes.SLATE, new ThemeChoice(family, "default", v));
@@ -46,8 +50,12 @@ public class WindowBench {
                 window(font, theme, out, tag);
             }
         }
-        for (String frame : List.of("leather", "slate", "bedrock", "glass", "soft", "bubbly")) {
-            Theme t = new Theme(frame, Themes.SLATE.palette(), FrameStyles.byName(frame));
+        for (String frame : List.of("leather", "slate", "bedrock", "slate-glass", "soft", "bubbly")) {
+            boolean glass = frame.endsWith("-glass");
+            FrameStyle style = FrameStyles.byName(glass ? frame.substring(0, frame.length() - "-glass".length()) : frame);
+            Theme t = glass
+                    ? new Theme(frame, GlassPalette.of(Themes.SLATE.palette()), new GlassFrame(style))
+                    : new Theme(frame, Themes.SLATE.palette(), style);
             RadialComponent<String> w = RadialComponent.<String>builder(new Box("screen", 0, 0, W, H), 76)
                     .slot(40, 20).page("Poses", List.of("Wave", "Sit", "Point", "Bow", "Dance", "Salute"))
                     .page("Props", List.of("Hat", "Cape")).label(x -> x).build();
@@ -154,7 +162,7 @@ public class WindowBench {
         };
         WindowComponent win = new WindowComponent("bench:" + tag, content, new Box("w", 40, 40, 0, 0))
                 .title("Paint tools").within(new Box("screen", 0, 0, W, H));
-        BaseComponent.keys = new dev.dryaides.minuit.HeldKeys() {
+        HostState.keys(new dev.dryaides.minuit.HeldKeys() {
             @Override
             public boolean ctrl() {
                 return true;
@@ -164,7 +172,7 @@ public class WindowBench {
             public boolean shift() {
                 return false;
             }
-        };
+        });
         BenchMock.MockDraw d = draw(font);
         win.draw(d, theme, 0, 0, 1F);
         // Move by the title bar, scale by Ctrl+wheel, then draw again.
@@ -181,7 +189,7 @@ public class WindowBench {
         check(win.box().right() <= W && win.box().bottom() <= H, tag + " window kept on screen " + win.box());
         WindowComponent again = new WindowComponent("bench:" + tag, content, new Box("w", 40, 40, 0, 0));
         check(again.box().x() == win.box().x() && again.scale() == win.scale(), tag + " reopens where it was left");
-        BaseComponent.keys = dev.dryaides.minuit.HeldKeys.NONE;
+        HostState.keys(dev.dryaides.minuit.HeldKeys.NONE);
         again.collapsible(true).collapse(true);
         WindowComponent folded = new WindowComponent("bench:" + tag, content, new Box("w", 40, 40, 0, 0)).collapsible(true);
         check(folded.collapsed() && folded.box().x() == win.box().x(), tag + " reopens folded where it was left");

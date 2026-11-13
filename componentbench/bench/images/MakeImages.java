@@ -293,6 +293,58 @@ public final class MakeImages {
         }
     }
 
+    private static final String MC_JAR = System.getProperty("bench.mcjar", "");
+
+    private static BufferedImage texture(String path) {
+        if (MC_JAR.isEmpty()) {
+            return null;
+        }
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(MC_JAR)) {
+            java.util.zip.ZipEntry e = zip.getEntry("assets/minecraft/textures/" + path + ".png");
+            if (e == null) {
+                return null;
+            }
+            try (java.io.InputStream in = zip.getInputStream(e)) {
+                return ImageIO.read(in);
+            }
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /** A 16 x 16 inventory icon: a flat item texture, or "cube:top,side" for a block item drawn as the game's cube. */
+    private static BufferedImage itemIcon(String spec) {
+        if (!spec.startsWith("cube:")) {
+            return texture(spec);
+        }
+        String[] faces = spec.substring(5).split(",");
+        BufferedImage top = texture(faces[0]);
+        BufferedImage side = texture(faces[1]);
+        if (top == null || side == null) {
+            return null;
+        }
+        BufferedImage out = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.drawImage(top, new java.awt.geom.AffineTransform(0.5, 0.25, -0.5, 0.25, 8, 0), null);
+        g.drawImage(shade(side, 0.8F), new java.awt.geom.AffineTransform(0.5, 0.25, 0, 0.5, 0, 4), null);
+        g.drawImage(shade(side, 0.6F), new java.awt.geom.AffineTransform(0.5, -0.25, 0, 0.5, 8, 8), null);
+        g.dispose();
+        return out;
+    }
+
+    private static BufferedImage shade(BufferedImage src, float f) {
+        BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < out.getHeight(); y++) {
+            for (int x = 0; x < out.getWidth(); x++) {
+                int c = src.getRGB(x, y);
+                out.setRGB(x, y, (c & 0xFF000000) | (Math.round(((c >> 16) & 255) * f) << 16)
+                    | (Math.round(((c >> 8) & 255) * f) << 8) | Math.round((c & 255) * f));
+            }
+        }
+        return out;
+    }
+
     /** A hotbar, a crosshair and two lines of small text, as a game's screen has. */
     private static void hud(Graphics2D g, BufferedImage img, int w, int h, Random r) {
         int slot = 44;
@@ -301,12 +353,27 @@ public final class MakeImages {
         int by = h - slot - 10;
         g.setColor(new Color(0x2A2A2A));
         g.fillRect(bx, by, barW, slot + 4);
-        int[] items = {0xB0B0B0, 0x7A5634, 0x5DA03A, 0xE53935, 0x1E88E5, 0xFDD835, 0x6B4A2B, 0xFFFFFF, 0x43A047};
+        // Real vanilla item textures from the game jar (build.py passes -Dbench.mcjar); without it the slots stay empty.
+        String[] items = {"item/iron_sword", "item/iron_pickaxe", "block/torch", "item/bread", "block/cobblestone",
+            "cube:block/oak_log_top,block/oak_log", "item/bow", "item/arrow", "item/apple"};
+        int[] counts = {1, 1, 64, 12, 64, 1, 1, 32, 1};
+        g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 16));
         for (int i = 0; i < 9; i++) {
+            int sx = bx + 2 + i * slot;
             g.setColor(new Color(0x8B8B8B));
-            g.fillRect(bx + 2 + i * slot + 2, by + 4, slot - 4, slot - 4);
-            g.setColor(new Color(items[i]));
-            g.fillRect(bx + 2 + i * slot + 12, by + 14, slot - 24, slot - 24);
+            g.fillRect(sx + 2, by + 4, slot - 4, slot - 4);
+            BufferedImage icon = itemIcon(items[i]);
+            if (icon != null) {
+                g.drawImage(icon, sx + 6, by + 8, 32, 32, null);
+            }
+            if (icon != null && counts[i] > 1) {
+                String n = Integer.toString(counts[i]);
+                int tx = sx + slot - 4 - g.getFontMetrics().stringWidth(n);
+                g.setColor(new Color(0x3F3F3F));
+                g.drawString(n, tx + 2, by + slot + 2);
+                g.setColor(Color.WHITE);
+                g.drawString(n, tx, by + slot);
+            }
         }
         g.setColor(Color.WHITE);
         g.drawRect(bx + 2 + 4 * slot, by + 2, slot - 1, slot);

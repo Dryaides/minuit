@@ -14,11 +14,12 @@
   "environment": "*",
   "entrypoints": {
     "main": ["dev.dryaides.minuit.fabric.MinuitFabric"],
-    "client": ["dev.dryaides.minuit.fabric.MinuitFabricClient"]
+    "modmenu": ["dev.dryaides.minuit.fabric.MinuitModMenu"],
+    "client": ["dev.dryaides.minuit.fabric.MinuitFabricClient"]${viewer_entrypoints}
   },
   "mixins": ["minuit.mixins.json"],
   "depends": {
-    "fabricloader": ">=0.16",
+    "fabricloader": ">=${fabric_loader_version}",
     "${fabric_api_id}": "*",
     "minecraft": "${minecraft_version_range}",
     "java": ">=${java_version}"

@@ -7,7 +7,8 @@ import dev.dryaides.minuit.internal.GuiPart;
 import dev.dryaides.minuit.internal.NineSlice;
 import dev.dryaides.minuit.internal.PartTable;
 import net.minecraft.client.gui.GuiComponent;
-import net.minecraft.client.resources.model.Material;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.List;
  * Atlas sprites on 1.19.2 and 1.18.2, which have no GUI atlas (it came with 1.20.2): the vanilla parts come
  * from the textures the game binds itself ({@link PartTable#LEGACY_WIDGETS}), cut in nine, so resource packs still
  * restyle them. Map markers have neither their atlas nor their own files (both came with 1.20.5): they
- * come from the one sheet {@code map_icons.png}. Any other atlas goes through its {@code Material}.
+ * come from the one sheet {@code map_icons.png}. Any other atlas goes through {@code ModelManager.getAtlas}.
  * Client only, not API.
  */
 public final class GameSprites {
@@ -37,8 +38,12 @@ public final class GameSprites {
 
     /** The shader colour and blending are the caller's. */
     public static void atlas(PoseStack pose, ResourceLocation atlas, ResourceLocation id, int x, int y, int w, int h) {
-        RenderSystem.setShaderTexture(0, atlas);
-        GuiComponent.blit(pose, x, y, 0, w, h, new Material(atlas, id).sprite());
+        TextureAtlas found = atlasOf(atlas);
+        if (found == null) {
+            return;
+        }
+        RenderSystem.setShaderTexture(0, found.location());
+        GuiComponent.blit(pose, x, y, 0, w, h, found.getSprite(id));
     }
 
     /** The game's art for a vanilla part, false when these versions draw that part with fills, not a texture. */
@@ -73,5 +78,15 @@ public final class GameSprites {
         if (i >= 0) {
             d.blitRegion(MAP_ICONS, x, y, w, h, i % 16 * 8, i / 16 * 8, 8, 8, 128, 128, alpha);
         }
+    }
+
+    /**
+     * The atlas a sprite lives in, null when the game has none by that id. Before 26.1 items and blocks
+     * share one atlas, under its texture path ({@code minecraft:items} names nothing there).
+     */
+    private static TextureAtlas atlasOf(ResourceLocation atlas) {
+        boolean shared = atlas.getNamespace().equals("minecraft")
+                && (atlas.getPath().equals("items") || atlas.getPath().equals("blocks"));
+        return Minecraft.getInstance().getModelManager().getAtlas(shared ? TextureAtlas.LOCATION_BLOCKS : atlas);
     }
 }

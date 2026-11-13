@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.internal.port;
 
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.BaseComponent;
 import dev.dryaides.minuit.ItemLookup;
 import dev.dryaides.minuit.RichTextComponent;
@@ -54,10 +55,10 @@ public final class Platform {
             return;
         }
         GamePlatform now = game;
-        BaseComponent.sound = now.sound();
-        BaseComponent.keys = now.keys();
+        HostState.sound(now.sound());
+        HostState.keys(now.keys());
         TextFieldComponent.clipboard = now.clipboard();
-        RichTextComponent.links = now.links();
+        HostState.links(now.links());
         TextMeasure.font = now.font();
         TextMeasure.fontChanged();
         ItemLookup items = now.items();

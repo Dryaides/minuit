@@ -31,7 +31,7 @@ public final class TimelineDemo implements Demo {
     }
 
     private static Box box() {
-        return new Box("t", 6, 6, W - 12, H - 12);
+        return new Box("t", 8, 8, W - 16, H - 16);
     }
 
     @Override

@@ -6,6 +6,7 @@ import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.MapComponent;
 import dev.dryaides.minuit.MapMarker;
 import dev.dryaides.minuit.MapSource;
+import dev.dryaides.minuit.MapWaypoint;
 import java.util.List;
 
 /** A generated map (fake terrain in the vanilla palette, a few markers): sizes, paper, zoom, states. */
@@ -98,6 +99,12 @@ public final class MapDemo implements Demo {
                 MapMarker.at("red_x", 20, 20, "Treasure"));
     }
 
+    /** From Steve past the village and the base to the treasure. */
+    static List<MapWaypoint> route() {
+        return List.of(MapWaypoint.of(markers().get(0)), MapWaypoint.at(75, 70, "Road"),
+                MapWaypoint.of(markers().get(2)), MapWaypoint.to(30, 28, "red_x", "Treasure"));
+    }
+
     private static final byte[] MAP = terrain(false);
     private static final byte[] PART = terrain(true);
 
@@ -140,6 +147,10 @@ public final class MapDemo implements Demo {
             s.add(map(full()));
             s.move(50, 110);
             s.settle(700);
+        });
+        stage.state("route to the treasure", W, H, s -> s.add(map(full()).paper(true).route(route())));
+        stage.state("route half walked, zoomed", W, H, s -> {
+            s.add(map(full()).route(route()).routeReached(1).view(2, 60, 55));
         });
         stage.state("loading", W, H, s -> s.add(new MapComponent(full()).source(MapSource.of(MapSource.MapData.LOADING)).paper(true)));
         stage.state("no map", W, H, s -> s.add(new MapComponent(full()).source(id -> null)));

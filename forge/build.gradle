@@ -69,3 +69,12 @@ processResources {
     inputs.properties(props)
     filesMatching("META-INF/mods.toml") { expand props }
 }
+
+// REI's loader jar, compile only: REI finds MinuitReiPlugin by its @REIPluginClient annotation.
+if (project.findProperty('rei_forge')) {
+    dependencies {
+        modCompileOnly(project.rei_forge.toString()) { transitive = false }
+        // Rectangle for the exclusion zones; cloth basic-math is not in REI's jar. Never bundled.
+        modCompileOnly('me.shedaniel.cloth:basic-math:0.6.1') { transitive = false }
+    }
+}

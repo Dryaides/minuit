@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.ThemeFiles;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -22,6 +23,46 @@ class SeriesColorsTest {
                     double de = deltaE2000(SeriesColors.color(null, scheme, i), SeriesColors.color(null, scheme, k));
                     if (de < MIN_DELTA_E) {
                         failures.add(String.format("%s %d/%d deltaE %.1f", scheme, i, k, de));
+                    }
+                }
+            }
+        }
+        assertTrue(failures.isEmpty(), failures.size() + " failures: " + failures);
+    }
+
+    /** OKLab distance from the plot face a line keeps (0.1 and more: two named colours); a filled area half of it. */
+    private static final double MIN_LINE_GAP = 0.15;
+    private static final double MIN_FILL_GAP = 0.08;
+    /** The kit's shipped chromas, read from its chroma folder. */
+    private static List<String> chromas() throws java.io.IOException {
+        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.list(
+                java.nio.file.Path.of("src/main/resources/assets/minuit/minuit/chromas"))) {
+            return files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".json"))
+                    .map(n -> n.substring(0, n.length() - ".json".length())).sorted().toList();
+        }
+    }
+
+    /** A theme's first four series, lines and filled slices alike, differ from each other and stand off the plot face (the surface). */
+    @Test
+    void themeSeriesDifferAndShowOnThePlotFace() throws Exception {
+        List<String> failures = new ArrayList<>();
+        for (String chroma : chromas()) {
+            for (ThemeChoice.Variant variant : new ThemeChoice.Variant[] {ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK, ThemeChoice.Variant.GLASS}) {
+                Palette p = ThemeFiles.builtIn(chroma, variant);
+                int well = p.surface() | 0xFF000000;
+                for (boolean filled : new boolean[] {false, true}) {
+                    int[] c = new int[4];
+                    for (int i = 0; i < c.length; i++) {
+                        c[i] = filled ? SeriesColors.fill(p, SeriesPalette.THEME, i) : SeriesColors.color(p, i);
+                        if (SeriesColors.distance(c[i], well) < (filled ? MIN_FILL_GAP : MIN_LINE_GAP) - 0.005) {
+                            failures.add(String.format("%s %s %s %d on plot face %.3f", chroma, variant, filled ? "fill" : "line", i, SeriesColors.distance(c[i], well)));
+                        }
+                        for (int k = 0; k < i; k++) {
+                            double de = deltaE2000(c[i], c[k]);
+                            if (de < MIN_DELTA_E) {
+                                failures.add(String.format("%s %s %s %d/%d deltaE %.1f", chroma, variant, filled ? "fill" : "line", k, i, de));
+                            }
+                        }
                     }
                 }
             }

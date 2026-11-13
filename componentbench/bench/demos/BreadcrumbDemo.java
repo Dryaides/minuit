@@ -43,8 +43,19 @@ public final class BreadcrumbDemo implements Demo {
         }
     }
 
+    /** A path that goes back to the crumb the player picks, with no test fixtures around it. */
+    private static BreadcrumbComponent path(Scene s, int width) {
+        BreadcrumbComponent[] c = new BreadcrumbComponent[1];
+        c[0] = s.add(new BreadcrumbComponent(new Box("path", 8, 8, width, 14), s.panel(),
+                i -> c[0].crumbs(java.util.Arrays.copyOf(PATH, i + 1))).crumbs(PATH));
+        s.add(c[0].menu());
+        return c[0];
+    }
+
     @Override
     public void states(Stage stage) {
+        stage.state("backup path fits", W, 30, s -> path(s, 244).crumbs("Worlds", "Survival", "Backups"));
+        stage.state("backup path folded", W, H, s -> path(s, 180));
         stage.state("fits", W, H, s -> {
             Rig r = new Rig(s, 244, "Worlds", "Survival", "Backups");
         });
@@ -103,7 +114,7 @@ public final class BreadcrumbDemo implements Demo {
         });
         stage.state("minecraft_items_fit_h_minus_2", W, H, s -> {
             Rig r = new Rig(s, 244);
-            r.c.crumbs(List.of(Crumb.of("Chest").iconArt(dev.dryaides.minuit.ItemView.of("minecraft:chest")),
+            r.c.crumbs(List.of(Crumb.of("Bundle").iconArt(dev.dryaides.minuit.ItemView.of("minecraft:bundle")),
                     Crumb.of("Diamonds").iconArt(dev.dryaides.minuit.ItemView.of("minecraft:diamond")),
                     Crumb.of("Off").iconArt(dev.dryaides.minuit.ItemView.of("minecraft:bread")), Crumb.of("Page")));
             r.c.disabled(2, true);

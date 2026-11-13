@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A prize wheel: segments around a hub, a pointer at the top, and a spin that eases out and lands exactly on the
@@ -25,11 +27,12 @@ import java.util.function.Consumer;
  *
  * <h2>Segments</h2>
  * A segment has a label, a weight (its share of the wheel, also its odds for {@link #spin(Random)}), a colour (the
- * theme's series colours by default) and content: an item ({@link Segment#item(ItemView)}), any {@link IconArt} such
- * as a {@link SpriteIcon}, an {@link AsyncImage}, or a renderer of your own. Items and sprites are drawn at the
+ * chroma's own colours by default, not darkened as a chart's lines are) and content: an item
+ * ({@link Segment#item(ItemView)}), any {@link IconArt} such as a {@link SpriteIcon}, an {@link AsyncImage}, or a renderer of your own. Items and sprites are drawn at the
  * largest scale that fits the segment and stays crisp: a whole number of screen pixels per texel. Text cannot turn,
- * so labels and icons stay upright at the middle of their segment; a label that does not fit is shortened, then
- * left out, and the tooltip still tells it.
+ * so labels and icons stay upright at the middle of their segment. An icon shrinks, never under its own size, to
+ * make room for its label; when a label still does not fit on every segment of one size, none shows, the icons stand
+ * for them and the tooltip names them.
  *
  * <h2>Spins</h2>
  * {@link #spin(int, long)} lands on a given segment; the seed only decides the number of turns and where in the
@@ -176,6 +179,9 @@ public class WheelComponent extends BaseComponent {
     private static final int TEXT_H = 8;
     private static final int DIM_ALPHA = 0xB0;
     private static final float LIT_MIX = 0.25F;
+    /** After a live landing the winner's inner rim blinks on and off: whole steps, no geometry change. */
+    private static final long WON_BLINK = 150L;
+    private static final int WON_BLINKS = 6;
     private static final long TICK_GAP_MS = 35L;
 
     private final List<Segment> segments = new ArrayList<>();
@@ -192,6 +198,7 @@ public class WheelComponent extends BaseComponent {
     private boolean muted;
     private Consumer<Segment> onLand;
     private Runnable onSpinRequest;
+    private Supplier<Random> randomSource = Random::new;
     private Runnable onClose;
 
     private boolean fullscreen;
@@ -210,6 +217,8 @@ public class WheelComponent extends BaseComponent {
     private boolean fired = true;
     private long landedAt;
     private int result = -1;
+    private boolean quietLand;
+    private boolean[] wonMask;
     private int tickAt = -1;
     private long tickTime;
 
@@ -358,6 +367,12 @@ public class WheelComponent extends BaseComponent {
         return this;
     }
 
+    /** Where spins without a seed take their randomness. Each spin asks for a fresh one; the default is {@code new Random()}. */
+    public WheelComponent randomSource(Supplier<Random> source) {
+        this.randomSource = Objects.requireNonNull(source);
+        return this;
+    }
+
     /** No ticks and no landing sound. */
     public WheelComponent muted(boolean muted) {
         this.muted = muted;
@@ -449,13 +464,13 @@ public class WheelComponent extends BaseComponent {
         if (spinning() || landing < 0 || landing >= segments.size() || segments.get(landing).weight <= 0D) {
             return this;
         }
-        start(new Spin(landing, seed, clock.getAsLong() + delay, rotation, duration, false));
+        start(new Spin(landing, seed, clock().getAsLong() + delay, rotation, duration, false));
         return this;
     }
 
     /** Spins to a segment with a seed of its own: only for one player. */
     public WheelComponent spin(int landing) {
-        return spin(landing, new Random().nextLong());
+        return spin(landing, randomSource.get().nextLong());
     }
 
     /** Picks a segment by weight, then spins to it. */
@@ -502,7 +517,8 @@ public class WheelComponent extends BaseComponent {
             landed = true;
             fired = true;
             result = state.landing();
-            landedAt = clock.getAsLong();
+            landedAt = clock().getAsLong();
+            quietLand = true;
         }
         return this;
     }
@@ -513,6 +529,7 @@ public class WheelComponent extends BaseComponent {
         rotation = s.from();
         landed = false;
         fired = false;
+        quietLand = false;
         result = -1;
         tickAt = pointed();
     }
@@ -535,9 +552,9 @@ public class WheelComponent extends BaseComponent {
 
     /** Moves the spin on to now: lands, ticks, closes. Called from both a frame and a tick. */
     private void update() {
-        long now = clock.getAsLong();
+        long now = Redraw.quietClock();
         if (spin != null && !landed) {
-            if (reducedMotion || now >= spin.start() + spin.duration()) {
+            if (reducedMotion() || now >= spin.start() + spin.duration()) {
                 rotation = end;
                 landed = true;
                 landedAt = now;
@@ -550,17 +567,17 @@ public class WheelComponent extends BaseComponent {
                 int at = pointed();
                 if (at != tickAt) {
                     tickAt = at;
-                    if (!muted && sound != null && now - tickTime >= TICK_GAP_MS) {
+                    if (!muted && sound() != null && now - tickTime >= TICK_GAP_MS) {
                         tickTime = now;
-                        sound.tick((float) Math.min(1D, v * 1.5D));
+                        sound().tick((float) Math.min(1D, v * 1.5D));
                     }
                 }
             }
         }
         if (landed && !fired) {
             fired = true;
-            if (!muted && sound != null) {
-                sound.land();
+            if (!muted && sound() != null) {
+                sound().land();
             }
             if (onLand != null && result >= 0 && result < segments.size()) {
                 onLand.accept(segments.get(result));
@@ -569,6 +586,9 @@ public class WheelComponent extends BaseComponent {
         if (fullscreen && open && landed && closeOnLand >= 0L && spin != null && now >= landedAt + closeOnLand
                 && landedAt >= spin.start()) {
             close();
+        }
+        if (spin != null && !landed || fullscreen && open && landed && closeOnLand >= 0L) {
+            Redraw.ask();
         }
     }
 
@@ -846,7 +866,7 @@ public class WheelComponent extends BaseComponent {
                         return false;
                     }
                     if (live > 1 && fitArc < Math.PI) {
-                        double delta = Math.abs(Math.IEEEremainder(Math.atan2(qx, -qy) - phi, 2D * Math.PI));
+                        double delta = gap(Math.atan2(qx, -qy) - phi);
                         double left = fitArc - delta;
                         if (left < 0D || (left < Math.PI / 2D && Math.sqrt(d2) * Math.sin(left) < fitMargin)) {
                             return false;
@@ -856,6 +876,15 @@ public class WheelComponent extends BaseComponent {
             }
         }
         return true;
+    }
+
+    /**
+     * The angle between two directions, 0 to pi. Not Math.IEEEremainder: TeaVM compiles it as a truncating
+     * remainder, which leaves a difference near 2 pi whole and made every block fail on the site.
+     */
+    private static double gap(double a) {
+        double full = 2D * Math.PI;
+        return Math.abs(a - full * Math.floor(a / full + 0.5D));
     }
 
     /** The widest label under something this tall that still fits, in whole pixels; -1 for none. */
@@ -899,6 +928,18 @@ public class WheelComponent extends BaseComponent {
         if (alone <= 0F) {
             fitLabelOnly(s, measure, full);
             return;
+        }
+        // A smaller icon, never under its native size, when that makes room for the label under or over it.
+        if (full > 0) {
+            for (float sc = alone; sc >= 1F - 1e-4F; sc -= step) {
+                int side = Math.round(nat * sc);
+                int room = widestLabel(full, side);
+                if (room > 0 && !shorten(measure, s.label, room).isEmpty()) {
+                    alone = sc;
+                    aloneR = place(side, side);
+                    break;
+                }
+            }
         }
         // The label of an icon is placed at rest, at the angle the wheel stopped at: see restLabels.
         s.contentR = aloneR;
@@ -1234,7 +1275,76 @@ public class WheelComponent extends BaseComponent {
         if (live > DataLook.COLOURS && i == segments.size() - 1 && i % DataLook.COLOURS == 0) {
             order = DataLook.COLOURS / 2;
         }
-        return DataLook.opaque(DataLook.seriesColour(t, seriesPalette, order));
+        return DataLook.opaque(SeriesColors.fill(t.palette(), seriesPalette, order));
+    }
+
+    private boolean won(int i) {
+        return i == result && landed && !spinning();
+    }
+
+    private boolean wonRimShown() {
+        if (quietLand || reducedMotion()) {
+            return true;
+        }
+        long step = (clock().getAsLong() - landedAt) / WON_BLINK;
+        return step < 0 || step >= WON_BLINKS || step % 2 == 0;
+    }
+
+    /**
+     * An inner rim around the winner: the winner's pixels whose neighbour one cell away is not the
+     * winner, so it follows the cell grid of the rows.
+     */
+    private int drawWonRim(Draw d, int ink) {
+        int seg = result;
+        int left = cx - radius - 1;
+        int top = cy - radius - 1;
+        int side = 2 * radius + 3;
+        if (wonMask == null || wonMask.length < side * side) {
+            wonMask = new boolean[side * side];
+        } else {
+            java.util.Arrays.fill(wonMask, 0, side * side, false);
+        }
+        for (int i = 0; i < runs; i++) {
+            if (rc[i] != seg) {
+                continue;
+            }
+            for (int y = Math.max(ry0[i], top); y < Math.min(ry1[i], top + side); y++) {
+                for (int x = Math.max(rx0[i], left); x < Math.min(rx1[i], left + side); x++) {
+                    wonMask[(y - top) * side + x - left] = true;
+                }
+            }
+        }
+        int c = Math.max(1, cell);
+        int count = 0;
+        for (int y = 0; y < side; y++) {
+            int start = -1;
+            for (int x = 0; x <= side; x++) {
+                boolean edge = x < side && wonMask[y * side + x] && !inside(wonMask, side, x, y, c);
+                if (edge && start < 0) {
+                    start = x;
+                } else if (!edge && start >= 0) {
+                    d.fill(left + start, top + y, left + x, top + y + 1, ink);
+                    count++;
+                    start = -1;
+                }
+            }
+        }
+        return count;
+    }
+
+    /** Two pixels deep at one pixel a cell, so the rim stands apart from the one-pixel lines; one cell otherwise. */
+    private static boolean inside(boolean[] mask, int side, int x, int y, int c) {
+        int depth = c == 1 ? 2 : c;
+        for (int k = c == 1 ? 1 : c; k <= depth; k++) {
+            if (!(in(mask, side, x - k, y) && in(mask, side, x + k, y) && in(mask, side, x, y - k) && in(mask, side, x, y + k))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean in(boolean[] mask, int side, int x, int y) {
+        return x >= 0 && y >= 0 && x < side && y < side && mask[y * side + x];
     }
 
     private void paintColours(Theme t, boolean hubLit) {
@@ -1247,7 +1357,7 @@ public class WheelComponent extends BaseComponent {
             int c = baseColour(t, i);
             if (!active) {
                 c = DataLook.faded(p, c);
-            } else if (i == lit) {
+            } else if (i == lit || won(i)) {
                 c = Shapes.mix(c, 0xFFFFFFFF, LIT_MIX);
             }
             colours[i] = c;
@@ -1304,6 +1414,9 @@ public class WheelComponent extends BaseComponent {
             d.fill(rx0[i], ry0[i], rx1[i], ry1[i], colours[rc[i]]);
         }
         sent += runs;
+        if (active && result >= 0 && won(result) && wonRimShown()) {
+            sent += drawWonRim(d, DataLook.opaque(Ink.on(p, colours[result])));
+        }
         sent += drawPointer(d, p);
         drawContent(d, t);
         if (!hubShown.isEmpty()) {
@@ -1429,8 +1542,9 @@ public class WheelComponent extends BaseComponent {
                 }
             }
         }
-        // Segments of one size where half the labels or more do not fit: none, so it does not look labelled at random.
-        if (tried > 1 && failed * 2 >= tried && most <= least * 1.5D) {
+        // Segments of one size where a label does not fit: none, the icons stand for them and the tooltip names them,
+        // so the wheel never looks labelled at random.
+        if (tried > 1 && failed > 0 && most <= least * 1.5D) {
             for (Segment s : segments) {
                 if (s.iconSide > 0) {
                     s.restShown = "";
@@ -1470,7 +1584,7 @@ public class WheelComponent extends BaseComponent {
                     return false;
                 }
                 if (live > 1 && fitArc < Math.PI) {
-                    double delta = Math.abs(Math.IEEEremainder(Math.atan2(qx, -qy) - phi, 2D * Math.PI));
+                    double delta = gap(Math.atan2(qx, -qy) - phi);
                     double left2 = fitArc - delta;
                     if (left2 < 0D || (left2 < Math.PI / 2D && Math.sqrt(d2) * Math.sin(left2) < fitMargin)) {
                         return false;
@@ -1610,7 +1724,7 @@ public class WheelComponent extends BaseComponent {
         if (onSpinRequest != null) {
             onSpinRequest.run();
         } else {
-            spin(new Random());
+            spin(randomSource.get());
         }
         return true;
     }

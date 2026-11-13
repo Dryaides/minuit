@@ -19,8 +19,6 @@ import java.util.function.Function;
  *                 .format(day -> day.getDayOfMonth() + "/" + day.getMonthValue() + "/" + day.getYear())
  *                 .onChange(this::setDay));
  *         when.calendar().labels(words, "mymod.calendar").today(serverDay);
- *         // Last, so that the calendar is drawn over the rest and offered every input first.
- *         add(when.popup());
  *     }
  * }
  * }</pre>
@@ -32,10 +30,10 @@ import java.util.function.Function;
  * format per language, and the calendar's keys do the same work.
  *
  * <h2>Putting it in a panel</h2>
- * As for a {@link ComboBoxComponent}: add {@link #popup()} <b>after every other widget</b>. The popup stays
- * in {@link #area(Box)}, the panel by default: it opens below, above when more of it fits there, and shrinks if the
- * area is too small. While it is open, the first click outside only closes it. Only a direct child of a panel
- * has been tried.
+ * As for a {@link ComboBoxComponent}: the calendar goes to the {@link OverlayLayer}, over every widget and
+ * outside every scissor, and gets the input first. It stays in {@link #area(Box)}, the panel by default: it opens
+ * below, above when more of it fits there, and shrinks if the area is too small. While it is open, the first
+ * click outside only closes it.
  */
 public class DatePickerComponent extends BaseComponent {
     private static final int TEXT_PAD = 4;
@@ -79,7 +77,6 @@ public class DatePickerComponent extends BaseComponent {
     private String separator = " - ";
     private Function<LocalDate, String> format = LocalDate::toString;
     private boolean clearable = true;
-    private boolean layered;
     private boolean ranged;
     private Box area;
     private Consumer<LocalDate> onChange;
@@ -175,12 +172,6 @@ public class DatePickerComponent extends BaseComponent {
     public DatePickerComponent tooltip(String... lines) {
         super.tooltip(lines);
         return this;
-    }
-
-    /** The calendar as a widget of its own: add it after every other widget of the panel. */
-    public BaseComponent popup() {
-        layered = true;
-        return popup;
     }
 
     public LocalDate value() {
@@ -303,7 +294,7 @@ public class DatePickerComponent extends BaseComponent {
         popup.visible = true;
         above = false;
         place();
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(true);
         } else {
             glide.replay();
@@ -415,8 +406,11 @@ public class DatePickerComponent extends BaseComponent {
                 drawButton(d, p, frame, CLEAR, ART_CLEAR, CLEAR_ART, over);
             }
         }
-        if (open && !layered) {
-            popup.draw(d, t, mx, my, delta);
+        if (open) {
+            d.overlay(popup, mx, my, (on, px, py) -> popup.draw(on, t, px, py, delta)).onClose(() -> {
+                BaseComponent.click();
+                close();
+            });
         }
     }
 
@@ -441,7 +435,7 @@ public class DatePickerComponent extends BaseComponent {
         Palette p = t.palette();
         FrameStyle frame = t.frame();
         d.nextLayer(); // the text beneath may sort above a rectangle otherwise
-        boolean moving = !reducedMotion && glide.moving();
+        boolean moving = !reducedMotion() && glide.moving();
         int px = popup.x;
         int py = popup.y;
         int pw = popup.w;
@@ -461,9 +455,7 @@ public class DatePickerComponent extends BaseComponent {
 
     @Override
     public List<String> tooltipAt(double mx, double my) {
-        if (sync() && !layered) {
-            return popup.tooltipAt(mx, my);
-        }
+        sync();
         return fieldTooltip(mx, my);
     }
 
@@ -480,7 +472,7 @@ public class DatePickerComponent extends BaseComponent {
 
     @Override
     public boolean isOver(double mx, double my) {
-        return inField(mx, my) && visible && settled() || (open && !layered);
+        return inField(mx, my) && visible && settled();
     }
 
     @Override
@@ -501,9 +493,6 @@ public class DatePickerComponent extends BaseComponent {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         sync();
-        if (open && !layered) {
-            return popup.mouseClicked(mx, my, button);
-        }
         if (!visible || !active || button != 0 || !inField(mx, my)) {
             return false;
         }
@@ -532,11 +521,6 @@ public class DatePickerComponent extends BaseComponent {
         heldButton = NO_BUTTON;
         calendar.mouseReleased(mx, my, button);
         return false;
-    }
-
-    @Override
-    public boolean mouseScrolled(double mx, double my, double amount) {
-        return open && !layered && popup.mouseScrolled(mx, my, amount);
     }
 
     @Override
@@ -585,7 +569,7 @@ public class DatePickerComponent extends BaseComponent {
         hadFocus = true;
     }
 
-    /** Draws the calendar and takes the clicks and wheel turns while it is open. Its box is the popup's. */
+    /** The open calendar in the {@link OverlayLayer}: draws it and takes the clicks and wheel turns first. Its box is the popup's. */
     private final class Popup extends BaseComponent {
         Popup() {
             super(0, 0, 0, 0);

@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.internal.Maths;
 import java.util.List;
 import java.util.function.LongSupplier;
@@ -7,23 +9,35 @@ import java.util.function.LongSupplier;
 /** Base of the kit's widgets: position, hover state, tooltip. */
 public abstract class BaseComponent {
 
-    /** Set by the screen host; the kit itself never names the sound engine. */
-    public static volatile UiSound sound = UiSound.NONE;
+    /** The host's sound cues; the kit itself never names the sound engine. */
+    public static UiSound sound() {
+        return HostState.sound();
+    }
 
     /** Milliseconds for animations; a bench sets its own to draw a slide frame by frame. */
-    public static volatile LongSupplier clock = System::currentTimeMillis;
+    public static LongSupplier clock() {
+        return HostState.clock();
+    }
 
     /** Skips slides and ticks: a widget jumps to its end state. */
-    public static volatile boolean reducedMotion;
+    public static boolean reducedMotion() {
+        return HostState.reducedMotion();
+    }
 
-    /** The motion style of the screen being built or drawn, set by the mod; see {@link MotionStyle}. */
-    public static volatile MotionStyle screenMotion = MotionStyle.SUBTLE;
+    /** The motion style of the screen being built or drawn; see {@link MotionStyle}. */
+    public static MotionStyle screenMotion() {
+        return HostState.screenMotion();
+    }
 
     /** The player's motion style from {@code config/minuit-client.json}, or null when they chose none. */
-    public static volatile MotionStyle playerMotion;
+    public static MotionStyle playerMotion() {
+        return HostState.playerMotion();
+    }
 
     /** Ctrl and Shift as held now, set by the host's input bridge. */
-    public static volatile HeldKeys keys = HeldKeys.NONE;
+    public static HeldKeys heldKeys() {
+        return HostState.keys();
+    }
 
     /** Milliseconds the hover glow takes to come in; it fades out in {@link #HOVER_OUT_MS}. */
     public static final int HOVER_IN_MS = 90;
@@ -40,7 +54,7 @@ public abstract class BaseComponent {
     public MotionStyle motionStyle;
     /** Holds the keyboard; set by {@link PanelComponent} on a click. */
     public boolean focused;
-    /** 0 at rest, 1 under the mouse, eased between on {@link #clock}. */
+    /** 0 at rest, 1 under the mouse, eased between on {@link #clock()}. */
     protected float hoverAnim;
     private long hoverTime;
     /** The frame time of the draw in progress, for a widget that draws others inside it. */
@@ -125,14 +139,19 @@ public abstract class BaseComponent {
         }
         this.delta = delta;
         boolean hovered = this.active && isOver(mx, my);
-        this.hoverAnim = hoverStep(this.hoverAnim, hovered, clock.getAsLong());
+        this.hoverAnim = hoverStep(this.hoverAnim, hovered, Redraw.quietClock());
+        if (this.hoverAnim != (hovered ? 1F : 0F)) {
+            Redraw.ask();
+        }
+        Theme outer = d.useTheme(theme);
         render(d, theme, mx - Math.round(gx), my - Math.round(gy), hovered);
+        d.useTheme(outer);
         if (moved) {
             d.pop();
         }
     }
 
-    /** The hover glow after the time since the last frame; a jump under {@link #reducedMotion}. */
+    /** The hover glow after the time since the last frame; a jump under {@link #reducedMotion()}. */
     float hoverStep(float from, boolean hovered, long now) {
         long last = this.hoverTime;
         this.hoverTime = now;
@@ -141,10 +160,10 @@ public abstract class BaseComponent {
 
     /**
      * A hover glow {@code dtMs} after it was {@code from}: in over {@link #HOVER_IN_MS}, out over
-     * {@link #HOVER_OUT_MS}. It jumps under {@link #reducedMotion} and on a first frame ({@code dtMs < 0}).
+     * {@link #HOVER_OUT_MS}. It jumps under {@link #reducedMotion()} and on a first frame ({@code dtMs < 0}).
      */
     static float glow(float from, boolean hovered, long dtMs) {
-        if (reducedMotion || dtMs < 0) {
+        if (reducedMotion() || dtMs < 0) {
             return hovered ? 1F : 0F;
         }
         float dt = Maths.clamp(dtMs, 0L, 250L);
@@ -153,10 +172,17 @@ public abstract class BaseComponent {
 
     /** The style this widget moves with now. */
     protected MotionStyle motion() {
-        return MotionStyle.resolve(reducedMotion, playerMotion, this.motionStyle, screenMotion);
+        return MotionStyle.resolve(reducedMotion(), playerMotion(), this.motionStyle, screenMotion());
     }
 
     protected abstract void render(Draw d, Theme theme, int mx, int my, boolean hovered);
+
+    /**
+     * Called on a panel's open overlay before each draw, with the box it may cover (the panel's
+     * {@link PanelComponent#overlayArea}): a list placed under its opener moves above it, or back in, here.
+     */
+    protected void placeOverlay(Theme theme, Box area) {
+    }
 
     /** The panel's translations, given when the panel adds this widget; a widget with default texts keeps them. */
     void words(Words words) {
@@ -220,6 +246,15 @@ public abstract class BaseComponent {
     }
 
     /**
+     * True for a widget that holds the keyboard only to hand it to the panel inside it, with no focused look of
+     * its own: an Escape it leaves unused lets go of it and goes on to the panel's back at once, so the player
+     * does not press a key that changes nothing.
+     */
+    protected boolean passesKeys() {
+        return false;
+    }
+
+    /**
      * True while this widget, once focused, wants the raw key or mouse button rather than the kit's
      * {@link InputKey}: a key binding field waiting for its key.
      */
@@ -229,6 +264,11 @@ public abstract class BaseComponent {
 
     /** A raw key or mouse button while this widget {@link #capturesKeys}; true when it used it. */
     public boolean keyCaptured(KeyPress key) {
+        return false;
+    }
+
+    /** A raw key let go while this widget {@link #capturesKeys}; true when it used it. */
+    public boolean keyReleasedCaptured(KeyPress key) {
         return false;
     }
 
@@ -260,6 +300,15 @@ public abstract class BaseComponent {
 
     /** The keyboard arrives on this stop, forward by Tab or back by Shift+Tab. */
     protected void enter(boolean forward) {
+    }
+
+    /**
+     * The keyboard arrives on this stop by an arrow ({@code key}) that left the previous stop, whose focus
+     * box was {@code from}. A stop with several cells starts on the cell beside {@code from}.
+     */
+    @Incubating
+    protected void enterFrom(InputKey key, Box from) {
+        enter(key == InputKey.DOWN || key == InputKey.RIGHT);
     }
 
     /** Enter or Space while the keyboard is on this stop; true when it did something. */
@@ -306,6 +355,6 @@ public abstract class BaseComponent {
     }
 
     public static void click() {
-        sound.click();
+        sound().click();
     }
 }

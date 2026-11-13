@@ -10,7 +10,8 @@ import dev.dryaides.minuit.internal.Maths;
  * <p>Build the content panel at (0, 0): the window moves and scales it. The content receives the
  * mouse in its own coordinates, the wheel unless Ctrl is held, and once the window is clicked the
  * keys, typed text and Tab between its widgets; its tooltips show over the window. Escape gives
- * the keyboard back to the panel holding the window.
+ * the keyboard back to the panel holding the window. The content wears the theme the window is
+ * drawn in, as long as that theme keeps the content's frame style (a palette change).
  */
 public final class WindowComponent extends BaseComponent implements ItemSource, ItemDropTarget {
 
@@ -331,6 +332,9 @@ public final class WindowComponent extends BaseComponent implements ItemSource, 
         if (this.collapsed) {
             return;
         }
+        if (this.content.theme() != null && theme != this.content.theme() && theme.frame() == this.content.theme().frame()) {
+            this.content.retheme(theme);
+        }
         d.push(contentX(), contentY(), this.scale);
         this.content.draw(d, (int) Math.floor(inX(mx)), (int) Math.floor(inY(my)), 1F);
         d.pop();
@@ -437,7 +441,7 @@ public final class WindowComponent extends BaseComponent implements ItemSource, 
             return true;
         }
         // Ctrl+wheel scales the window before the content scrolls; the host reports Ctrl in keys.
-        if (this.resizable && keys.ctrl() && amount != 0) {
+        if (this.resizable && heldKeys().ctrl() && amount != 0) {
             this.scale += amount > 0 ? STEP : -STEP;
             place();
             save();

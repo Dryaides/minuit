@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -36,8 +37,8 @@ public final class CommandPaletteDemo implements Demo {
             this.s = s;
             this.width = width;
             this.height = height;
-            behind = s.add(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Behind", () -> pressedBehind++));
-            s.caption(() -> "ran " + ran);
+            behind = s.fixture(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Settings", () -> pressedBehind++));
+            s.caption(() -> ran.isEmpty() ? "" : "Ran " + String.join(", ", ran));
             c = s.add(new CommandPaletteComponent(new Box("area", 0, 0, width, height), s.panel())
                     .group("World",
                             cmd("Teleport home").icon(Icon.GLOBE).shortcut("H").keywords("spawn", "bed"),
@@ -123,6 +124,21 @@ public final class CommandPaletteDemo implements Demo {
             Rig r = new Rig(s);
             r.c.open();
             s.type("tw");
+            s.waitMs(150);
+        });
+        stage.state("site_open", W, H, s -> {
+            Rig r = new Rig(s);
+            r.c.footer("Enter: run   Esc: close").open();
+            s.key(InputKey.DOWN);
+            s.key(InputKey.UP);
+            s.waitMs(150);
+        });
+        stage.state("site_search", W, H, s -> {
+            Rig r = new Rig(s);
+            r.c.footer("Enter: run   Esc: close").open();
+            s.type("tw");
+            s.key(InputKey.DOWN);
+            s.key(InputKey.UP);
             s.waitMs(150);
         });
         stage.state("prefix_beats_scattered", W, H, s -> {
@@ -269,14 +285,14 @@ public final class CommandPaletteDemo implements Demo {
             r.c.open();
         });
         stage.state("reduced_motion_at_once", W, H, s -> {
-            boolean was = BaseComponent.reducedMotion;
-            BaseComponent.reducedMotion = true;
+            boolean was = BaseComponent.reducedMotion();
+            HostState.reducedMotion(true);
             try {
                 Rig r = new Rig(s);
                 r.c.open();
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = was;
+                HostState.reducedMotion(was);
             }
         });
         stage.state("copy_paste_in_search", W, H, s -> {

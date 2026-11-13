@@ -1,5 +1,7 @@
 import dev.dryaides.minuit.Draw;
+import dev.dryaides.minuit.internal.ImageSource;
 import dev.dryaides.minuit.ItemView;
+import dev.dryaides.minuit.internal.ItemIcon;
 import dev.dryaides.minuit.SpriteIcon;
 
 import javax.imageio.ImageIO;
@@ -279,6 +281,28 @@ final class BenchDraw {
     record Drawn(String text, double x, double y, double width, double height, float scale) {
     }
 
+    /**
+     * Draws {@code itemId}'s {@link ItemIcon} into device pixels {@code x0..x1, y0..y1}, sampled as the live canvas
+     * (site PixelDraw.stretched) samples it; false when {@code d} has no texture for it. Both bench draws use it.
+     */
+    static boolean itemIcon(Draw d, Graphics2D g, String itemId, int x0, int y0, int x1, int y1) {
+        ImageSource.Pixels icon = ItemIcon.of(d, itemId, Math.max(1, x1 - x0));
+        if (icon == null) {
+            return false;
+        }
+        for (int py = y0; py < y1; py++) {
+            int v = (py - y0) * icon.h() / (y1 - y0);
+            for (int px = x0; px < x1; px++) {
+                int argb = icon.argb()[v * icon.w() + (px - x0) * icon.w() / (x1 - x0)];
+                if (argb >>> 24 != 0) {
+                    g.setColor(new Color(argb, true));
+                    g.fillRect(px, py, 1, 1);
+                }
+            }
+        }
+        return true;
+    }
+
     static final class MockDraw extends Draw {
         final BufferedImage image;
         final List<Drawn> texts = new ArrayList<>();
@@ -350,7 +374,7 @@ final class BenchDraw {
         }
 
         @Override
-        protected String cut(String text, int maxWidth) {
+        public String cut(String text, int maxWidth) {
             return this.font.cut(text, maxWidth);
         }
 
@@ -412,21 +436,34 @@ final class BenchDraw {
             box(0, 0, this.image.getWidth() / (double) PX, this.image.getHeight() / (double) PX, 0x70101010);
         }
 
+        /** The device pixel of GUI coordinate {@code v} under offset {@code t}: the one whose centre it covers. */
+        private int dev(double v, double t) {
+            return (int) Math.ceil((t + v * this.scale) * PX - 0.5);
+        }
+
         /**
-         * The item's own texture when the bench has it (the small copied set the scenes show), else the
-         * kit's stand-in.
+         * The item's icon from {@link ItemIcon}, the path the site's live canvas draws too, else an empty slot and
+         * the id on stderr, so the missing texture gets extracted rather than invented.
          */
         @Override
         public void item(ItemView item, int x, int y) {
-            String[] parts = item.id().split(":", 2);
-            for (String folder : new String[]{"item", "block"}) {
-                String texture = parts[0] + ":textures/" + folder + "/" + parts[1] + ".png";
-                if (has(texture)) {
-                    image(texture, x, y, 16, 16, 16, 16, 1F);
-                    return;
-                }
+            int x0 = dev(x, this.tx);
+            int y0 = dev(y, this.ty);
+            int x1 = dev(x + 16, this.tx);
+            int y1 = dev(y + 16, this.ty);
+            if (!BenchDraw.itemIcon(this, this.g, item.id(), x0, y0, x1, y1)) {
+                missing(item.id());
             }
-            super.item(item, x, y);
+        }
+
+        private static final Map<String, ImageSource.Pixels> TEXELS = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private static final java.util.Set<String> MISSING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+        private static void missing(String id) {
+            if (MISSING.add(id)) {
+                System.err.println("bench: no texture for item " + id);
+            }
         }
 
         @Override
@@ -436,8 +473,23 @@ final class BenchDraw {
             if (has(parts[0] + ":" + folder + parts[1] + ".png")) {
                 super.sprite(atlas, sprite, x, y, w, h, alpha);
             } else {
-                super.item(ItemView.of(sprite), x, y);
+                item(ItemView.of(sprite), x, y);
             }
+        }
+
+        /** The texture from the Minecraft jar on the classpath, for the entity models the kit draws itself. */
+        @Override
+        public ImageSource.Pixels texels(String texture) {
+            if (!has(texture)) {
+                return null;
+            }
+            String[] parts = texture.split(":", 2);
+            return TEXELS.computeIfAbsent(texture, name -> {
+                BufferedImage source = BenchDraw.image("/assets/" + parts[0] + "/" + parts[1]);
+                int w = source.getWidth();
+                int h = source.getHeight();
+                return new ImageSource.Pixels(w, h, source.getRGB(0, 0, w, h, null, 0, w));
+            });
         }
 
         private static boolean has(String texture) {
@@ -451,7 +503,7 @@ final class BenchDraw {
         }
 
         @Override
-        public void push(float x, float y, float scale) {
+        protected void pushPose(float x, float y, float scale) {
             this.stack.push(new double[]{this.tx, this.ty, this.scale});
             this.tx += x * this.scale;
             this.ty += y * this.scale;
@@ -459,7 +511,7 @@ final class BenchDraw {
         }
 
         @Override
-        public void pop() {
+        protected void popPose() {
             double[] saved = this.stack.pop();
             this.tx = saved[0];
             this.ty = saved[1];

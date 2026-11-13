@@ -30,12 +30,22 @@ final class Textures {
         this.mcJar = mcJar;
     }
 
+    /** How many blits asked for a texture: the image-family proof checks its sheet drew sprites. */
+    int gets;
+
     BufferedImage get(String id) {
+        gets++;
         BufferedImage img = cache.computeIfAbsent(id, this::read).orElse(null);
         if (img == null) {
             missing.add(id);
         }
         return img;
+    }
+
+    /** Serves {@code img} under {@code id} from now on: a baked or generated texture. */
+    void put(String id, BufferedImage img) {
+        cache.put(id, Optional.of(img));
+        missing.remove(id);
     }
 
     /** Like {@link #get}, without counting a miss: for probing where a texture might be. */

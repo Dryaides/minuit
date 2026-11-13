@@ -498,11 +498,11 @@ public class SparklineComponent extends BaseComponent {
         colourVersion = version;
         int color;
         if (hasColor) {
-            color = DataLook.opaque(customColor);
+            color = SeriesColors.custom(p, customColor, false);
         } else if (trend) {
-            color = Ink.readable(up ? p.good() : p.bad(), DataLook.back(p), Ink.MARK);
+            color = Ink.readable(p, up ? p.good() : p.bad(), DataLook.back(p), Ink.MARK);
         } else {
-            color = DataLook.seriesColour(t, 0);
+            color = DataLook.opaque(p.accent());
         }
         colourInk = active ? color : DataLook.faded(p, color);
         return colourInk;

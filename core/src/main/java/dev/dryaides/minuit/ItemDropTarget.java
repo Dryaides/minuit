@@ -44,7 +44,13 @@ public interface ItemDropTarget {
             return contains(x, y) && fits(item);
         }
 
-        /** Hands the item in; true when the target took it. */
+        /**
+         * Hands the item in; true when the target took it. From an expandable hotbar drag the item is the
+         * player's carried stack, still on the cursor: on true minuit empties the cursor on the client only,
+         * and the target must remove the stack from the player's carried stack on the server, through its
+         * own form or menu packet (the server checks it is there). A target that inserts the item without
+         * taking it from the cursor duplicates it. On false the stack goes back to a slot.
+         */
         public boolean acceptDrop(ItemView item) {
             return this.accept.test(item);
         }

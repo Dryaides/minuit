@@ -28,7 +28,7 @@ class RichTextTest {
         }
 
         @Override
-        protected String cut(String text, int maxWidth) {
+        public String cut(String text, int maxWidth) {
             return text.substring(0, Math.min(text.length(), maxWidth / 6));
         }
 
@@ -37,11 +37,11 @@ class RichTextTest {
         }
 
         @Override
-        public void push(float x, float y, float scale) {
+        protected void pushPose(float x, float y, float scale) {
         }
 
         @Override
-        public void pop() {
+        protected void popPose() {
         }
 
         @Override

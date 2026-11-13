@@ -29,7 +29,6 @@ class SelectedLookTest {
                 new Tile("bedrock", "bedrock", ThemeChoice.Variant.LIGHT, 0.20F),
                 new Tile("bedrock", "bedrock", ThemeChoice.Variant.LIGHT, 0.35F),
                 new Tile("bedrock", "bedrock", ThemeChoice.Variant.LIGHT, 0.50F),
-                new Tile("glass", "clear", ThemeChoice.Variant.DARK, 0.35F),
                 new Tile("soft", "grey", ThemeChoice.Variant.DARK, 0.50F));
         for (Tile t : failing) {
             Palette p = palette(t.family(), t.chroma(), t.variant());
@@ -41,9 +40,10 @@ class SelectedLookTest {
 
     @Test
     void selectedTextReadsInEveryFamily() {
-        for (String famId : List.of("bedrock", "slate", "glass", "bubbly", "soft")) {
+        for (String famId : List.of("bedrock", "slate", "bubbly", "soft")) {
             ThemeFamily fam = Themes.family("minuit", famId);
-            for (ThemeChoice.Variant v : ThemeChoice.Variant.values()) {
+            for (ThemeChoice.Variant v : List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK,
+                    ThemeChoice.Variant.AUTO)) {
                 Palette p = fam.first().palette(v);
                 for (float hover : new float[]{0F, 1F}) {
                     int face = Shapes.selectedFace(p, hover);

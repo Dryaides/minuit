@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -625,9 +626,9 @@ public final class SplitPaneDemo implements Demo {
 
         stage.state("reduced motion snaps", W, 72, s -> {
             SplitPaneComponent p = s.add(tiles(new Box("s", 6, 6, 188, 60), Orientation.HORIZONTAL).collapsible(Side.FIRST));
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             clickArrow(s, p, 0);
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(0);
         });
 

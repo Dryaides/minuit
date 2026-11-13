@@ -25,6 +25,10 @@ public class ToggleGroupComponent extends BaseComponent {
     private final Consumer<Set<Integer>> onChange;
     /** In {@link Mode#SINGLE}: a click on the item that is on keeps it on instead of clearing the group. */
     public boolean required;
+    /** How the pushed segment shows; {@link PressStyle#OVERLAP} by default. */
+    private PressStyle press = PressStyle.OVERLAP;
+    /** Per item, how far its label moves down this frame, set by the row drawn under the labels. */
+    private int[] shift = new int[0];
 
     /** @param onChange the indexes that are on, after each change made by the player */
     public ToggleGroupComponent(Box box, List<String> labels, Mode mode, Set<Integer> on, Consumer<Set<Integer>> onChange) {
@@ -41,6 +45,16 @@ public class ToggleGroupComponent extends BaseComponent {
     public ToggleGroupComponent required(boolean value) {
         this.required = value;
         return this;
+    }
+
+    /** Sets how the pushed segment shows; {@link PressStyle#RAISED_SELECTED} is an option only, never a default. */
+    public ToggleGroupComponent style(PressStyle press) {
+        this.press = press;
+        return this;
+    }
+
+    public PressStyle style() {
+        return this.press;
     }
 
     public int count() {
@@ -110,6 +124,13 @@ public class ToggleGroupComponent extends BaseComponent {
 
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
+        if (this.press != PressStyle.SEPARATE) {
+            joined(d, theme);
+            for (Item item : this.items) {
+                item.draw(d, theme, mx, my, this.delta);
+            }
+            return;
+        }
         for (Item item : this.items) {
             item.draw(d, theme, mx, my, this.delta);
         }
@@ -121,6 +142,25 @@ public class ToggleGroupComponent extends BaseComponent {
             int x = this.items.get(i).x;
             d.fill(x, this.y + 1, x + 1, this.y + this.h - 1, p.wellEdge());
         }
+    }
+
+    /** The plates of a joined row in {@link #press}; the items then draw only their labels on top. */
+    private void joined(Draw d, Theme theme) {
+        Palette p = theme.palette();
+        int n = this.items.size();
+        int[] xs = new int[n + 1];
+        int[] faces = new int[n];
+        boolean[] on = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            Item item = this.items.get(i);
+            boolean usable = item.active && this.active;
+            xs[i] = item.x;
+            on[i] = usable && item.on;
+            faces[i] = !usable ? p.disabled() : on[i] ? Shapes.mix(p.primary(), p.primaryHover(), item.hoverAnim)
+                    : Shapes.mix(p.raised(), p.raisedHover(), item.hoverAnim);
+        }
+        xs[n] = this.x + this.w;
+        this.shift = this.press.row(d, p, theme.frame(), xs, this.y, this.h, faces, on);
     }
 
     @Override
@@ -142,6 +182,29 @@ public class ToggleGroupComponent extends BaseComponent {
     public List<BaseComponent> stops() {
         return this.active ? this.items.stream().filter(item -> item.active).map(item -> (BaseComponent) item).toList()
                 : List.of();
+    }
+
+    /**
+     * One segment of a joined row or column: the plate runs past the inner edges and is cut there, so only the
+     * ends get the frame's corners and a sunk segment shows its neighbours' edges beside it. Shared by the side rail.
+     */
+    static void segment(Draw d, Theme theme, int x, int y, int w, int h, boolean first, boolean last, boolean vertical,
+                        int face, Shapes.Relief relief) {
+        int reach = 8;
+        int x0 = x;
+        int y0 = y;
+        int x1 = x + w;
+        int y1 = y + h;
+        if (vertical) {
+            y0 = first ? y : y - reach;
+            y1 = last ? y + h : y + h + reach;
+        } else {
+            x0 = first ? x : x - reach;
+            x1 = last ? x + w : x + w + reach;
+        }
+        d.scissor(x, y, x + w, y + h);
+        theme.frame().button(d, theme.palette(), x0, y0, x1 - x0, y1 - y0, null, face, relief);
+        d.endScissor();
     }
 
     private final class Item extends BaseComponent {
@@ -168,6 +231,17 @@ public class ToggleGroupComponent extends BaseComponent {
             Palette p = theme.palette();
             boolean usable = this.active && ToggleGroupComponent.this.active;
             FrameStyle style = theme.frame();
+            ToggleGroupComponent group = ToggleGroupComponent.this;
+            if (group.press != PressStyle.SEPARATE) {
+                boolean on = usable && this.on;
+                int ink = !usable ? p.disabledText() : on ? p.primaryText() : p.raisedText();
+                int room = this.w - 6;
+                int fit = Math.min(room, d.width(this.label));
+                int sink = this.index < group.shift.length ? group.shift[this.index] : 0;
+                d.textShrink(this.label, this.x + (this.w - fit) / 2, this.y + sink, room,
+                        PressStyle.faceHeight(style, this.h), 0.75F, ink);
+                return;
+            }
             if (style.gameWidgets()) {
                 boolean shown = usable && this.on;
                 style.tab(d, p, this.x, this.y, this.w, this.h, shown, usable && (hovered || this.focused));
@@ -192,17 +266,13 @@ public class ToggleGroupComponent extends BaseComponent {
                 face = Shapes.mix(p.raised(), p.raisedHover(), this.hoverAnim);
                 text = p.raisedText();
             }
-            // The plate runs past the inner edges and is cut there, so only the ends get the frame's corners.
-            int reach = 8;
-            int left = first() ? this.x : this.x - reach;
-            int right = last() ? this.x + this.w : this.x + this.w + reach;
-            d.scissor(this.x, this.y, this.x + this.w, this.y + this.h);
-            theme.frame().button(d, p, left, this.y, right - left, this.h, null, face,
+            segment(d, theme, this.x, this.y, this.w, this.h, first(), last(), false, face,
                     usable && this.on ? theme.frame().selectedRelief() : Shapes.Relief.RAISED);
-            d.endScissor();
             int room = this.w - 6;
             int fit = Math.min(room, d.width(this.label));
-            d.textShrink(this.label, this.x + (this.w - fit) / 2, this.y, room, this.h, 0.75F, text);
+            int sink = usable && this.on ? style.selectedTravel() : 0;
+            d.textShrink(this.label, this.x + (this.w - fit) / 2, this.y + sink, room,
+                    this.h - style.buttonLip(this.h), 0.75F, text);
         }
 
         @Override

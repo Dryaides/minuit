@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -228,9 +229,9 @@ public final class TextAreaDemo implements Demo {
             s.settle(600);
         });
         stage.state("reduced motion: caret stays on", W, 74, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             TextAreaComponent a = area(s, WORDS);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
+            s.paint((d, t) -> HostState.reducedMotion(false));
             s.focus(a);
             s.settle(600);
         });

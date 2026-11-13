@@ -1,0 +1,16 @@
+pluginManagement {
+    // The version lives here so build.gradle can ask for the plugin without one, as it must when the repo's
+    // settings.gradle includes this project (-Pingame_bench) and the root already loaded the plugin.
+    plugins {
+        id 'dev.architectury.loom-no-remap' version '1.17-SNAPSHOT'
+    }
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { name = "Fabric"; url = "https://maven.fabricmc.net/" }
+        maven { name = "Architectury"; url = "https://maven.architectury.dev/" }
+        // Architectury Loom transitively needs mcinjector + DiffPatch from Forge maven.
+        maven { name = "MinecraftForge"; url = "https://maven.minecraftforge.net/" }
+    }
+}
+rootProject.name = "minuit-components-ingame-1201"

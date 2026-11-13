@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.OfficialPalettes;
+
 /**
  * What the data widgets (donut, gauge, sparkline, heatmap, steps, timeline, kanban) draw the same way: the
  * {@link SeriesColors}, the inks on the panel's surface, and pictures made of whole pixels.
@@ -30,6 +32,30 @@ final class DataLook {
         return opaque(p.surface());
     }
 
+    private static Palette plotFrom;
+    private static Palette plotPalette;
+
+    /**
+     * The face a chart plots on: the panel's surface (an inventory's grey in a light variant, the dark panel in a
+     * dark one), as solid colour. A dark well under the data only hides it.
+     */
+    static int plotFace(Palette p) {
+        return back(p);
+    }
+
+    /** {@code p} with its well turned into the {@link #plotFace}, for the frame's sunken plot and the inks on it. */
+    static synchronized Palette plotPalette(Palette p) {
+        if (plotFrom != p) {
+            plotPalette = OfficialPalettes.derive(p, new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(), p.surface(),
+                    p.surfaceEdge(), p.section(), p.surface(), p.wellEdge(), p.text(), p.textSoft(), p.textFaint(), p.raised(),
+                    p.raisedHover(), p.raisedText(), p.primary(), p.primaryHover(), p.primaryText(), p.accent(),
+                    p.accentDeep(), p.good(), p.warn(), p.bad(), p.destructive(), p.destructiveHover(),
+                    p.destructiveText(), p.track(), p.disabled(), p.disabledText(), p.shadow(), p.link(), p.backdrop(), p.line(), p.mark(), p.slot()));
+            plotFrom = p;
+        }
+        return plotPalette;
+    }
+
     /** The text on the panel's surface. */
     static int ink(Palette p, boolean active) {
         return active ? bestInk(p, back(p)) : p.disabledText();
@@ -47,7 +73,7 @@ final class DataLook {
 
     /** A colour moved towards the text until a shape of it reads on the surface. */
     static int readable(Palette p, int color) {
-        return Ink.readable(color, back(p), Ink.MARK);
+        return Ink.readable(p, color, back(p), Ink.MARK);
     }
 
     /** A well of nothing: the part of a shape that is not filled in. */

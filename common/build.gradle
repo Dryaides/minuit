@@ -82,15 +82,13 @@ dependencies {
     compileOnly('net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7')
 }
 
-// Import fence: no common file may gain Minecraft names, src/main stays Java 17 source, and the
-// variant dirs hold only Minecraft glue; the ceilings in fence.tsv and port-fence.tsv only go down.
+// Rules in tools/fence.py.
 tasks.register('fence', Exec) {
     group = 'verification'
     workingDir = rootDir
     commandLine 'python', 'tools/fence.py', rootDir.path
     inputs.dir('src')
     inputs.file('fence.tsv')
-    inputs.file('port-fence.tsv')
     outputs.upToDateWhen { false }
 }
 tasks.named('check') { dependsOn 'fence' }

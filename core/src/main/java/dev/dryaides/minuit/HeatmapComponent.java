@@ -608,7 +608,7 @@ public class HeatmapComponent extends BaseComponent {
             ramp = new int[levels];
         }
         int back = DataLook.back(p);
-        int top = Ink.readable(p.primary(), DataLook.back(p), Ink.MARK);
+        int top = Ink.readable(p, p.markInk(), DataLook.back(p), Ink.MARK);
         int low = Shapes.mix(back, top, RAMP_LOW);
         // Quieter than the first real shade: a wash as strong as a shape's would read as more than that shade.
         ramp[0] = Shapes.alpha(DataLook.opaque(Ink.on(p, back)), NOTHING_ALPHA);

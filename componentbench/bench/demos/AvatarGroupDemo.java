@@ -26,6 +26,15 @@ public final class AvatarGroupDemo implements Demo {
         return out;
     }
 
+    /** The first {@code count} of the game's default players, each with its skin. */
+    private static List<Member> players(int count) {
+        List<Member> out = new ArrayList<>();
+        for (String name : Mc.PLAYERS.subList(0, count)) {
+            out.add(new Member(name, Mc.skin(name)));
+        }
+        return out;
+    }
+
     private static AvatarGroupComponent group(Scene s, int count) {
         return s.add(new AvatarGroupComponent(new Box("g", 8, 8, 170, H), people(count)));
     }
@@ -86,6 +95,8 @@ public final class AvatarGroupDemo implements Demo {
             AvatarGroupComponent g = group(s, 4);
             s.key(InputKey.TAB);
         });
+        stage.state("default skins fit", W, 38, s -> s.add(new AvatarGroupComponent(new Box("g", 8, 8, 170, H), players(4))));
+        stage.state("default skins plus n", W, 38, s -> s.add(new AvatarGroupComponent(new Box("g", 8, 8, 170, H), players(9))).max(4));
         stage.state("with heads", W, 38, s -> {
             AsyncImage skin = AsyncImage.of(AvatarDemo.STEVE, 64, 64);
             List<Member> list = new ArrayList<>(List.of(new Member("Steve", skin), new Member("Alex Stone", null), new Member("Steve Two", skin), new Member("Grumm", null), new Member("Ivo", null)));

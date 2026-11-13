@@ -1,3 +1,4 @@
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.BaseComponent;
 import dev.dryaides.minuit.EntityPreviewComponent;
 import dev.dryaides.minuit.EntityView;
@@ -12,8 +13,8 @@ import dev.dryaides.minuit.Themes;
 import dev.dryaides.minuit.Words;
 import dev.dryaides.minuit.internal.ThemeFiles;
 
-import site.McScenes;
-import site.SiteScenes.Scene;
+import dev.dryaides.minuit.internal.showcase.McScenes;
+import dev.dryaides.minuit.internal.showcase.SiteScenes.Scene;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,7 +33,8 @@ public class McBench {
         File out = new File(args[0]);
         out.mkdirs();
         BenchDraw.McFont font = new BenchDraw.McFont();
-        BaseComponent.clock = () -> WidgetBench.now;
+        HostState.clock(() -> WidgetBench.now);
+        dev.dryaides.minuit.ItemLookup.plugIn(McScenes.LOOKUP);
         McScenes.words = lang(java.nio.file.Path.of("common/src/main/resources/assets/minuit/lang/en_us.json"));
         Theme first = Themes.defaultTheme();
         checks(font, first);
@@ -130,12 +132,12 @@ public class McBench {
 
         // A link click opens its URL through the host's opener.
         List<String> opened = new ArrayList<>();
-        RichTextComponent.links = opened::add;
+        HostState.links(opened::add);
         Scene rs = new Scene(theme, "Rich");
         RichTextComponent rich = rs.put(new RichTextComponent(rs.place(12, 26, 276, 20), "[wiki](https://minecraft.wiki)"));
         frame(font, rs);
         rs.mouseClicked(rich.x + 2, rich.y + 4, 0);
         check(opened.equals(List.of("https://minecraft.wiki")), "a link click opens its URL, got " + opened);
-        RichTextComponent.links = url -> { };
+        HostState.links(url -> { });
     }
 }

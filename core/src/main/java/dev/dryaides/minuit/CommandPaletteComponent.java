@@ -258,7 +258,9 @@ public final class CommandPaletteComponent extends BaseComponent {
         Object[] how = {disabled, tip};
         disabledIds.put(id, how);
         for (Entry entry : entries) {
-            applyDisabled(entry.command, how);
+            if (entry.command.id.equals(id)) {
+                applyDisabled(entry.command, how);
+            }
         }
         return this;
     }
@@ -386,7 +388,7 @@ public final class CommandPaletteComponent extends BaseComponent {
         field.active = true;
         host.focus(this);
         refilter();
-        if (reducedMotion) {
+        if (reducedMotion()) {
             glide.snap(true);
         } else {
             glide.replay();
@@ -790,7 +792,7 @@ public final class CommandPaletteComponent extends BaseComponent {
         measure();
         Palette p = t.palette();
         FrameStyle frame = t.frame();
-        boolean moving = !reducedMotion && glide.moving();
+        boolean moving = !reducedMotion() && glide.moving();
         float shown = moving ? Math.max(0F, Math.min(1F, glide.progress())) : 1F;
         d.nextLayer(); // the text beneath may sort above a rectangle otherwise
         d.fill(x, y, x + w, y + h, (Math.round(DIM_ALPHA * shown) << 24) | (p.shadow() & 0xFFFFFF));

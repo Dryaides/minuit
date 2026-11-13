@@ -18,19 +18,19 @@
       "raisedHover": "#FFE3D9F5",
       "raisedText": "#FF44385A",
       "primary": "#FF7554BF",
-      "primaryHover": "#FF8767CC",
+      "primaryHover": "#FF8464CB",
       "primaryText": "#FFFFFFFF",
       "accent": "#FF7554BF",
       "accentDeep": "#FF533397",
-      "good": "#FF1F9D62",
-      "warn": "#FFB07A00",
+      "good": "#FF187B4D",
+      "warn": "#FF8F6300",
       "bad": "#FFC0392B",
       "destructive": "#FFB13428",
-      "destructiveHover": "#FFC9574B",
+      "destructiveHover": "#FFC3483B",
       "destructiveText": "#FFFFF4F2",
       "track": "#FFEDE7F5",
       "disabled": "#FFF1EDF6",
-      "disabledText": "#FFA69BC6",
+      "disabledText": "#FF8F82B8",
       "shadow": "#40000000"
     },
     "dark": {
@@ -58,11 +58,11 @@
       "warn": "#FFF0B429",
       "bad": "#FFFF6B6B",
       "destructive": "#FFB24B4B",
-      "destructiveHover": "#FFE05E5E",
+      "destructiveHover": "#FFB82323",
       "destructiveText": "#FFFFF4F2",
       "track": "#FF2F2745",
       "disabled": "#FF2F2945",
-      "disabledText": "#FF6E6590",
+      "disabledText": "#FF79709A",
       "shadow": "#66000000"
     }
   }

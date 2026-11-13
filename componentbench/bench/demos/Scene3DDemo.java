@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -402,21 +403,21 @@ public final class Scene3DDemo implements Demo {
         });
 
         stage.state("auto_rotate_off_under_reduced_motion", W, H, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             Scene3DComponent v = view(s, house()).autoRotate(true);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
                 s.waitMs(200);
-                BaseComponent.reducedMotion = true; // the second paint turned it off for the next state
+                HostState.reducedMotion(true); // the second paint turned it off for the next state
                 s.drag(100, 70, 60, 70);
                 s.move(RESET_X, RESET_Y);
                 s.press(RESET_X, RESET_Y);
-                BaseComponent.reducedMotion = true;
+                HostState.reducedMotion(true);
                 v.mouseReleased(RESET_X, RESET_Y, 0);
                 s.move(-100, -100);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
             note(s, NOTE_Y, "still; a reset snaps");
         });

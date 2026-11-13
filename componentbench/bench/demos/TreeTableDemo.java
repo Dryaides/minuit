@@ -55,17 +55,18 @@ public final class TreeTableDemo implements Demo {
 
         stage.state("items", 220, 100, s -> {
             dev.dryaides.minuit.TreeTableComponent<String> t = s.add(new dev.dryaides.minuit.TreeTableComponent<String>(new Box("t", 6, 6, 208, 88), 18,
-                    java.util.List.of("minecraft:chest", "minecraft:barrel"), n -> n.equals("minecraft:chest") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of())
+                    java.util.List.of("minecraft:bundle", "minecraft:book"), n -> n.equals("minecraft:bundle") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of())
                     .treeColumn("Name", n -> n.substring(n.indexOf(':') + 1).replace('_', ' '), n -> dev.dryaides.minuit.ItemView.of(n, n.endsWith("log") ? 12 : 1))
                     .textColumn("Mod", n -> n.substring(0, n.indexOf(':'))));
-            t.expand("minecraft:chest");
+            t.expand("minecraft:bundle");
         });
         stage.state("folded", W, H, s -> {
             TreeTableComponent<Task> c = s.add(table());
         });
 
-        stage.state("open two levels", W, H, s -> {
-            TreeTableComponent<Task> c = s.add(table());
+        // the header and all seven open rows fit, so the last row keeps the panel margin under it
+        stage.state("open two levels", W, 8 * ROW + 24, s -> {
+            TreeTableComponent<Task> c = s.add(table(8 * ROW + 2));
             c.expand(BUILD);
             c.expand(BASE);
         });

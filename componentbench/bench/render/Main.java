@@ -1,5 +1,6 @@
 package bench.render;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import com.google.gson.JsonObject;
@@ -40,7 +41,10 @@ public final class Main {
 
     record StateDef(String name, int w, int h, Consumer<Scene> script) { }
 
-    private static final String[] DEFAULT_FAMILIES = {"soft", "bedrock", "glass", "slate", "bubbly", "vanilla"};
+    private static final String[] DEFAULT_FAMILIES = {"soft", "bedrock", "slate", "bubbly", "vanilla"};
+    /** The modes each default family is drawn in; glass is a mode of every chroma since 2026-11-11. */
+    private static final List<ThemeChoice.Variant> DEFAULT_VARIANTS =
+            List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK, ThemeChoice.Variant.GLASS);
 
     public static void main(String[] args) throws Exception {
         String demoFilter = null;
@@ -68,6 +72,7 @@ public final class Main {
         String mcJar = System.getProperty("bench.mcjar", "");
         BenchFont font = new BenchFont(mcJar);
         Textures textures = new Textures(assets, mcJar);
+        dev.dryaides.minuit.internal.ImageFamily.install(new BenchImages(textures));
         TextMeasure.font = font::width;
         loadThemes(assets);
         Words words = loadWords(assets);
@@ -92,9 +97,9 @@ public final class Main {
         }
 
         Scene.Sim sim = new Scene.Sim();
-        BaseComponent.clock = sim;
-        BaseComponent.keys = sim;
-        BaseComponent.reducedMotion = false;
+        HostState.clock(sim);
+        HostState.keys(sim);
+        HostState.reducedMotion(false);
 
         int rendered = 0;
         int failed = 0;
@@ -205,7 +210,7 @@ public final class Main {
         scene.waitMs(scene.settleMs());
 
         BufferedImage img = new BufferedImage(s.w * scale, s.h * scale, BufferedImage.TYPE_INT_ARGB);
-        backdrop(img, spec.family);
+        backdrop(img, spec.variant, theme.palette().backdrop());
         BenchDraw d = new BenchDraw(img, scale, font, textures);
         scene.panel().draw(d, scene.mouseX(), scene.mouseY(), 1F);
         scene.panel().drawTooltip(d, scene.mouseX(), scene.mouseY());
@@ -214,15 +219,15 @@ public final class Main {
     }
 
     /**
-     * Glass gets a dimmed, blurred world to show. Every other family sits on flat neutral grey, so the open
-     * corner steps of a panel show nothing coloured.
+     * The glass mode gets a world to show through it. Every other mode sits on flat neutral grey, so the open
+     * corner steps of a panel show nothing coloured. A chroma with a backdrop role sits on that colour.
      */
-    static void backdrop(BufferedImage img, String family) {
+    static void backdrop(BufferedImage img, ThemeChoice.Variant variant, int page) {
         Graphics2D g = img.createGraphics();
         int w = img.getWidth();
         int h = img.getHeight();
-        if (!"glass".equals(family)) {
-            g.setColor(new Color(0x808080));
+        if (variant != ThemeChoice.Variant.GLASS) {
+            g.setColor(new Color(page != 0 ? page & 0xFFFFFF : 0x808080));
             g.fillRect(0, 0, w, h);
             g.dispose();
             return;
@@ -249,7 +254,16 @@ public final class Main {
     }
 
     static void loadThemes(Path assets) throws IOException {
-        List<ThemeFiles.Entry> entries = ThemeFiles.fromDirectory(assets.resolve("minuit/minuit"), "minuit");
+        // the kit's own themes, then any other namespace's (a resource pack merged in through BENCH_PACKS)
+        List<ThemeFiles.Entry> entries = new ArrayList<>(ThemeFiles.fromDirectory(assets.resolve("minuit/minuit"), "minuit"));
+        try (var namespaces = Files.list(assets)) {
+            for (Path ns : namespaces.sorted().toList()) {
+                String name = ns.getFileName().toString();
+                if (!name.equals("minuit") && Files.isDirectory(ns.resolve("minuit"))) {
+                    entries.addAll(ThemeFiles.fromDirectory(ns.resolve("minuit"), name));
+                }
+            }
+        }
         String result = ThemeFiles.reload(entries, m -> System.err.println("theme file: " + m));
         if (Themes.family("bench", "soft") == null) {
             throw new IllegalStateException("themes did not load (" + result + "), entries: " + entries.size());
@@ -274,7 +288,7 @@ public final class Main {
             for (String part : arg.split(",")) {
                 String[] p = part.split(":");
                 if (p.length != 3) {
-                    throw new IllegalArgumentException("a theme is family:chroma:light|dark, got " + part);
+                    throw new IllegalArgumentException("a theme is family:chroma:light|dark|glass, got " + part);
                 }
                 out.add(new Spec(p[0], p[1], ThemeChoice.Variant.parse(p[2])));
             }
@@ -287,7 +301,7 @@ public final class Main {
                 continue;
             }
             ThemeFamily.Chroma first = family.first();
-            for (ThemeChoice.Variant v : List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK)) {
+            for (ThemeChoice.Variant v : DEFAULT_VARIANTS) {
                 if (first.has(v)) {
                     out.add(new Spec(id, first.id(), v));
                 }

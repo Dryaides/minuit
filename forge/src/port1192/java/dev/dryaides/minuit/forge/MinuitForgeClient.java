@@ -1,12 +1,17 @@
 package dev.dryaides.minuit.forge;
 
+import dev.dryaides.minuit.client.ThemeScreen;
+import dev.dryaides.minuit.internal.ContainerTab;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.client.ConfigScreenHandler;
 import dev.dryaides.minuit.client.MinuitClient;
 import dev.dryaides.minuit.client.ThemeReload;
 import dev.dryaides.minuit.client.form.FormScreen;
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
+import dev.dryaides.minuit.port.mc.HudFeed;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.wire.Channels;
 import dev.dryaides.minuit.internal.port.Platform;
@@ -35,11 +40,16 @@ final class MinuitForgeClient {
 
     static void init(IEventBus modBus) {
         Bridges.install();
+        dev.dryaides.minuit.client.MinuitKeys.modifiers(new ForgeKeys());
         Platform.development(!FMLEnvironment.production);
+        ModLoadingContext.get().registerExtensionPoint(ConfigScreenHandler.ConfigScreenFactory.class, () ->
+                new ConfigScreenHandler.ConfigScreenFactory((minecraft, parent) -> new ThemeScreen(parent, ContainerTab.THEME_ID)));
         modBus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(MinuitClient::themeChoices));
         modBus.addListener((RegisterClientReloadListenersEvent event) -> event.registerReloadListener(new ThemeReload()));
         modBus.addListener((RegisterGuiOverlaysEvent event) -> event.registerBelow(VanillaGuiOverlay.CHAT_PANEL.id(),
                 "bubbles", (gui, pose, partial, width, height) -> BubbleLayer.render(pose, partial)));
+        modBus.addListener((RegisterGuiOverlaysEvent event) -> event.registerBelow(VanillaGuiOverlay.CHAT_PANEL.id(),
+                "hud", (gui, pose, partial, width, height) -> HudFeed.render(pose, partial)));
         ClientForms.connect(MinuitForgeClient::send, FormScreen.HOST);
         MinecraftForge.EVENT_BUS.addListener((ClientPlayerNetworkEvent.LoggingOut event) ->
                 Minecraft.getInstance().execute(ClientForms::left));

@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.Lists;
 
 import java.util.ArrayList;
@@ -42,6 +43,10 @@ public class ListComponent<T> extends BaseComponent {
     private final ScrollBar bar = new ScrollBar();
     private FrameStyle frame = FrameStyles.VANILLA;
     public T selected;
+    /** False keeps the box at its declared height and scrolls on any overflow (see {@link ScrollComponent}). */
+    public boolean fit = true;
+    /** The declared height: the most the box takes. */
+    public int max;
 
     public ListComponent(Box box, int rowHeight, RowRenderer<T> renderer, Consumer<T> onClick) {
         this(box, rowHeight, renderer, (item, index, mouseX, mouseY) -> onClick.accept(item));
@@ -52,6 +57,12 @@ public class ListComponent<T> extends BaseComponent {
         this.rowHeight = Math.max(1, rowHeight);
         this.renderer = renderer;
         this.onClick = onClick;
+        this.max = this.h;
+    }
+
+    /** Sizes the box by the scroll rule, never under one row so an empty list keeps a visible well. */
+    private void fitHeight() {
+        this.h = ScrollComponent.fitted(Math.max(this.rowHeight, this.items.size() * this.rowHeight), this.max, this.fit);
     }
 
     /** Gives every row the widgets {@code build} makes, built again on each {@link #setItems}. */
@@ -63,6 +74,7 @@ public class ListComponent<T> extends BaseComponent {
 
     public void setItems(List<T> items) {
         this.items = new ArrayList<>(Lists.withoutNulls(items));
+        fitHeight();
         this.bar.content(this.items.size() * this.rowHeight, this.h);
         buildWidgets();
     }
@@ -149,6 +161,8 @@ public class ListComponent<T> extends BaseComponent {
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         Palette p = theme.palette();
         this.frame = theme.frame();
+        fitHeight();
+        this.bar.content(this.items.size() * this.rowHeight, this.h);
         this.frame.well(d, p, this.x, this.y, this.w, this.h, false);
         if (!this.focused) {
             allWidgets().forEach(w -> w.focused = false);
@@ -156,7 +170,7 @@ public class ListComponent<T> extends BaseComponent {
         boolean in = hovered && mx < barX();
         int cx = in ? mx : Integer.MIN_VALUE;
         int cy = in ? my : Integer.MIN_VALUE;
-        this.glows.frame(clock.getAsLong());
+        this.glows.frame(Redraw.quietClock());
         d.scissor(this.x + 1, this.y + 1, this.x + this.w - 1, this.y + this.h - 1);
         int scroll = this.bar.offset();
         int first = scroll / this.rowHeight;
@@ -171,7 +185,7 @@ public class ListComponent<T> extends BaseComponent {
             float glow = this.glows.of(item, rowHover);
             if (isSelected || glow > 0F) {
                 theme.frame().row(d, p, this.x + 2, ry + 1, this.w - 4 - ScrollBar.room(this.frame), this.rowHeight - 2,
-                        isSelected ? p.raisedHover() : Shapes.mix(Shapes.alpha(p.raised(), 0), p.raised(), glow));
+                        isSelected ? p.primary() : Shapes.mix(Shapes.alpha(p.raised(), 0), p.raised(), glow));
             }
             this.renderer.draw(d, theme, item, rowBox(i, scroll), rowHover, isSelected);
             for (BaseComponent w : widgetsOf(i)) {

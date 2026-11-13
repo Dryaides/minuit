@@ -283,7 +283,7 @@ public final class DialogComponent extends BaseComponent {
             body = new Body(panel.theme(), panel.words);
         }
         dirty = true;
-        if (reducedMotion) {
+        if (reducedMotion()) {
             slide.snap(true);
         } else if (turningBack) {
             slide.show();
@@ -299,7 +299,7 @@ public final class DialogComponent extends BaseComponent {
             return;
         }
         open = false;
-        if (reducedMotion) {
+        if (reducedMotion()) {
             slide.snap(false);
         } else {
             slide.hide();
@@ -438,6 +438,7 @@ public final class DialogComponent extends BaseComponent {
         boolean overflow = flowH > room;
         ScrollComponent view = overflow ? new ScrollComponent(new Box("view", left, top, inner, viewH)) : null;
         if (view != null) {
+            view.fit = false;
             view.step = LINE;
         }
         List<BaseComponent> flow = new ArrayList<>();
@@ -670,6 +671,11 @@ public final class DialogComponent extends BaseComponent {
     @Override
     public boolean keyCaptured(KeyPress press) {
         return open && active && body != null && body.rawKey(press);
+    }
+
+    @Override
+    public boolean keyReleasedCaptured(KeyPress press) {
+        return open && active && body != null && body.rawKeyReleased(press);
     }
 
     /** Runs the default action, as Enter does with nothing else to press. */

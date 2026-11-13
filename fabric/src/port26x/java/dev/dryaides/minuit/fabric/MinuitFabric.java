@@ -17,6 +17,7 @@ public final class MinuitFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        FabricBundling.check();
         PayloadTypeRegistry.serverboundPlay().register(WirePayload.HELLO, WirePayload.codec(WirePayload.HELLO));
         PayloadTypeRegistry.clientboundPlay().register(WirePayload.HELLO, WirePayload.codec(WirePayload.HELLO));
         PayloadTypeRegistry.clientboundPlay().register(WirePayload.SCREEN, WirePayload.codec(WirePayload.SCREEN));

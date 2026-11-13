@@ -156,4 +156,77 @@ class PanelFocusTest {
         panel.keyPressed(InputKey.SPACE, false);
         assertEquals(List.of("check"), pressed);
     }
+
+    /** The demo's case: a scene widget hands keys to the panel inside it; Escape leaves the field, then goes back. */
+    @Test
+    void escapeLeavesTheInnerFieldThenGoesBackThroughAWidgetThatPassesKeys() {
+        TextFieldComponent field = new TextFieldComponent(new Box("f", 10, 10, 100, 20), "", t -> { });
+        PanelComponent inner = new PanelComponent(null, null, 0, 0) {
+            {
+                add(field);
+            }
+
+            @Override
+            public int width() {
+                return 200;
+            }
+
+            @Override
+            public int height() {
+                return 100;
+            }
+
+            @Override
+            protected void drawBackground(Draw d, int mx, int my) {
+            }
+        };
+        BaseComponent stage = new BaseComponent(new Box("s", 0, 30, 200, 70)) {
+            @Override
+            protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
+            }
+
+            @Override
+            protected boolean takesFocus() {
+                return true;
+            }
+
+            @Override
+            protected boolean passesKeys() {
+                return true;
+            }
+
+            @Override
+            public boolean keyPressed(InputKey key, boolean shift) {
+                return inner.keyPressed(key, shift);
+            }
+        };
+        List<String> went = new ArrayList<>();
+        PanelComponent outer = new PanelComponent(null, (k, a) -> k, 0, 0) {
+            {
+                add(stage);
+                addBack(() -> went.add("back"));
+            }
+
+            @Override
+            public int width() {
+                return 200;
+            }
+
+            @Override
+            public int height() {
+                return 100;
+            }
+
+            @Override
+            protected void drawBackground(Draw d, int mx, int my) {
+            }
+        };
+        outer.focus(stage);
+        inner.focus(field);
+        outer.keyPressed(InputKey.ESCAPE, false);
+        assertEquals(null, inner.focus());
+        assertEquals(List.of(), went);
+        outer.keyPressed(InputKey.ESCAPE, false);
+        assertEquals(List.of("back"), went);
+    }
 }

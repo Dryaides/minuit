@@ -1,6 +1,7 @@
 package dev.dryaides.minuit.internal;
 
 import dev.dryaides.minuit.FrameStyles;
+import dev.dryaides.minuit.ThemeChoice;
 import dev.dryaides.minuit.ThemeFamily;
 import org.junit.jupiter.api.Test;
 
@@ -31,25 +32,30 @@ class ThemeFilesTest {
         assertEquals(0xFFE6E9EC, slate.dark().text());
         assertEquals(0x66000000, slate.dark().shadow());
         assertEquals(0xFF8A96A3, slate.light().frame());
-        assertEquals(FrameStyles.GLASS, ThemeFiles.family(read("themes/glass/family.json")).style());
+        assertEquals(FrameStyles.SLATE, ThemeFiles.family(read("themes/slate/family.json")).style());
     }
 
     /**
-     * Glass's translucency is its family's override, not the chroma's: clear glass keeps the
-     * #78ECF6FA surface (owner review: more see-through), and the same chroma on slate is opaque.
+     * A family's override sets alpha on its own chromas only: a pack family "tinted" (slate shapes) makes teal's light
+     * surface #78 see-through and its glass smoke #99, while the shipped slate keeps teal opaque. The glass smoke is
+     * #0B0D10 (owner, 2026-11-11), so the glass override keeps that colour under the new alpha.
      */
     @Test
     void familyOverrideSetsAlphaOnItsChromasOnly() throws Exception {
+        String tinted = """
+                {"style": "slate", "chromas": ["teal"],
+                 "override": {"light": {"surface": "#78"}, "glass": {"surface": "#99"}}}""";
+        List<ThemeFiles.Entry> entries = new ArrayList<>(ThemeFiles.fromDirectory(ROOT, "minuit"));
+        entries.add(new ThemeFiles.Entry("pack:minuit/themes/tinted/family.json", "pack", "themes/tinted/family.json",
+                tinted));
         List<String> log = new ArrayList<>();
-        List<ThemeFamily> families = ThemeFiles.assemble(ThemeFiles.fromDirectory(ROOT, "minuit"), log::add);
+        List<ThemeFamily> families = ThemeFiles.assemble(entries, log::add);
         assertEquals(List.of(), log);
-        ThemeFamily glass = families.stream().filter(f -> f.id().equals("glass")).findFirst().orElseThrow();
+        ThemeFamily own = families.stream().filter(f -> f.id().equals("tinted")).findFirst().orElseThrow();
         ThemeFamily slate = families.stream().filter(f -> f.id().equals("slate")).findFirst().orElseThrow();
-        assertEquals(List.of("clear", "green"), glass.recommended().stream().map(ThemeFamily.Chroma::id).toList());
-        assertEquals(0x78ECF6FA, glass.chroma("clear").light().surface());
-        assertEquals(0x7A0C161C, glass.chroma("clear").dark().surface());
-        assertEquals(0xFFECF6FA, slate.chroma("clear").light().surface());
-        assertEquals(0x26000000, slate.chroma("clear").light().shadow());
+        assertEquals(0x78E7EBEF, own.chroma("teal").light().surface());
+        assertEquals(0xFFE7EBEF, slate.chroma("teal").light().surface());
+        assertEquals(0x990B0D10, own.chroma("teal").palette(ThemeChoice.Variant.GLASS).surface());
     }
 
     @Test
@@ -60,22 +66,22 @@ class ThemeFilesTest {
 
     @Test
     void missingRoleSkipsTheFileAndNamesTheField() throws Exception {
-        String text = read("chromas/green.json").replaceFirst("\"textSoft\": \"#[0-9A-F]+\",\s*", "");
+        String text = read("chromas/lilac.json").replaceFirst("\"textSoft\": \"#[0-9A-F]+\",\s*", "");
         ThemeFiles.BadFile bad = assertThrows(ThemeFiles.BadFile.class, () -> ThemeFiles.chroma(text));
         assertEquals("variants.light.textSoft: missing", bad.getMessage());
 
         List<String> log = new ArrayList<>();
         List<ThemeFiles.Entry> entries = List.of(
-                new ThemeFiles.Entry("pack:minuit/themes/glass/family.json", "pack", "themes/glass/family.json",
-                        read("themes/glass/family.json")),
-                new ThemeFiles.Entry("pack:minuit/chromas/clear.json", "pack", "chromas/clear.json", read("chromas/clear.json")),
-                new ThemeFiles.Entry("pack:minuit/chromas/green.json", "pack", "chromas/green.json", text));
+                new ThemeFiles.Entry("pack:minuit/themes/tinted/family.json", "pack", "themes/tinted/family.json",
+                        "{\"style\": \"slate\", \"chromas\": [\"teal\", \"lilac\"]}"),
+                new ThemeFiles.Entry("pack:minuit/chromas/teal.json", "pack", "chromas/teal.json", read("chromas/teal.json")),
+                new ThemeFiles.Entry("pack:minuit/chromas/lilac.json", "pack", "chromas/lilac.json", text));
         List<ThemeFamily> families = ThemeFiles.assemble(entries, log::add);
         assertEquals(1, families.size());
-        assertEquals("clear", families.get(0).first().id());
-        assertNull(families.get(0).chroma("green"));
-        assertEquals(List.of("minuit theme file pack:minuit/chromas/green.json skipped: variants.light.textSoft: missing",
-                "minuit theme family glass: recommended chroma green not found"), log);
+        assertEquals("teal", families.get(0).first().id());
+        assertNull(families.get(0).chroma("lilac"));
+        assertEquals(List.of("minuit theme file pack:minuit/chromas/lilac.json skipped: variants.light.textSoft: missing",
+                "minuit theme family tinted: recommended chroma lilac not found"), log);
     }
 
     /** A chroma file in a family folder, the layout before shared chromas, still joins that family. */

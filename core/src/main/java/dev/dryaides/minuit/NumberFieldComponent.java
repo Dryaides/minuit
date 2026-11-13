@@ -393,7 +393,7 @@ public class NumberFieldComponent extends BaseComponent {
         if (held == NO_BUTTON || over != held || !can(held)) {
             return;
         }
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         while (now >= nextRepeat && can(held)) {
             stepBy(held == PLUS ? 1 : -1);
             nextRepeat += REPEAT_FIRST;
@@ -437,7 +437,7 @@ public class NumberFieldComponent extends BaseComponent {
             if (can(hit)) {
                 BaseComponent.click();
                 held = hit;
-                nextRepeat = BaseComponent.clock.getAsLong() + StepperComponent.REPEAT_DELAY_MS;
+                nextRepeat = BaseComponent.clock().getAsLong() + StepperComponent.REPEAT_DELAY_MS;
                 stepBy(hit == PLUS ? 1 : -1);
             }
             return true;

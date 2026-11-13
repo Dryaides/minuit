@@ -1,12 +1,17 @@
 package dev.dryaides.minuit.forge;
 
+import dev.dryaides.minuit.client.ThemeScreen;
+import dev.dryaides.minuit.internal.ContainerTab;
+import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.ExtensionPoint;
 import dev.dryaides.minuit.client.MinuitClient;
 import dev.dryaides.minuit.client.ThemeReload;
 import dev.dryaides.minuit.client.form.FormScreen;
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
+import dev.dryaides.minuit.port.mc.HudFeed;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.wire.Channels;
 import dev.dryaides.minuit.internal.port.Platform;
@@ -34,7 +39,10 @@ final class MinuitForgeClient {
 
     static void init(IEventBus modBus) {
         Bridges.install();
+        dev.dryaides.minuit.client.MinuitKeys.modifiers(new ForgeKeys());
         Platform.development(!FMLEnvironment.production);
+        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.CONFIGGUIFACTORY,
+                () -> (minecraft, parent) -> new ThemeScreen(parent, ContainerTab.THEME_ID));
         modBus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(MinuitClient::themeChoices));
         // Forge 36 has no client reload listener event: the resource manager exists once mods are constructed.
         ((ReloadableResourceManager) Minecraft.getInstance().getResourceManager()).registerReloadListener(new ThemeReload());
@@ -42,6 +50,7 @@ final class MinuitForgeClient {
         MinecraftForge.EVENT_BUS.addListener((RenderGameOverlayEvent.Pre event) -> {
             if (event.getType() == RenderGameOverlayEvent.ElementType.CHAT) {
                 BubbleLayer.render(event.getMatrixStack(), event.getPartialTicks());
+                HudFeed.render(event.getMatrixStack(), event.getPartialTicks());
             }
         });
         ClientForms.connect(MinuitForgeClient::send, FormScreen.HOST);

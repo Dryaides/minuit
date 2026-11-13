@@ -36,8 +36,10 @@ public class WaveComponent extends BaseComponent {
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         Palette p = theme.palette();
         theme.frame().well(d, p, this.x, this.y, this.w, this.h, false);
-        double ticks = BaseComponent.clock.getAsLong() / 50.0;
-        int lit = this.color != 0 ? this.color : Shapes.mix(p.accent(), 0xFFFFFFFF, 0.35F);
+        double ticks = BaseComponent.clock().getAsLong() / 50.0;
+        // The softened accent keeps 3:1 on the well, so a light chroma's bars do not fade into it.
+        int lit = this.color != 0 ? this.color
+                : Ink.readable(p, Shapes.mix(p.accent(), 0xFFFFFFFF, 0.35F), Ink.seen(p, p.well()), Ink.MARK);
         int middle = this.y + this.h / 2;
         int bars = (this.w - 12) / 4;
         // Bars stay inside the well's 2 px edge, whatever the level or the height.

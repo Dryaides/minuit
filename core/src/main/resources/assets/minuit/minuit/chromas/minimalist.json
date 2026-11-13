@@ -30,8 +30,9 @@
       "destructiveText": "#FFFFFFFF",
       "track": "#FFE4E4E7",
       "disabled": "#FFF4F4F5",
-      "disabledText": "#FFA1A1AA",
-      "shadow": "#1A000000"
+      "disabledText": "#FF8C8C97",
+      "shadow": "#1A000000",
+      "line": "#FFE4E4E7"
     },
     "dark": {
       "frame": "#FF27272A",
@@ -62,8 +63,9 @@
       "destructiveText": "#FFFFFFFF",
       "track": "#FF27272A",
       "disabled": "#FF18181B",
-      "disabledText": "#FF52525B",
-      "shadow": "#66000000"
+      "disabledText": "#FF64646F",
+      "shadow": "#66000000",
+      "line": "#FF27272A"
     }
   }
 }

@@ -18,6 +18,19 @@ public final class ByteWriter {
         return this;
     }
 
+    /** A varint over 64 bits, for amounts of a shop's currency; 0 or more. */
+    public ByteWriter varlong(long value) {
+        if (value < 0) {
+            throw new WireException("varlong " + value);
+        }
+        while ((value & ~0x7FL) != 0) {
+            out.write((int) (value & 0x7F) | 0x80);
+            value >>>= 7;
+        }
+        out.write((int) value);
+        return this;
+    }
+
     /** The zigzag varint, for signed values. */
     public ByteWriter svarint(int value) {
         return varint((value << 1) ^ (value >> 31));

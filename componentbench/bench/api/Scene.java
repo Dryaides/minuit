@@ -16,7 +16,7 @@ import java.util.function.LongSupplier;
  * (or when the renderer lets animations settle), so every picture comes out the same.
  */
 public final class Scene {
-    /** The simulated time, shared with BaseComponent.clock while rendering. */
+    /** The simulated time, shared with BaseComponent.clock() while rendering. */
     public static final class Sim implements LongSupplier, HeldKeys {
         public long now = 1_000_000L;
         public boolean ctrl;
@@ -55,6 +55,16 @@ public final class Scene {
     public Words words() { return words; }
     public ScenePanel panel() { return panel; }
 
+    private boolean showcase;
+
+    /** Marks the scene as a site or gallery picture: {@link #fixture} widgets stay out of it. */
+    public Scene showcase() { showcase = true; return this; }
+
+    /** A test widget around the component (a button behind a dialog); left out of a showcase picture. */
+    public <W extends BaseComponent> W fixture(W widget) {
+        return showcase ? widget : panel.put(widget);
+    }
+
     /** Adds a widget to the scene's panel, like PanelComponent.add. */
     public <W extends BaseComponent> W add(W widget) {
         return panel.put(widget);
@@ -75,23 +85,52 @@ public final class Scene {
     /** Height of the bottom band the caption line keeps clear: the panel frame is up to 7 rows and the glyph cell 8. */
     public static final int CAPTION_BAND = 16;
 
+    /** The caption band in {@code frame}: a thick bottom lip (vanilla, thick-lip) widens it so the line clears the rim by 2. */
+    static int captionBand(dev.dryaides.minuit.FrameStyle frame) {
+        return Math.max(CAPTION_BAND, 9 + frame.panelInsets().bottom() + frame.panelShadow() + 2);
+    }
+
     /** A status line at the panel bottom, above the frame. Demos size their stage so widgets end above it. */
     public void caption(java.util.function.Supplier<String> text) {
         hasCaption = true;
-        paint((d, t) -> d.textFit(text.get(), 6, panel.height() - CAPTION_BAND, panel.width() - 12, t.palette().text()));
+        paint((d, t) -> {
+            int left = Math.max(6, t.frame().panelInsets().left() + 4);
+            int widgets = Integer.MAX_VALUE;
+            for (BaseComponent w : panel.widgets()) {
+                if (w.visible && w.w > 0 && w.w < panel.width() && w.x >= left) {
+                    widgets = Math.min(widgets, w.x);
+                }
+            }
+            if (widgets <= 12) {
+                left = widgets; // in line with the widgets above it
+            }
+            d.textFit(text.get(), left, panel.height() - captionBand(t.frame()), panel.width() - 2 * left, t.palette().text());
+        });
     }
+
+    private boolean keepHeight;
+
+    /** The declared height stays: for a demo whose popup fills a panel-wide host, which {@link #fitHeight} cannot measure. */
+    public void keepHeight() { keepHeight = true; }
 
     /**
      * The panel height that leaves the same margin under the last widget as above the first, counted on
      * the widgets as they stand after the script (an open popup counts). A caption line adds its band.
-     * The margin is the top one, at most 8 (a demo that leaves room above for a tooltip keeps its room).
-     * Returns -1 when a widget touches the top edge (a full-bleed demo) or a modal is open: the declared height stays.
+     * The margin is the top one, at most 8 (a demo that leaves room above for a tooltip keeps its room),
+     * and at least the frame's bottom lip and shadow plus 2, so a thick-lipped family keeps the last widget off its rim.
+     * Returns -1 when a widget touches the top edge (a full-bleed demo), a modal is open or {@link #keepHeight} was called: the declared height stays.
      */
     public int fitHeight() {
+        if (keepHeight) {
+            return -1;
+        }
         int top = Integer.MAX_VALUE;
         int bottom = 0;
         for (dev.dryaides.minuit.BaseComponent w : panel.widgets()) {
             String kind = w.getClass().getSimpleName();
+            if (w instanceof dev.dryaides.minuit.LightboxComponent lb && !lb.isOpen()) {
+                continue; // a closed viewer waits for a click; the grid under it sets the height
+            }
             if ((kind.equals("DialogComponent") || kind.equals("DrawerComponent") || kind.equals("LightboxComponent")
                     || kind.equals("CommandPaletteComponent"))) {
                 return -1;
@@ -105,8 +144,9 @@ public final class Scene {
         if (top < 4 || top == Integer.MAX_VALUE) {
             return -1;
         }
-        int margin = Math.min(top, 8);
-        return hasCaption ? bottom + 4 + CAPTION_BAND : bottom + margin;
+        dev.dryaides.minuit.FrameStyle frame = theme.frame();
+        int margin = Math.max(Math.min(top, 8), frame.panelInsets().bottom() + frame.panelShadow() + 2);
+        return hasCaption ? bottom + 4 + captionBand(frame) : bottom + margin;
     }
 
     /** Shows a widget above the rest, like a panel's overlay (an open dropdown's popup). */
@@ -153,7 +193,7 @@ public final class Scene {
     public void focus(BaseComponent widget) { panel.focus(widget); frame(); }
     public void tick(int ticks) { for (int i = 0; i < ticks; i++) panel.tickAll(); }
 
-    /** Holds ctrl and shift for the widgets that read BaseComponent.keys. */
+    /** Holds ctrl and shift for the widgets that read BaseComponent.heldKeys(). */
     public void held(boolean ctrl, boolean shift) {
         if (sim != null) { sim.ctrl = ctrl; sim.shift = shift; }
     }

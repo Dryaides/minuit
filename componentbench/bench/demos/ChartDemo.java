@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -106,7 +107,9 @@ public final class ChartDemo implements Demo {
         });
 
         stage.state("title and legend", W, H, s -> {
-            ChartComponent c = two(s, Mode.LINE).title("Ore mined");
+            ChartComponent c = chart(s).title("Ore mined");
+            c.addSeries("Iron").color(DonutChartDemo.IRON).set(WAVE);
+            c.addSeries("Gold").color(DonutChartDemo.GOLD).set(OTHER);
         });
 
         stage.state("title only", W, H, s -> {
@@ -214,9 +217,9 @@ public final class ChartDemo implements Demo {
 
         stage.state("reduced motion crosshair", W, H, s -> {
             ChartComponent c = two(s, Mode.LINE);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             s.move(at(c, 6), mid(c));
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(0);
         });
 
@@ -454,10 +457,10 @@ public final class ChartDemo implements Demo {
             ChartComponent c = chart(s);
             Series v = c.addSeries("A").set(10, 20, 15, 18);
             s.waitMs(16);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             v.add(400);
             s.waitMs(16);
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(0);
         });
 

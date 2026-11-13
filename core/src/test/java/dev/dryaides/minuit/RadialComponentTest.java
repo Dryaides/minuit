@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,13 +15,13 @@ class RadialComponentTest {
 
     @AfterEach
     void reset() {
-        BaseComponent.clock = System::currentTimeMillis;
+        HostState.clock(System::currentTimeMillis);
     }
 
     /** The site's quick menu, clicked as the owner did: a pick, then spam on the page card and the wheel. */
     @Test
     void clickWheelKeepsTurningPagesAfterAPick() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         List<String> picked = new ArrayList<>();
         RadialComponent<String> wheel = RadialComponent.<String>builder(new Box("screen", 0, 0, 330, 230), 76)
                 .slot(40, 20)
@@ -39,5 +40,30 @@ class RadialComponentTest {
         assertEquals(0, wheel.page());
         wheel.mouseClicked(205, 155, 0);
         assertEquals(List.of("Warn", "Warn"), picked);
+    }
+
+    /** A held emote wheel with three pages: keys page round both ways, and a released wheel no longer pages. */
+    @Test
+    void heldWheelPagesWithKeysUntilReleased() {
+        HostState.clock(() -> this.now);
+        List<String> cancelled = new ArrayList<>();
+        RadialComponent<String> wheel = RadialComponent.<String>builder(new Box("screen", 0, 0, 330, 230), 76)
+                .page("Greet", List.of("Wave", "Bow"))
+                .page("Play", List.of("Dance", "Jump"))
+                .page("Rest", List.of("Sit", "Sleep"))
+                .holdToSelect(() -> true)
+                .onCancel(() -> cancelled.add("cancel"))
+                .build();
+        wheel.keyPressed(InputKey.RIGHT, false);
+        wheel.turnPage(1);
+        assertEquals(2, wheel.page());
+        wheel.turnPage(1);
+        assertEquals(0, wheel.page());
+        wheel.keyPressed(InputKey.LEFT, false);
+        assertEquals(2, wheel.page());
+        wheel.release();
+        assertEquals(List.of("cancel"), cancelled);
+        assertEquals(false, wheel.turnPage(1));
+        assertEquals(2, wheel.page());
     }
 }

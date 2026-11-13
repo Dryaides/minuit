@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Stage;
 import dev.dryaides.minuit.Picture;
@@ -81,15 +82,15 @@ public final class CardDemo implements Demo {
         });
 
         stage.state("reduced motion lifts at once", W, 62, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             CardComponent c = s.add(new CardComponent(new Box("c", 8, 10, 184, 44)).title("No easing").text("Up in one frame."));
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
                 s.move(40, 30);
                 s.waitMs(16);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

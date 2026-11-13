@@ -1,6 +1,12 @@
 package dev.dryaides.minuit.mixin.client;
 
+import dev.dryaides.minuit.SlotPlacement;
+import dev.dryaides.minuit.SpriteIcon;
+import dev.dryaides.minuit.client.GuiDraw;
 import dev.dryaides.minuit.client.MinuitContainerScreen;
+import dev.dryaides.minuit.client.GuiDraw;
+import dev.dryaides.minuit.internal.ContainerTab;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -72,7 +78,7 @@ public abstract class AbstractContainerScreenMixin {
                 return;
             }
             for (Slot slot : this.menu.slots) {
-                if (slot.isActive() && screen.showsSlot(slot)
+                if (slot.isActive() && screen.placement().finds(slot.index) && screen.showsSlot(slot)
                         && isHovering(slot, x - screen.slotOffsetX(slot) - screen.placement().shiftX(slot.index),
                                 y - screen.slotOffsetY(slot) - screen.placement().shiftY(slot.index))) {
                     found = slot;
@@ -101,11 +107,15 @@ public abstract class AbstractContainerScreenMixin {
         }
     }
 
-    /** The ghost has one owner: a slot part that draws its own empty outline, so the game's grey one is left out. */
+    /** The game's empty-slot outline of the slot being drawn, kept for the theme to draw at its end; the game's is never drawn. */
+    @Unique
+    private Pair<ResourceLocation, ResourceLocation> minuit$ghost;
+
     @Redirect(method = "renderSlot", require = 0, at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/inventory/Slot;getNoItemIcon()Lcom/mojang/datafixers/util/Pair;"))
     private Pair<ResourceLocation, ResourceLocation> minuit$themeGhost(Slot slot) {
-        if ((Object) this instanceof MinuitContainerScreen<?> screen && screen.placement().drawsGhost(slot.index)) {
+        if ((Object) this instanceof MinuitContainerScreen<?> screen && screen.placement() != SlotPlacement.NONE) {
+            this.minuit$ghost = slot.getNoItemIcon();
             return null;
         }
         return slot.getNoItemIcon();
@@ -113,6 +123,12 @@ public abstract class AbstractContainerScreenMixin {
 
     @Inject(method = "renderSlot", at = @At("RETURN"))
     private void minuit$movedSlotBack(GuiGraphics graphics, Slot slot, CallbackInfo ci) {
+        Pair<ResourceLocation, ResourceLocation> ghost = this.minuit$ghost;
+        this.minuit$ghost = null;
+        if (ghost != null && (Object) this instanceof MinuitContainerScreen<?>) {
+            ((MinuitContainerScreen<?>) (Object) this).placement().drawGhost(new GuiDraw(graphics), slot.index,
+                    new SpriteIcon(ghost.getFirst().toString(), ghost.getSecond().toString(), 16, 16), slot.x, slot.y);
+        }
         if (this.minuit$slotMoved) {
             this.minuit$slotMoved = false;
             graphics.pose().popPose();
@@ -131,6 +147,49 @@ public abstract class AbstractContainerScreenMixin {
     @Inject(method = "renderFloatingItem", at = @At("HEAD"), cancellable = true)
     private void minuit$hiddenCarried(GuiGraphics graphics, ItemStack stack, int x, int y, String count, CallbackInfo ci) {
         if ((Object) this instanceof MinuitContainerScreen<?> screen && stack != this.snapbackItem && !screen.drawsCarried()) {
+            ci.cancel();
+        }
+    }
+
+    @Shadow
+    protected int leftPos;
+
+    @Shadow
+    protected int topPos;
+
+    /** minuit's own container screens draw their tab; the creative tabs fill the top edge. */
+    @Unique
+    private boolean minuit$hasTab() {
+        return !((Object) this instanceof MinuitContainerScreen<?>) && !((Object) this instanceof CreativeModeInventoryScreen);
+    }
+
+    /** The theme tab on a container screen minuit does not draw, before the labels, where the pose stands at the container's corner. */
+    @Inject(method = "render", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/inventory/AbstractContainerScreen;renderLabels(Lnet/minecraft/client/gui/GuiGraphics;II)V"))
+    private void minuit$themeTab(GuiGraphics graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
+        if (minuit$hasTab()) {
+            ContainerTab.draw(this, new GuiDraw(graphics), this.leftPos, this.topPos, this.leftPos, this.topPos, mouseX, mouseY);
+        }
+    }
+
+    @Inject(method = "render", at = @At("TAIL"))
+    private void minuit$themeTabTip(GuiGraphics graphics, int mouseX, int mouseY, float partial, CallbackInfo ci) {
+        if (minuit$hasTab()) {
+            ContainerTab.drawTip(this, new GuiDraw(graphics), this.leftPos, this.topPos, mouseX, mouseY);
+        }
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void minuit$clickThemeTab(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (minuit$hasTab() && button == 0 && ContainerTab.click(this, this.leftPos, this.topPos, mouseX, mouseY)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    /** Back from the theme page the screen comes again: the menu stays open. */
+    @Inject(method = "removed", at = @At("HEAD"), cancellable = true)
+    private void minuit$backFromThemePage(CallbackInfo ci) {
+        if (ContainerTab.leaving(this)) {
             ci.cancel();
         }
     }

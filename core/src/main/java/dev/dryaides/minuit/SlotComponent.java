@@ -18,9 +18,12 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
     public long count;
     /** Ringed in accent: a target, a result. */
     public boolean marked;
+    /** In the drag of a carried stack over several slots: lit like the hover, as the game lights them. */
+    public boolean dragged;
     /** Ghost drawn at 40 % while there is no item: an armour slot's outline. */
     public IconArt empty;
     private IntConsumer onClick;
+    private IntConsumer onPress;
     private Predicate<ItemView> onDrop;
     private boolean gameTip;
 
@@ -46,6 +49,12 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
         return this;
     }
 
+    /** Display mode: a mouse press goes here instead of {@link #onClick}, for a host that plays the whole gesture. */
+    public SlotComponent onPress(IntConsumer button) {
+        this.onPress = button;
+        return this;
+    }
+
     /** Display mode: takes an item handed in from outside the kit; the test says whether it took it. */
     public SlotComponent onDrop(Predicate<ItemView> accept) {
         this.onDrop = accept;
@@ -54,7 +63,7 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
 
     /** True over a menu slot: no item shown and nothing to call, so the container screen gives the click to the game. */
     public boolean holdsMenu() {
-        return this.item == null && this.onClick == null && this.onDrop == null;
+        return this.item == null && this.onClick == null && this.onPress == null && this.onDrop == null;
     }
 
     /** Its 18 px well while it holds the menu. */
@@ -65,37 +74,50 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
 
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
-        this.gameTip = cell(d, theme, this.x, this.y, this.item, this.count, this.empty, hovered, this.marked, mx, my);
+        this.gameTip = cell(d, theme, this.x, this.y, this.item, this.count, this.empty, hovered || this.dragged,
+                hovered, this.marked, mx, my);
     }
 
     /**
-     * Draws one well, and in display mode its item, count and the game's tooltip when hovered.
+     * Draws one well, lit when {@code lit}, and in display mode its item, count and, when {@code tip}, the
+     * game's tooltip.
      *
      * @return true when the game queued its own tooltip for the item
      */
     static boolean cell(Draw d, Theme theme, int x, int y, ItemView item, long count, IconArt empty,
-                        boolean hovered, boolean marked, int mx, int my) {
-        theme.frame().slot(d, theme.palette(), x, y, hovered, marked);
-        return items(d, theme, x, y, 1, item, count, empty, hovered, mx, my);
+                        boolean lit, boolean tip, boolean marked, int mx, int my) {
+        theme.frame().slot(d, theme.palette(), x, y, lit, marked);
+        return items(d, theme, x, y, 1, item, count, empty, lit, tip, mx, my);
+    }
+
+    /** An empty slot's outline, centred on the 16 px item area at {@code ix, iy}: a part's own or a menu slot's. */
+    static void ghost(Draw d, Theme theme, IconArt icon, int ix, int iy) {
+        icon.draw(d, ix + (16 - icon.width()) / 2, iy + (16 - icon.height()) / 2, theme.palette().text(), 0.4F);
     }
 
     /** The item of a cell whose 16 px item area starts {@code off} px in from {@code x, y}; no well. */
     static boolean items(Draw d, Theme theme, int x, int y, int off, ItemView item, long count, IconArt empty,
-                         boolean hovered, int mx, int my) {
+                         boolean lit, boolean tip, int mx, int my) {
         int ix = x + off;
         int iy = y + off;
         if (item == null) {
             if (empty != null) {
-                empty.draw(d, ix + (16 - empty.width()) / 2, iy + (16 - empty.height()) / 2,
-                        theme.palette().text(), 0.4F);
+                ghost(d, theme, empty, ix, iy);
             }
-            if (hovered) {
+            if (lit) {
                 d.fill(ix, iy, ix + 16, iy + 16, Shapes.SLOT_HOVER_FRONT);
             }
             return false;
         }
         d.item(item, ix, iy);
         String label = count > 1 ? shortCount(count) : null;
+        if (label != null) {
+            // The count over the item at every size, as the game raises it: a scaled item otherwise covers it.
+            // The pose is popped below so the lift does not add up cell after cell and climb over a later tooltip.
+            d.push(0F, 0F, 1F);
+            d.nextLayer();
+        }
+        // White with the game's drop shadow in every theme, as the game draws counts: readable over any item.
         if (label == null || d.width(label) <= 16) {
             d.itemDecorations(item, ix, iy, label);
         } else {
@@ -106,10 +128,13 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
             d.text(label, 0, 0, 0xFFFFFFFF);
             d.pop();
         }
-        if (hovered) {
+        if (lit) {
             d.fill(ix, iy, ix + 16, iy + 16, Shapes.SLOT_HOVER_FRONT);
         }
-        return hovered && d.itemTooltip(item, mx, my);
+        if (label != null) {
+            d.pop();
+        }
+        return tip && d.itemTooltip(item, mx, my);
     }
 
     /** The item's name, unless the game shows its own tooltip. */
@@ -158,11 +183,10 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        if (this.onClick == null || !this.active || !isOver(mx, my)) {
+        if (this.onClick == null && this.onPress == null || !this.active || !isOver(mx, my)) {
             return false;
         }
-        click();
-        this.onClick.accept(button);
+        (this.onPress != null ? this.onPress : this.onClick).accept(button);
         return true;
     }
 
@@ -176,7 +200,6 @@ public class SlotComponent extends BaseComponent implements ItemSource, ItemDrop
         if (this.onClick == null || !this.active) {
             return false;
         }
-        click();
         this.onClick.accept(0);
         return true;
     }

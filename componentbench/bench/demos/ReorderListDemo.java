@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -130,7 +131,7 @@ public final class ReorderListDemo implements Demo {
 
         stage.state("items", 180, 100, s -> {
             dev.dryaides.minuit.ReorderListComponent<String> c = s.add(new dev.dryaides.minuit.ReorderListComponent<String>(new Box("r", 6, 6, 168, 92),
-                    java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple"), n -> n.substring(n.indexOf(':') + 1).replace('_', ' ')).iconArt(n -> dev.dryaides.minuit.ItemView.of(n, n.endsWith("log") ? 64 : 1)).deletable(true));
+                    java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple"), Mc::name).iconArt(n -> dev.dryaides.minuit.ItemView.of(n)).deletable(true));
             s.move(80, 30);
         });
         looks(stage);
@@ -379,28 +380,28 @@ public final class ReorderListDemo implements Demo {
         });
         state(stage, "reduced motion snaps", 5, r -> {
             r.list(5, BLOCKS);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             r.lift(0, 2 * ROW);
             r.drop();
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             r.s.settle(0);
         });
         stage.state("reduced motion, held", W, height(5), s -> {
             Rig r = new Rig(s, lineY(5));
             r.list(5, BLOCKS);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             r.lift(0, 2 * ROW);
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(0);
         });
         state(stage, "reduced motion, keys and delete", 5, r -> {
             r.list(5, BLOCKS).deletable(true);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             r.s.focus(r.c);
             r.c.select("Dirt");
             r.alt(InputKey.DOWN);
             r.s.click(r.dx(), r.mid(0));
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             r.s.move(-100, -100);
         });
         state(stage, "duplicates stay apart", 5, r -> {
@@ -456,11 +457,11 @@ public final class ReorderListDemo implements Demo {
         stage.state("refusal stays under reduced motion", W, height(5), s -> {
             Rig r = new Rig(s, lineY(5));
             r.list(5, BLOCKS).locked("Dirt"::equals);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             s.focus(r.c);
             r.c.select("Dirt");
             r.alt(InputKey.DOWN);
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(100);
         });
         state(stage, "only one movable row", 5, r -> {

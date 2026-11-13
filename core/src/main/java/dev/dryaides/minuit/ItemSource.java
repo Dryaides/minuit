@@ -12,9 +12,15 @@ public interface ItemSource {
     /** The item drawn at the mouse, screen coordinates, or null. */
     ItemView itemAt(double mx, double my);
 
-    /** The item under the mouse among the panel's widgets, the open overlay and the topmost widget first; or null. */
+    /** The item under the mouse among the panel's widgets, the open popup and the topmost widget first; or null. */
     static ItemView under(PanelComponent panel, double mx, double my) {
-        if (panel.overlay() instanceof ItemSource open && panel.overlay().isOver(mx, my)) {
+        if (panel.layer().isOpen()) {
+            boolean[] covered = {false};
+            ItemView item = panel.layer().itemAt(mx, my, covered);
+            if (covered[0]) {
+                return item;
+            }
+        } else if (panel.overlay() instanceof ItemSource open && panel.overlay().isOver(mx, my)) {
             return open.itemAt(mx, my);
         }
         List<BaseComponent> widgets = panel.widgets();

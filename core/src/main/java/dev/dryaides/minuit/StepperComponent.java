@@ -162,7 +162,7 @@ public class StepperComponent extends BaseComponent {
     }
 
     private boolean move(int direction) {
-        return moveBy(direction, keys.shift());
+        return moveBy(direction, heldKeys().shift());
     }
 
     private boolean moveBy(int direction, boolean shift) {
@@ -187,7 +187,7 @@ public class StepperComponent extends BaseComponent {
         if (this.held == 0) {
             return;
         }
-        int due = repeatsDue(clock.getAsLong() - this.heldSince);
+        int due = repeatsDue(clock().getAsLong() - this.heldSince);
         this.repeating = true;
         try {
             while (this.repeatsDone < due) {
@@ -247,7 +247,7 @@ public class StepperComponent extends BaseComponent {
         click();
         this.pressValue = this.value;
         this.held = part;
-        this.heldSince = clock.getAsLong();
+        this.heldSince = clock().getAsLong();
         this.repeatsDone = 0;
         move(part);
         return true;

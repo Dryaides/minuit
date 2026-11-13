@@ -1,6 +1,7 @@
 package dev.dryaides.minuit.forge;
 
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
+import dev.dryaides.minuit.internal.Bundling;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.internal.game.ServerForms;
 import dev.dryaides.minuit.port.mc.WirePayload;
@@ -11,16 +12,23 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.fml.IExtensionPoint;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.network.NetworkConstants;
+import net.minecraftforge.forgespi.language.IModFileInfo;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.event.EventNetworkChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Forge entry point: the three minuit channels as raw event channels, all optional so a vanilla client
@@ -39,6 +47,7 @@ public final class MinuitForge {
     static final EventNetworkChannel INPUT = channel(WirePayload.INPUT);
 
     public MinuitForge() {
+        bundling();
         // Present on one side only: a vanilla client or server shows no mismatch in the server list.
         ModLoadingContext.get().registerExtensionPoint(IExtensionPoint.DisplayTest.class,
                 () -> new IExtensionPoint.DisplayTest(() -> NetworkConstants.IGNORESERVERONLY, (remote, server) -> true));
@@ -64,6 +73,22 @@ public final class MinuitForge {
     }
 
     /** A client's hello on the server; on the client, a server asking for one. */
+    /** jarJar: a nested mod file sits in a jij file system; its parent's metadata.json lists it. */
+    private static void bundling() {
+        IModFileInfo self = ModList.get().getModFileById("minuit");
+        if (self == null || self.getFile().getFilePath().getFileSystem() == FileSystems.getDefault()) {
+            return;
+        }
+        List<IModFileInfo> files = ModList.get().getModFiles();
+        List<Path> metadata = new ArrayList<>();
+        for (IModFileInfo file : files) {
+            metadata.add(file == self ? null : file.getFile().findResource("META-INF/jarjar/metadata.json"));
+        }
+        int parent = Bundling.jarJarParent(self.getFile().getFileName(), metadata);
+        Bundling.found(parent < 0 || files.get(parent).getMods().isEmpty() ? null
+                : files.get(parent).getMods().get(0).getDisplayName() + " (" + files.get(parent).getMods().get(0).getModId() + ")");
+    }
+
     private static void hello(NetworkEvent event) {
         NetworkEvent.Context context = event.getSource().get();
         if (event instanceof NetworkEvent.ClientCustomPayloadEvent && context.getSender() != null) {

@@ -6,6 +6,7 @@ import dev.dryaides.minuit.ItemLookup;
 import dev.dryaides.minuit.TextFieldComponent;
 import dev.dryaides.minuit.UiSound;
 import dev.dryaides.minuit.Words;
+import dev.dryaides.minuit.internal.ImageFamily;
 import dev.dryaides.minuit.internal.game.GameItems;
 import dev.dryaides.minuit.internal.port.GamePlatform;
 import dev.dryaides.minuit.internal.port.KeyCodes;
@@ -25,7 +26,7 @@ import java.util.function.ToIntFunction;
  */
 public final class Bridges {
 
-    private static final TextureBridge TEXTURES = new GameTextures();
+    private static final GameTextures TEXTURES = new GameTextures();
     private static final SkinBridge SKINS = new GameSkins();
     private static final ScreenBridge SCREENS = new GameScreenBridge();
 
@@ -33,6 +34,7 @@ public final class Bridges {
     }
 
     public static void install() {
+        ImageFamily.install(TEXTURES);
         Platform.install(new GamePlatform() {
             @Override
             public Path gameDir() {

@@ -22,15 +22,15 @@
       "primaryText": "#FFFFFFFF",
       "accent": "#FF3F649A",
       "accentDeep": "#FF2C4A75",
-      "good": "#FF1F9D62",
-      "warn": "#FFB07A00",
-      "bad": "#FFC0392B",
+      "good": "#FF177549",
+      "warn": "#FF885E00",
+      "bad": "#FFBA372A",
       "destructive": "#FFB13428",
-      "destructiveHover": "#FFC9574B",
+      "destructiveHover": "#FFC3483B",
       "destructiveText": "#FFFFF4F2",
       "track": "#FFC8D0DA",
       "disabled": "#FFD5DAE1",
-      "disabledText": "#FF98A1AE",
+      "disabledText": "#FF707C8E",
       "shadow": "#40000000"
     },
     "dark": {
@@ -58,11 +58,11 @@
       "warn": "#FFF0B429",
       "bad": "#FFFF6B6B",
       "destructive": "#FFB24B4B",
-      "destructiveHover": "#FFE05E5E",
+      "destructiveHover": "#FFB82323",
       "destructiveText": "#FFFFF4F2",
       "track": "#FF1E2126",
       "disabled": "#FF33373E",
-      "disabledText": "#FF666D78",
+      "disabledText": "#FF79808D",
       "shadow": "#66000000"
     }
   }

@@ -73,3 +73,93 @@ tasks.named('test', Test) {
     useJUnitPlatform()
     testLogging { events 'failed'; exceptionFormat 'full' }
 }
+
+// The component bench's draw-cost count (componentbench/bench/render/PerfBench) as a Gradle task, for a machine
+// with no Python bench setup: `:core:perfBench -PperfArgs="--frames 200 --themes bubbly:lilac:light,bedrock:bedrock:light"`.
+// Runs only when asked. Without a game jar (-PbenchMcJar, else the largest Loom jar holding the font) the bench
+// measures text with stand-in widths: counts shift a little, the ratio between families in one run still holds.
+sourceSets {
+    bench {
+        java.srcDirs = [rootProject.file('componentbench/bench')]
+        java.exclude 'images/**'
+        resources.srcDirs = []
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+dependencies {
+    benchImplementation 'com.google.code.gson:gson:2.11.0'
+}
+
+tasks.named('compileBenchJava', JavaCompile) {
+    options.compilerArgs += ['-proc:none']
+}
+
+def benchAssets = tasks.register('benchAssets', Sync) {
+    from(file('src/main/resources/assets'))
+    from(rootProject.file('common/src/main/resources/assets'))
+    into(layout.buildDirectory.dir('bench-assets'))
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+// perfHash: the same run with one frame per state, printing a digest of every state's picture in every family as
+// `HASH <state> <digest>` lines, so a remote build's log carries the before/after pixel proof.
+def benchRun = { JavaExec t, String defaultArgs ->
+    t.group = 'verification'
+    t.dependsOn benchAssets, tasks.named('benchClasses')
+    t.classpath = sourceSets.bench.runtimeClasspath
+    t.mainClass = 'bench.render.PerfBench'
+    t.javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(java_version as int) }
+    t.jvmArgs '-Xms32m', '-Xmx768m', '-XX:ActiveProcessorCount=4', '-Djava.awt.headless=true', '-Dfile.encoding=UTF-8'
+    t.args((findProperty('perfArgs') ?: defaultArgs).toString().trim().split(/\s+/))
+    t.doFirst {
+        def mcJar = findProperty('benchMcJar')?.toString() ?: ''
+        if (!mcJar) {
+            def loom = new File(gradle.gradleUserHomeDir, 'caches/fabric-loom')
+            if (loom.isDirectory()) {
+                def jars = fileTree(loom) { include '**/*.jar' }.files.sort { -it.length() }
+                mcJar = jars.find { f ->
+                    try {
+                        return new java.util.zip.ZipFile(f).withCloseable { it.getEntry('assets/minecraft/textures/font/ascii.png') != null }
+                    } catch (Exception ignored) {
+                        return false
+                    }
+                }?.path ?: ''
+            }
+        }
+        logger.lifecycle("perfBench game jar: ${mcJar ?: 'none, stand-in font'}")
+        t.systemProperty 'bench.classes', sourceSets.bench.java.destinationDirectory.get().asFile.path
+        t.systemProperty 'bench.assets', benchAssets.get().destinationDir.path
+        t.systemProperty 'bench.mcjar', mcJar
+    }
+}
+
+tasks.register('perfBench', JavaExec) { t ->
+    t.description = 'Fills, strings, blits, ns and bytes per frame for each look, headless.'
+    benchRun(t, '--frames 200 --themes bubbly:lilac:light,bubbly:lilac:dark,bedrock:bedrock:light,bedrock:bedrock:dark')
+}
+
+// bedrockArt: every family x chroma x variant's form pieces (panel, buttons, field, toggle, slider) as nine-slice
+// PNGs drawn by the FrameStyle code, for mod-bedrock/tools/gen_theme.py --art. bedrockArtJar zips them into
+// build/libs/minuit-bedrockart-<mc>-art.jar, so remotebuild --fetch brings them back with the loader jars.
+def bedrockArtDir = layout.buildDirectory.dir('bedrock-art')
+def bedrockArt = tasks.register('bedrockArt', JavaExec) { t ->
+    t.description = 'Form pieces of every look as nine-slice PNGs for the Bedrock resource pack, headless.'
+    benchRun(t, '')
+    t.mainClass = 'bench.render.BedrockExport'
+    t.setArgs([bedrockArtDir.get().asFile.path])
+    t.outputs.dir(bedrockArtDir)
+    t.doFirst { project.delete(bedrockArtDir) }
+}
+
+tasks.register('bedrockArtJar', Zip) {
+    from(bedrockArt)
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    archiveFileName = "minuit-bedrockart-${versionProps.minecraft_version}-art.jar"
+}
+
+tasks.register('perfHash', JavaExec) { t ->
+    t.description = 'A digest of every demo state picture in every family, as HASH lines in the build log.'
+    benchRun(t, '--frames 1 --hash -')
+}

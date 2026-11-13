@@ -1,5 +1,6 @@
 package bench.ingame;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import dev.dryaides.minuit.BaseComponent;
@@ -157,9 +158,9 @@ public final class BenchScreen extends MinuitScreen {
             Entry e = entries.get(index);
             // The scripts count on simulated time, as on the bench: they play on it, then the real clock takes over.
             Scene.Sim sim = SHOTS ? new Scene.Sim() : null;
-            java.util.function.LongSupplier realClock = BaseComponent.clock;
+            java.util.function.LongSupplier realClock = BaseComponent.clock();
             if (sim != null) {
-                BaseComponent.clock = sim;
+                HostState.clock(sim);
             }
             Scene scene = new Scene(theme, words, e.w, e.h, sim);
             try {
@@ -175,7 +176,7 @@ public final class BenchScreen extends MinuitScreen {
                     System.out.println("[bench]     at " + where[i]);
                 }
             }
-            BaseComponent.clock = realClock;
+            HostState.clock(realClock);
             add(new SceneView(new Box("scene", (screenW - e.w) / 2, Math.max(32, (screenH - e.h) / 2), e.w, e.h), scene));
         }
 

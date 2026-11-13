@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "minuit_components_bench",
+  "version": "0",
+  "name": "minuit frame bench",
+  "description": "Dev only: times demo states per theme when config/minuit_bench.properties exists.",
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["bench.ingame1201.FrameBenchMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.14",
+    "minecraft": "~1.20.1",
+    "fabric-lifecycle-events-v1": "*",
+    "minuit": ">=1.0.0 <2.0.0"
+  }
+}

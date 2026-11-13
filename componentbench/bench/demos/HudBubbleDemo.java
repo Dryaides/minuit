@@ -2,6 +2,7 @@ package bench.demos;
 
 import bench.api.Demo;
 import bench.api.Stage;
+import dev.dryaides.minuit.BubbleStyle;
 import dev.dryaides.minuit.HudBubble;
 
 /** A bubble with no panel and no entity, as on a mod's HUD. */
@@ -38,6 +39,14 @@ public final class HudBubbleDemo implements Demo {
                 b.tick();
             }
             show(s, b, 214, 50);
+        });
+        stage.state("thought", W, H, s -> {
+            HudBubble b = new HudBubble().style(BubbleStyle.THOUGHT);
+            b.say("I could use a cake right now", 100);
+            for (int i = 0; i < 10; i++) {
+                b.tick();
+            }
+            show(s, b, 90, 56);
         });
         stage.state("fading in", W, H, s -> {
             HudBubble b = new HudBubble();

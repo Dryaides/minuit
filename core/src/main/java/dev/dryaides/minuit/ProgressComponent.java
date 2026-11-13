@@ -13,6 +13,8 @@ public class ProgressComponent extends BaseComponent {
 
     public float fraction = -1;
     public int color;
+    /** When set, the fill colour follows {@link #fraction} and wins over {@link #color}; a sliding block takes it at 0. */
+    public FillColor fillColor;
 
     public ProgressComponent(Box box) {
         super(box);
@@ -21,7 +23,8 @@ public class ProgressComponent extends BaseComponent {
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         Palette p = theme.palette();
-        int fill = this.color != 0 ? this.color : p.accent();
+        int fill = this.fillColor != null ? this.fillColor.color(Math.max(0F, this.fraction), p)
+                : this.color != 0 ? this.color : p.accent();
         if (this.fraction >= 0) {
             theme.frame().bar(d, p, this.x, this.y, this.w, this.h, this.fraction, fill);
             return;
@@ -30,7 +33,7 @@ public class ProgressComponent extends BaseComponent {
         int block = Math.max(6, this.w / 5);
         int travel = this.w - 2 + block;
         int bx = motion() == MotionStyle.NONE ? this.x + (this.w - block) / 2
-                : this.x + 1 - block + (int) (Math.floorMod(clock.getAsLong(), SLIDE_MS) * travel / SLIDE_MS);
+                : this.x + 1 - block + (int) (Math.floorMod(clock().getAsLong(), SLIDE_MS) * travel / SLIDE_MS);
         d.scissor(this.x + 1, this.y + 1, this.x + this.w - 1, this.y + this.h - 1);
         Shapes.rounded(d, bx, this.y + 1, block, this.h - 2, Math.max(0, Math.min(2, (this.h - 2) / 2)), fill);
         d.endScissor();

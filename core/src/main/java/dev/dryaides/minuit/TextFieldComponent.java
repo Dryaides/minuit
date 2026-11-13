@@ -262,12 +262,12 @@ public class TextFieldComponent extends BaseComponent {
     }
 
     private boolean cursorLit() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         if (this.blinkCursor != this.cursor) {
             this.blinkCursor = this.cursor;
             this.blinkFrom = now;
         }
-        return BaseComponent.reducedMotion || (now - this.blinkFrom) / BLINK_MS % 2 == 0;
+        return BaseComponent.reducedMotion() || (now - this.blinkFrom) / BLINK_MS % 2 == 0;
     }
 
     private void replace(int start, int end, String with) {

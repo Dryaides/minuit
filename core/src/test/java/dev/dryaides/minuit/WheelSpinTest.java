@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -9,11 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WheelSpinTest {
     private static final String[] PRIZES = {"Diamond", "Emerald", "Gold", "Iron", "Coal"};
-    private final LongSupplier clock = BaseComponent.clock;
+    private final LongSupplier clock = BaseComponent.clock();
 
     @AfterEach
     void restoreClock() {
-        BaseComponent.clock = clock;
+        HostState.clock(clock);
     }
 
     private static WheelComponent wheel() {
@@ -29,7 +30,7 @@ class WheelSpinTest {
     void twoSpinsWithOneSeedLandOnOneAngleInsideTheLanding() {
         long start = 1_000_000L;
         long[] now = {start};
-        BaseComponent.clock = () -> now[0];
+        HostState.clock(() -> now[0]);
         int landing = 2;
         long seed = 0x5EEDL;
 

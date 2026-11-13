@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -54,9 +55,7 @@ public final class AccordionDemo implements Demo {
 
     @Override
     public void states(Stage stage) {
-        stage.state("closed", W, H, s -> {
-            AccordionComponent c = stack(s, Mode.SINGLE);
-        });
+        stage.state("closed", W, 16 + 3 * AccordionComponent.HEADER, s -> stack(s, Mode.SINGLE).fit());
 
         stage.state("hover title", W, H, s -> {
             AccordionComponent c = stack(s, Mode.SINGLE);
@@ -89,11 +88,11 @@ public final class AccordionDemo implements Demo {
 
         stage.state("reduced motion opens at once", W, H, s -> {
             AccordionComponent c = stack(s, Mode.SINGLE);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 clickRow(s, 0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

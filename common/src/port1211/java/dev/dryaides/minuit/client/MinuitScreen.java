@@ -77,8 +77,8 @@ public abstract class MinuitScreen extends MinuitScreenBody {
         Platform.screens().onGameThread(task);
     }
 
-    /** Opens {@code screen}, or closes the current one for null. */
-    protected static void show(@org.jetbrains.annotations.Nullable Screen screen) {
+    /** Opens {@code screen}, or closes the current one for null, the way this game version wants it; call this rather than {@code Minecraft.setScreen}. */
+    public static void show(@org.jetbrains.annotations.Nullable Screen screen) {
         Minecraft.getInstance().setScreen(screen);
     }
 
@@ -86,7 +86,7 @@ public abstract class MinuitScreen extends MinuitScreenBody {
      * Opens {@code screen} with its panel gliding in from {@code from} ({@link Slide}): a menu tab that
      * opens another screen. A screen that is not a {@code MinuitScreen} opens at once.
      */
-    protected static void show(Screen screen, Slide from) {
+    public static void show(Screen screen, Slide from) {
         if (screen instanceof MinuitScreen next) {
             next.slideFrom(from);
         }

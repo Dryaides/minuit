@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Stage;
 import dev.dryaides.minuit.AlertComponent;
@@ -96,11 +97,11 @@ public final class AlertDemo implements Demo {
 
         stage.state("dismiss under reduced motion", W, 44, s -> {
             AlertComponent a = s.add(new AlertComponent(box(8), Variant.INFO, "Gone at once", "").dismissible(true).fit());
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 a.dismiss();
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

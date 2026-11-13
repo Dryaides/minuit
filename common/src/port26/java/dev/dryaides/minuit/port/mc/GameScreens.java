@@ -2,6 +2,7 @@ package dev.dryaides.minuit.port.mc;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.BossHealthOverlay;
 import net.minecraft.client.gui.components.toasts.ToastManager;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -21,5 +22,14 @@ public final class GameScreens {
 
     public static InputConstants.Type keyboard() {
         return InputConstants.Type.KEYSYM;
+    }
+
+    /** F1: the game draws no HUD. */
+    public static boolean hudHidden() {
+        return Minecraft.getInstance().options.hideGui;
+    }
+
+    public static BossHealthOverlay bossOverlay() {
+        return Minecraft.getInstance().gui.getBossOverlay();
     }
 }

@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -27,7 +28,7 @@ public final class PictureDemo implements Demo {
         stage.state("contain 16:9 in a square", 136, 136, s -> {
             add(s, 8, 8, 120, 120, Shots.pattern());
         });
-        stage.state("cover around the middle", 136, 136, s -> add(s, 8, 8, 120, 120, Shots.pattern().fit(Picture.Fit.COVER)));
+        stage.state("cover around the middle", 136, 136, s -> add(s, 8, 8, 120, 120, Shots.painting().fit(Picture.Fit.COVER)));
         stage.state("cover with focus on the left", 136, 136, s -> add(s, 8, 8, 120, 120, Shots.pattern().fit(Picture.Fit.COVER).focus(0F, 0.5F)));
         stage.state("stretch distorts", 200, 76, s -> add(s, 8, 8, 184, 60, Shots.pattern().fit(Picture.Fit.STRETCH)));
         stage.state("natural, one pixel per screen pixel", 200, 116, s -> add(s, 8, 8, 184, 100, Shots.pattern().fit(Picture.Fit.NATURAL)));
@@ -48,12 +49,12 @@ public final class PictureDemo implements Demo {
 
         // ---- pixel art, items, sprites ----
         stage.state("pixel art: contain, integer", 200, 84, s -> {
-            add(s, 8, 8, 88, 68, Shots.gem().fit(Picture.Fit.CONTAIN));
-            add(s, 104, 8, 88, 68, Shots.gem());
+            add(s, 8, 8, 88, 68, Shots.emerald().fit(Picture.Fit.CONTAIN));
+            add(s, 104, 8, 88, 68, Shots.emerald());
         });
         stage.state("pixel art: natural and scale down", 200, 84, s -> {
-            add(s, 8, 8, 88, 68, Shots.gem().fit(Picture.Fit.NATURAL));
-            add(s, 104, 8, 88, 68, Shots.gem().fit(Picture.Fit.SCALE_DOWN));
+            add(s, 8, 8, 88, 68, Shots.emerald().fit(Picture.Fit.NATURAL));
+            add(s, 104, 8, 88, 68, Shots.emerald().fit(Picture.Fit.SCALE_DOWN));
         });
         stage.state("items grow by whole pixels", 200, 76, s -> {
             add(s, 8, 8, 60, 60, Picture.item("minecraft:diamond_sword"));
@@ -150,17 +151,17 @@ public final class PictureDemo implements Demo {
             s.settle(50);
         });
         stage.state("reduced motion snaps", 200, 120, s -> {
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 PictureComponent p = zoomable(s);
                 s.scroll(100, 60, 4);
                 s.settle(16);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("zoomed pixel art", 120, 120, s -> {
-            PictureComponent p = s.add(new PictureComponent(new Box("p", 8, 8, 104, 104), Shots.gem()).zoomable(true));
+            PictureComponent p = s.add(new PictureComponent(new Box("p", 8, 8, 104, 104), Shots.emerald()).zoomable(true));
             s.scroll(40, 40, 6);
             s.waitMs(300);
         });

@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -18,7 +19,7 @@ public final class DatePickerDemo implements Demo {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 6);
     private static final int W = 170;
     private static final int TALL = 136;
-    private static final int SHORT = 32;
+    private static final int SHORT = TALL;
     private static final int X = 8;
     private static final int Y = 8;
     private static final int OPENED = 150;
@@ -89,63 +90,56 @@ public final class DatePickerDemo implements Demo {
         });
         stage.state("click opens below", W, TALL, s -> {
             DatePickerComponent d = picker(s);
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(1, 1);
         });
         stage.state("opening half way", W, TALL, s -> {
             DatePickerComponent d = picker(s);
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(48);
             s.settle(0);
         });
         stage.state("reduced motion opens at once", W, TALL, s -> {
             DatePickerComponent d = picker(s);
-            s.add(d.popup());
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 clickField(s, d);
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("a pick closes and tells", W, TALL, s -> {
             List<LocalDate> heard = new ArrayList<>();
             DatePickerComponent d = picker(s).onChange(heard::add);
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             clickDay(s, d, nov(19));
             s.move(1, 1);
         });
-        stage.state("opens on the value's month", W, TALL, s -> {
+        stage.state("opens on the value's month", W, TALL + 14, s -> {
             DatePickerComponent d = picker(s);
             d.setValue(LocalDate.of(2027, 3, 14));
-            s.add(d.popup());
+            s.keepHeight();
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(1, 1);
         });
         stage.state("opens above at the bottom of the panel", W, TALL, s -> {
             DatePickerComponent d = picker(s, new Box("d", X, TALL - 24, 150, 16));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(1, 1);
         });
         stage.state("stays in a short panel", W, 90, s -> {
             DatePickerComponent d = picker(s, new Box("d", X, 37, 150, 16));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(1, 1);
         });
         stage.state("right edge keeps it inside", W, TALL, s -> {
             DatePickerComponent d = picker(s, new Box("d", 120, Y, 44, 16));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(1, 1);
@@ -154,7 +148,6 @@ public final class DatePickerDemo implements Demo {
             DatePickerComponent d = picker(s);
             int[] pressed = new int[1];
             s.add(new ButtonComponent(new Box("b", X, 40, 150, 20), "Behind the calendar", () -> pressed[0]++));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.move(dayX(s, nov(11), DayOfWeek.MONDAY) - 4, dayY(s, nov(11), DayOfWeek.MONDAY) - 1);
@@ -164,7 +157,6 @@ public final class DatePickerDemo implements Demo {
             int[] pressed = new int[1];
             DatePickerComponent d = picker(s);
             s.add(new ButtonComponent(new Box("b", X, TALL + 6, 150, 20), "Beneath", () -> pressed[0]++));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             s.click(X + 20, TALL + 14);
@@ -174,7 +166,6 @@ public final class DatePickerDemo implements Demo {
         stage.state("keys open walk and pick", W, TALL, s -> {
             List<LocalDate> heard = new ArrayList<>();
             DatePickerComponent d = picker(s).onChange(heard::add);
-            s.add(d.popup());
             s.key(InputKey.TAB);
             s.key(InputKey.DOWN);
             s.waitMs(OPENED);
@@ -184,7 +175,6 @@ public final class DatePickerDemo implements Demo {
         });
         stage.state("enter picks and closes", W, SHORT, s -> {
             DatePickerComponent d = picker(s);
-            s.add(d.popup());
             s.key(InputKey.TAB);
             s.key(InputKey.ENTER);
             s.waitMs(OPENED);
@@ -193,7 +183,6 @@ public final class DatePickerDemo implements Demo {
         });
         stage.state("escape closes then lets go", W, SHORT, s -> {
             DatePickerComponent d = picker(s);
-            s.add(d.popup());
             s.key(InputKey.TAB);
             s.key(InputKey.DOWN);
             s.waitMs(OPENED);
@@ -203,7 +192,6 @@ public final class DatePickerDemo implements Demo {
         stage.state("tab closes and moves on", W, 52, s -> {
             DatePickerComponent d = picker(s);
             ButtonComponent b = s.add(new ButtonComponent(new Box("b", X, 28, 80, 18), "Next", () -> { }));
-            s.add(d.popup());
             s.key(InputKey.TAB);
             s.key(InputKey.DOWN);
             s.waitMs(OPENED);
@@ -212,7 +200,6 @@ public final class DatePickerDemo implements Demo {
         stage.state("range mid way", W, TALL, s -> {
             List<String> heard = new ArrayList<>();
             DatePickerComponent d = picker(s).range(true).onRange((a, b) -> heard.add(a + ".." + b));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             clickDay(s, d, nov(10));
@@ -221,7 +208,6 @@ public final class DatePickerDemo implements Demo {
         stage.state("range done", W, TALL, s -> {
             List<String> heard = new ArrayList<>();
             DatePickerComponent d = picker(s).range(true).onRange((a, b) -> heard.add(a + ".." + b));
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             clickDay(s, d, nov(10));
@@ -230,7 +216,6 @@ public final class DatePickerDemo implements Demo {
         });
         stage.state("closing drops a started range", W, TALL, s -> {
             DatePickerComponent d = picker(s).range(true);
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             clickDay(s, d, nov(10));
@@ -248,7 +233,6 @@ public final class DatePickerDemo implements Demo {
         stage.state("the calendar's rules reach the popup", W, TALL, s -> {
             DatePickerComponent d = picker(s);
             d.calendar().weekStart(DayOfWeek.SUNDAY).disabled(day -> day.getDayOfWeek() == DayOfWeek.SATURDAY);
-            s.add(d.popup());
             clickField(s, d);
             s.waitMs(OPENED);
             clickDay(s, d, nov(7), DayOfWeek.SUNDAY);

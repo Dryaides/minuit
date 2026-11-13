@@ -408,7 +408,7 @@ public class SidebarComponent extends BaseComponent {
             return;
         }
         collapsed = wanted;
-        if (reducedMotion) {
+        if (reducedMotion()) {
             fold.snap(!wanted);
         } else if (wanted) {
             fold.hide();
@@ -487,7 +487,7 @@ public class SidebarComponent extends BaseComponent {
     }
 
     private boolean moving() {
-        return !reducedMotion && fold.moving();
+        return !reducedMotion() && fold.moving();
     }
 
     /** The rail's list applies once folded, and goes as soon as the opening starts. */
@@ -872,7 +872,7 @@ public class SidebarComponent extends BaseComponent {
             case BAD -> p.bad();
             default -> p.primary();
         };
-        return Ink.readable(color, Ink.seen(p, rowFace), Ink.MARK);
+        return Ink.readable(p, color, Ink.seen(p, rowFace), Ink.MARK);
     }
 
     private int badgeInk(Palette p, Item item, int face) {

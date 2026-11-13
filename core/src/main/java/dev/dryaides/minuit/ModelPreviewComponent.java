@@ -55,6 +55,8 @@ public class ModelPreviewComponent extends BaseComponent {
     private boolean selected;
     private boolean wasSpinning;
     private boolean framed = true;
+    /** The frame's insets as last drawn: a framed card keeps its caption off a thick rim. */
+    private Insets frameIn = new Insets(3, 3, 3, 3);
 
     private boolean pressed;
     private boolean turning;
@@ -214,7 +216,12 @@ public class ModelPreviewComponent extends BaseComponent {
             return 0;
         }
         int lines = (title.isEmpty() ? 0 : 1) + (showsSubtitle() ? 1 : 0);
-        return lines == 0 ? 0 : lines * LINE_H + 2;
+        return lines == 0 ? 0 : lines * LINE_H + 2 + rim();
+    }
+
+    /** Rows of a framed card's bottom rim past the 2 every family leaves. */
+    private int rim() {
+        return framed ? Math.max(0, frameIn.bottom() - 2) : 0;
     }
 
     // ---- drawing ----
@@ -224,6 +231,7 @@ public class ModelPreviewComponent extends BaseComponent {
         Palette p = t.palette();
         FrameStyle frame = t.frame();
         int corner = frame.corner();
+        frameIn = frame.panelInsets();
         if (framed) {
             frame.panel(d, p, x, y, w, h);
         } else {
@@ -233,9 +241,9 @@ public class ModelPreviewComponent extends BaseComponent {
             return;
         }
         boolean live = hovered || focused || turning;
-        boolean wantSpin = active && !reducedMotion && !turning && !pressed
+        boolean wantSpin = active && !reducedMotion() && !turning && !pressed
                 && (spin == Spin.ALWAYS || (spin == Spin.ON_HOVER && live));
-        if (wasSpinning && !wantSpin && !live && active && !reducedMotion) {
+        if (wasSpinning && !wantSpin && !live && active && !reducedMotion()) {
             scene.reset();
         }
         wasSpinning = wantSpin;
@@ -280,8 +288,9 @@ public class ModelPreviewComponent extends BaseComponent {
         if (lines == 0) {
             return;
         }
-        int left = x + PAD;
-        int room = Math.max(0, w - 2 * PAD);
+        int pad = framed ? Math.max(PAD, Math.max(frameIn.left(), frameIn.right()) + 2) : PAD;
+        int left = x + pad;
+        int room = Math.max(0, w - 2 * pad);
         int line = y + h - lines;
         int ink = active ? Ink.on(p, back) : p.disabledText();
         if (!title.isEmpty()) {
@@ -453,7 +462,7 @@ public class ModelPreviewComponent extends BaseComponent {
                     made.smooth(smooth);
                     return made;
                 });
-                boolean wantSpin = hovered && !reducedMotion;
+                boolean wantSpin = hovered && !reducedMotion();
                 if (!wantSpin && scene.rotating()) {
                     scene.reset();
                 }

@@ -12,12 +12,27 @@ import java.util.List;
 
 /**
  * A game {@code KeyMapping} as the kit's {@link KeyBinding}, for a {@code KeybindFieldComponent}. A change
- * is saved to {@code options.txt} at once. One key or mouse button: NeoForge's key modifiers are left
- * as they are. Client only.
+ * is saved to {@code options.txt} at once. On NeoForge and Forge, whose entry points install
+ * {@link #modifiers}, a binding takes Ctrl, Shift or Alt with its key; on Fabric the key alone. Client only.
  */
 public final class MinuitKeys {
 
+    /** How a loader with key modifiers sets one on a mapping; the loader's name and conflicts already count it. Set by minuit's loader entry points only. */
+    public interface Modifiers {
+        void set(KeyMapping mapping, KeyPress.Modifier modifier, InputConstants.Key key);
+
+        /** Back to the default key and modifier. */
+        void reset(KeyMapping mapping);
+    }
+
+    private static Modifiers modifiers;
+
     private MinuitKeys() {
+    }
+
+    /** Installed once by the loader's client entry point. */
+    public static void modifiers(Modifiers loader) {
+        modifiers = loader;
     }
 
     public static KeyBinding binding(KeyMapping mapping) {
@@ -47,24 +62,42 @@ public final class MinuitKeys {
             }
 
             @Override
+            public boolean supportsModifiers() {
+                return modifiers != null;
+            }
+
+            @Override
             public void bind(KeyPress key) {
                 InputConstants.Type type = key.kind() == KeyPress.Kind.MOUSE ? InputConstants.Type.MOUSE
                         : dev.dryaides.minuit.port.mc.GameScreens.keyboard();
-                set(type.getOrCreate(key.code()));
+                set(key.modifier(), type.getOrCreate(key.code()));
             }
 
             @Override
             public void unbind() {
-                set(InputConstants.UNKNOWN);
+                set(KeyPress.Modifier.NONE, InputConstants.UNKNOWN);
             }
 
             @Override
             public void reset() {
-                set(mapping.getDefaultKey());
+                if (modifiers != null) {
+                    modifiers.reset(mapping);
+                } else {
+                    mapping.setKey(mapping.getDefaultKey());
+                }
+                saved();
             }
 
-            private void set(InputConstants.Key key) {
-                mapping.setKey(key);
+            private void set(KeyPress.Modifier modifier, InputConstants.Key key) {
+                if (modifiers != null) {
+                    modifiers.set(mapping, modifier, key);
+                } else {
+                    mapping.setKey(key);
+                }
+                saved();
+            }
+
+            private void saved() {
                 KeyMapping.resetMapping();
                 Minecraft.getInstance().options.save();
             }

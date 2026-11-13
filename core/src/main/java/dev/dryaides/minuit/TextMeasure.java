@@ -55,7 +55,7 @@ public final class TextMeasure {
             }
 
             @Override
-            protected String cut(String text, int maxWidth) {
+            public String cut(String text, int maxWidth) {
                 int end = 0;
                 while (end < text.length()) {
                     int next = end + Character.charCount(text.codePointAt(end));
@@ -73,11 +73,11 @@ public final class TextMeasure {
             }
 
             @Override
-            public void push(float x, float y, float scale) {
+            protected void pushPose(float x, float y, float scale) {
             }
 
             @Override
-            public void pop() {
+            protected void popPose() {
             }
 
             @Override

@@ -703,7 +703,7 @@ public class PaginationComponent extends BaseComponent {
         }
         int target = page + (amount > 0 ? -1 : 1);
         if (canPick(target)) {
-            BaseComponent.sound.tap();
+            BaseComponent.sound().tap();
             go(target);
         }
         return true;
@@ -748,7 +748,7 @@ public class PaginationComponent extends BaseComponent {
 
     private void keyGo(int target) {
         if (canPick(target)) {
-            BaseComponent.sound.tap();
+            BaseComponent.sound().tap();
             go(target);
         }
     }

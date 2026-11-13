@@ -127,6 +127,13 @@ public class PlayerInventoryComponent extends BaseComponent implements ItemSourc
         return this.rows.mouseClicked(mx, my, button) || this.hotbar.mouseClicked(mx, my, button);
     }
 
+    /** {@link SlotGridComponent#keys} on the rows and the hotbar. */
+    public PlayerInventoryComponent keys(boolean on) {
+        this.rows.keys(on);
+        this.hotbar.keys(on);
+        return this;
+    }
+
     @Override
     public List<BaseComponent> stops() {
         List<BaseComponent> out = new ArrayList<>(this.rows.stops());

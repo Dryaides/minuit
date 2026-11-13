@@ -1,11 +1,12 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Text with the game's formatting codes ({@link RichText}), wrapped to the box. A link is underlined in
- * the accent, shows its URL as tooltip and opens through {@link #links} on a click.
+ * the accent, shows its URL as tooltip and opens through the host's link opener on a click.
  */
 public class RichTextComponent extends BaseComponent {
 
@@ -14,9 +15,6 @@ public class RichTextComponent extends BaseComponent {
     public interface LinkOpener {
         void open(String url);
     }
-
-    /** Plugged by the host; links do nothing until then. */
-    public static volatile LinkOpener links = url -> { };
 
     private static final int LINE = 10;
 
@@ -79,7 +77,7 @@ public class RichTextComponent extends BaseComponent {
         for (int i = 0; i < lines.size() && i < this.maxLines; i++) {
             RichText line = lines.get(i);
             int x = this.centered ? this.x + (this.w - line.width(d)) / 2 : this.x;
-            d.rich(line, x, y, base, p.accent());
+            d.rich(line, x, y, base, p.linkInk(), Ink.seen(p, p.surface() | 0xFF000000));
             int pen = x;
             for (RichText.Run run : line.runs()) {
                 int rw = d.styledWidth(run.text(), run.style());
@@ -114,7 +112,7 @@ public class RichTextComponent extends BaseComponent {
             return false;
         }
         click();
-        links.open(url);
+        HostState.links().open(url);
         return true;
     }
 }

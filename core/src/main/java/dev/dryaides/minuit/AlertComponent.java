@@ -305,7 +305,7 @@ public class AlertComponent extends BaseComponent {
             color = Shapes.mix(color, surface, DISABLED_FADE);
         }
         int under = Shapes.mix(surface, color, WASH / 255F);
-        int edge = active ? Ink.readable(color, under, Ink.MARK) : color;
+        int edge = active ? Ink.readable(p, color, under, Ink.MARK) : color;
         t.frame().plate(d, p, x, y, w, h, Shapes.alpha(color, WASH), edge);
         wrap(textRoom());
         if (showsIcon()) {

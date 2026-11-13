@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -176,15 +177,15 @@ public final class SidebarDemo implements Demo {
             s.settle(0);
         });
         stage.state("rail_reduced_motion", W, H, s -> {
-            boolean was = BaseComponent.reducedMotion;
-            BaseComponent.reducedMotion = true;
+            boolean was = BaseComponent.reducedMotion();
+            HostState.reducedMotion(true);
             try {
                 Rig r = new Rig(s);
                 r.clickToggle();
                 r.clickToggle();
                 r.clickToggle();
             } finally {
-                BaseComponent.reducedMotion = was;
+                HostState.reducedMotion(was);
             }
         });
         stage.state("rail_tooltip", W, H, s -> {

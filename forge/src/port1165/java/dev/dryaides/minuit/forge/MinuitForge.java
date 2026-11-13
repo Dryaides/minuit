@@ -1,6 +1,6 @@
 package dev.dryaides.minuit.forge;
 
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.internal.game.ServerForms;
 import dev.dryaides.minuit.port.mc.WirePayload;

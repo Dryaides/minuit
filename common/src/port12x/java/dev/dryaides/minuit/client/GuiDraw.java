@@ -115,8 +115,43 @@ public final class GuiDraw extends Draw {
         if (stack.isEmpty()) {
             return false;
         }
+        if (itemTooltipLines(item) == null) {
+            return true;
+        }
         this.g.renderTooltip(this.font, stack, mx, my);
         return true;
+    }
+
+    /** The lines of the game's item tooltip, each style's colour and format as section codes; null when all are blank. */
+    @Override
+    public List<String> itemTooltipLines(ItemView item) {
+        ItemStack stack = stack(item);
+        if (stack.isEmpty()) {
+            return null;
+        }
+        List<String> lines = new ArrayList<>();
+        boolean blank = true;
+        for (Component line : net.minecraft.client.gui.screens.Screen.getTooltipFromItem(Minecraft.getInstance(), stack)) {
+            StringBuilder out = new StringBuilder();
+            line.visit((style, text) -> {
+                out.append(ChatFormatting.RESET);
+                if (style.getColor() != null) {
+                    ChatFormatting named = ChatFormatting.getByName(style.getColor().serialize());
+                    if (named != null) {
+                        out.append(named);
+                    }
+                }
+                if (style.isBold()) out.append(ChatFormatting.BOLD);
+                if (style.isItalic()) out.append(ChatFormatting.ITALIC);
+                if (style.isUnderlined()) out.append(ChatFormatting.UNDERLINE);
+                if (style.isStrikethrough()) out.append(ChatFormatting.STRIKETHROUGH);
+                out.append(text);
+                return java.util.Optional.empty();
+            }, Style.EMPTY);
+            blank &= line.getString().isBlank();
+            lines.add(out.toString());
+        }
+        return blank ? null : lines;
     }
 
     /** Through the atlas, so a sprite of any pixel size fills the box and an animated one moves. */
@@ -142,7 +177,7 @@ public final class GuiDraw extends Draw {
 
     @Override
     public boolean entity(EntityView view, int x0, int y0, int x1, int y1, float yaw, float pitch) {
-        return EntityDraw.draw(this.g, view, x0, y0, x1, y1, yaw, pitch);
+        return EntityDraw.draw(this, this.g, view, x0, y0, x1, y1, yaw, pitch);
     }
 
     private static Style style(int color, int style) {
@@ -170,6 +205,11 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
+    protected void vertical(int x0, int y0, int x1, int y1, int top, int bottom) {
+        this.g.fillGradient(x0, y0, x1, y1, top, bottom);
+    }
+
+    @Override
     protected void string(String text, int x, int y, int argb) {
         this.g.drawString(this.font, text, x, y, argb, false);
     }
@@ -180,7 +220,7 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    protected String cut(String text, int maxWidth) {
+    public String cut(String text, int maxWidth) {
         return this.font.plainSubstrByWidth(text, maxWidth);
     }
 
@@ -234,14 +274,14 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    public void push(float x, float y, float scale) {
+    protected void pushPose(float x, float y, float scale) {
         this.g.pose().pushPose();
         this.g.pose().translate(x, y, 0F);
         this.g.pose().scale(scale, scale, 1F);
     }
 
     @Override
-    public void pop() {
+    protected void popPose() {
         this.g.pose().popPose();
     }
 

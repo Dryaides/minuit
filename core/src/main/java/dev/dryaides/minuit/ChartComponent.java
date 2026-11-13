@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.Lists;
 
 import java.util.ArrayList;
@@ -748,15 +749,19 @@ public class ChartComponent extends BaseComponent {
         if (crossSample == NONE) {
             return 0F;
         }
-        if (reducedMotion || crossSince == NONE) {
+        if (reducedMotion() || crossSince == NONE) {
             return 1F;
         }
-        return Math.max(0F, Math.min(1F, (BaseComponent.clock.getAsLong() - crossSince) / (float) BaseComponent.HOVER_IN_MS));
+        float k = Math.max(0F, Math.min(1F, (Redraw.quietClock() - crossSince) / (float) BaseComponent.HOVER_IN_MS));
+        if (k < 1F) {
+            Redraw.ask();
+        }
+        return k;
     }
 
     /** The colour a series has in a theme: fixed by the order it was added in, whatever else is hidden. */
     public int seriesColor(Theme theme, Series s) {
-        return s.customColor ? s.color | 0xFF000000 : SeriesColors.color(theme.palette(), seriesPalette, s.order);
+        return s.customColor ? SeriesColors.custom(theme.palette(), s.color, false) : SeriesColors.color(theme.palette(), seriesPalette, s.order);
     }
 
     // ---- data ----
@@ -1420,18 +1425,19 @@ public class ChartComponent extends BaseComponent {
         colourFor = p;
         pickInks(p);
         cardInk = Ink.on(p, opaque(p.surface()));
-        back = Shapes.mix(opaque(p.surface()), opaque(p.well()), (p.well() >>> 24) / 255F);
+        back = DataLook.plotFace(p);
     }
 
     private void pickInks(Palette p) {
         inkActive = active;
-        ink = RowLook.ink(p, 0, false, active);
-        softInk = active ? RowLook.softInk(p, ink) : ink;
+        Palette plot = DataLook.plotPalette(p);
+        ink = RowLook.ink(plot, 0, false, active);
+        softInk = active ? RowLook.softInk(plot, ink) : ink;
     }
 
 
     private int colourOf(Series s) {
-        int base = s.customColor ? opaque(s.color) : SeriesColors.color(colourFor, seriesPalette, s.order);
+        int base = s.customColor ? SeriesColors.custom(colourFor, s.color, false) : SeriesColors.color(colourFor, seriesPalette, s.order);
         return active ? base : Shapes.mix(base, back, DISABLED_FADE);
     }
 
@@ -1441,8 +1447,8 @@ public class ChartComponent extends BaseComponent {
         if (!hasRange) {
             return;
         }
-        long now = BaseComponent.clock.getAsLong();
-        if (!shownSet || reducedMotion) {
+        long now = Redraw.quietClock();
+        if (!shownSet || reducedMotion()) {
             shownLo = targetLo;
             shownHi = targetHi;
             shownSet = true;
@@ -1457,6 +1463,9 @@ public class ChartComponent extends BaseComponent {
                 shownHi = targetHi;
             }
         }
+        if (shownLo != targetLo || shownHi != targetHi) {
+            Redraw.ask();
+        }
         lastGlide = now;
     }
 
@@ -1466,7 +1475,7 @@ public class ChartComponent extends BaseComponent {
         pickColours(p);
         refresh();
         stepRange();
-        t.frame().well(d, p, x, y, w, h, focused && active);
+        t.frame().well(d, DataLook.plotPalette(p), x, y, w, h, focused && active);
         cardDrawn = false;
 
         boolean inside = active && hovered && settled();
@@ -1864,7 +1873,7 @@ public class ChartComponent extends BaseComponent {
             return;
         }
         if (crossSample == NONE) {
-            crossSince = reducedMotion ? NONE : BaseComponent.clock.getAsLong();
+            crossSince = reducedMotion() ? NONE : BaseComponent.clock().getAsLong();
         }
         crossSample = sample;
         crossByPointer = byPointer;
@@ -2057,7 +2066,7 @@ public class ChartComponent extends BaseComponent {
         frame.dropShadow(d, p, cardX, cardY, cardW, cardH, 2);
         int surface = p.surface();
         if (surface >>> 24 != 0xFF) {
-            // A see-through family (glass) would show the chart through the words: hide it first.
+            // A see-through palette (the glass mode) would show the chart through the words: hide it first.
             int corner = Math.max(1, frame.corner());
             int solid = opaque(surface);
             d.fill(cardX + corner, cardY + 1, cardX + cardW - corner, cardY + cardH - 1, solid);

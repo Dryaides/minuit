@@ -26,6 +26,17 @@ public final class FormFieldDemo implements Demo {
         return s.add(new TextFieldComponent(new Box("t", 0, 0, FW, 16), value, v -> { }));
     }
 
+    /** Null when the port is valid. */
+    private static String portError(String v) {
+        int port;
+        try {
+            port = Integer.parseInt(v.trim());
+        } catch (NumberFormatException e) {
+            return "Not a number";
+        }
+        return port < 1024 ? "Too low" : port > 65535 ? "Too high" : null;
+    }
+
     private static FormFieldComponent field(Scene s, String label, TextFieldComponent control) {
         return s.add(new FormFieldComponent(new Box("f", X, Y, FW, 0), s.panel(), label, control));
     }
@@ -47,8 +58,10 @@ public final class FormFieldDemo implements Demo {
             f.setError("A world needs a name");
         });
         stage.state("description and error", W, 60, s -> {
-            FormFieldComponent f = field(s, "Port", text(s, "99999")).description("Between 1024 and 65535.");
-            f.setError("Too high");
+            FormFieldComponent[] f = new FormFieldComponent[1];
+            TextFieldComponent port = s.add(new TextFieldComponent(new Box("t", 0, 0, FW, 16), "99999", v -> f[0].setError(portError(v))));
+            f[0] = field(s, "Port", port).description("Between 1024 and 65535.");
+            f[0].setError(portError("99999"));
         });
         stage.state("long error wraps", W, 74, s -> {
             FormFieldComponent f = field(s, "Port", text(s, "x"));

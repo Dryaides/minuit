@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -135,7 +136,7 @@ public class CarouselComponent<T> extends BaseComponent {
     /** Moves on by itself, this often. 0 turns it off, which is the default. See the class's notes for when it rests. */
     public CarouselComponent<T> autoPlay(int everyMs) {
         autoMs = Math.max(0, everyMs);
-        lastMove = clock.getAsLong();
+        lastMove = clock().getAsLong();
         return this;
     }
 
@@ -215,7 +216,7 @@ public class CarouselComponent<T> extends BaseComponent {
 
     /** True when it would move by itself now. */
     public boolean autoPlaying() {
-        return autoMs > 0 && visible && !reducedMotion && active && items.size() > 1 && !hoveredNow && !focused && !dragging;
+        return autoMs > 0 && visible && !reducedMotion() && active && items.size() > 1 && !hoveredNow && !focused && !dragging;
     }
 
     /** True when more dots than fit have turned into a counter. */
@@ -350,13 +351,13 @@ public class CarouselComponent<T> extends BaseComponent {
     private void startTo(int next, float target, boolean tell, boolean pick) {
         boolean changed = next != index;
         index = next;
-        lastMove = clock.getAsLong();
+        lastMove = clock().getAsLong();
         position.go(target);
         if (changed && tell) {
             if (pick) {
                 BaseComponent.click();
             } else {
-                BaseComponent.sound.tap();
+                BaseComponent.sound().tap();
             }
             if (onChange != null) {
                 onChange.accept(index);
@@ -379,6 +380,7 @@ public class CarouselComponent<T> extends BaseComponent {
             lastMove = now;
             return;
         }
+        Redraw.ask();
         if (now - lastMove >= autoMs) {
             if (canGo(1)) {
                 moveBy(1, false);
@@ -396,7 +398,7 @@ public class CarouselComponent<T> extends BaseComponent {
     @Override
     protected void render(Draw d, Theme t, int mx, int my, boolean hovered) {
         hoveredNow = hovered;
-        autoStep(clock.getAsLong());
+        autoStep(Redraw.quietClock());
         landed();
         Palette p = t.palette();
         if (framed) {
@@ -487,7 +489,7 @@ public class CarouselComponent<T> extends BaseComponent {
             return;
         }
         int dy = top + (STRIP_H - DOT) / 2;
-        int lit = Ink.readable(p.primary(), p.well(), Ink.MARK);
+        int lit = Ink.readable(p, p.markInk(), p.well(), Ink.MARK);
         for (int i = 0; i < items.size(); i++) {
             int dx = dotX(i);
             int color;
@@ -506,7 +508,7 @@ public class CarouselComponent<T> extends BaseComponent {
 
     @Override
     public void tick() {
-        autoStep(clock.getAsLong());
+        autoStep(Redraw.quietClock());
     }
 
     @Override
@@ -544,7 +546,7 @@ public class CarouselComponent<T> extends BaseComponent {
             pressX = mx;
             pressPos = position.value();
             lastX = mx;
-            lastTime = clock.getAsLong();
+            lastTime = clock().getAsLong();
             speed = 0F;
             return true;
         }
@@ -566,7 +568,7 @@ public class CarouselComponent<T> extends BaseComponent {
                 pos = pos < 0F ? pos * RESIST : pos > last ? last + (pos - last) * RESIST : pos;
             }
             position.snap(pos);
-            long now = clock.getAsLong();
+            long now = clock().getAsLong();
             if (now > lastTime) {
                 speed = (float) ((mx - lastX) / (now - lastTime));
                 lastTime = now;
@@ -583,7 +585,7 @@ public class CarouselComponent<T> extends BaseComponent {
             pressedView = false;
             float moved = position.value() - pressPos;
             // A pointer that stopped before letting go did not flick.
-            float flick = clock.getAsLong() - lastTime <= FLICK_FRESH_MS ? speed : 0F;
+            float flick = clock().getAsLong() - lastTime <= FLICK_FRESH_MS ? speed : 0F;
             int by = moved >= DRAG_AT || flick <= -FLICK ? 1 : moved <= -DRAG_AT || flick >= FLICK ? -1 : 0;
             int from = index;
             if (by != 0 && canGo(by)) {
@@ -596,7 +598,7 @@ public class CarouselComponent<T> extends BaseComponent {
                 }
             } else {
                 position.go(loop ? pressPos : index);
-                lastMove = clock.getAsLong();
+                lastMove = clock().getAsLong();
             }
             return true;
         }
@@ -626,9 +628,9 @@ public class CarouselComponent<T> extends BaseComponent {
     }
 
     private void startLoopLanding(int from, int by) {
-        lastMove = clock.getAsLong();
+        lastMove = clock().getAsLong();
         position.go(Math.round(pressPos) + by);
-        BaseComponent.sound.tap();
+        BaseComponent.sound().tap();
         if (onChange != null && from != index) {
             onChange.accept(index);
         }

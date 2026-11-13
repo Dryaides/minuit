@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.IdentityHashMap;
@@ -99,6 +100,7 @@ public class KanbanComponent<T> extends BaseComponent {
         String fitTitle = "";
         String count = "";
         boolean headerDirty = true;
+        int headerFont;
         boolean refusing;
     }
 
@@ -108,6 +110,7 @@ public class KanbanComponent<T> extends BaseComponent {
         boolean cut;
         String wholeTitle = "";
         int width;
+        int font;
         IconArt iconArt;
         Picture icon;
         Picture coverFrom;
@@ -627,10 +630,10 @@ public class KanbanComponent<T> extends BaseComponent {
     private float pushOf(Column<T> c, int shown) {
         float before = shown >= c.gapFrom ? 1F : 0F;
         float after = shown >= c.gapTo ? 1F : 0F;
-        if (before == after || reducedMotion || c.gapAt == NEVER) {
+        if (before == after || reducedMotion() || c.gapAt == NEVER) {
             return after;
         }
-        long age = BaseComponent.clock.getAsLong() - c.gapAt;
+        long age = BaseComponent.clock().getAsLong() - c.gapAt;
         return age >= SLIDE_MS ? after : before + (after - before) * eased(age);
     }
 
@@ -641,7 +644,7 @@ public class KanbanComponent<T> extends BaseComponent {
         }
         c.gapFrom = c.gapTo;
         c.gapTo = slot;
-        c.gapAt = reducedMotion ? NEVER : BaseComponent.clock.getAsLong();
+        c.gapAt = reducedMotion() ? NEVER : BaseComponent.clock().getAsLong();
     }
 
     private void resetGaps() {
@@ -673,7 +676,7 @@ public class KanbanComponent<T> extends BaseComponent {
         grabX = armX - card.x();
         grabY = armY - card.y();
         liftY = armY;
-        lastStep = BaseComponent.clock.getAsLong();
+        lastStep = BaseComponent.clock().getAsLong();
         edgeSince = NEVER;
         resetGaps();
         // The place it left stays open, so nothing jumps as it lifts.
@@ -734,7 +737,7 @@ public class KanbanComponent<T> extends BaseComponent {
 
     /** Scrolls the column and the board while the pointer holds near an edge. */
     private void stepDrag() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         long elapsed = Math.max(0L, Math.min(MAX_STEP_MS, now - lastStep));
         lastStep = now;
         boolean moved = false;
@@ -795,7 +798,7 @@ public class KanbanComponent<T> extends BaseComponent {
         }
         if (toCol < 0) {
             refusedCol = nearestColumn(dragX);
-            refusedAt = BaseComponent.clock.getAsLong();
+            refusedAt = BaseComponent.clock().getAsLong();
             clampAll();
             return;
         }
@@ -862,7 +865,7 @@ public class KanbanComponent<T> extends BaseComponent {
         // Each card keeps the width it was cut for: columns with and without a bar differ, and one shared
         // width would throw the words away twice a frame.
         Words known = words.get(item);
-        if (known != null && known.width == width) {
+        if (known != null && known.width == width && known.font == TextMeasure.fontGeneration()) {
             return known;
         }
         if (words.size() >= CACHE_MAX) {
@@ -870,6 +873,7 @@ public class KanbanComponent<T> extends BaseComponent {
         }
         known = new Words();
         known.width = width;
+        known.font = TextMeasure.fontGeneration();
         Draw measure = TextMeasure.draw();
         String whole = label.apply(item);
         known.wholeTitle = whole == null ? "" : whole;
@@ -884,6 +888,7 @@ public class KanbanComponent<T> extends BaseComponent {
 
     private void refreshHeader(Column<T> c) {
         c.headerDirty = false;
+        c.headerFont = TextMeasure.fontGeneration();
         c.count = c.limit > 0 ? c.items.size() + "/" + c.limit : Integer.toString(c.items.size());
         int room = Math.max(0, columnW - 2 * CARD_PAD - TextMeasure.width(c.count) - 2);
         c.fitTitle = TextMeasure.draw().ellipsize(c.title, room);
@@ -956,7 +961,7 @@ public class KanbanComponent<T> extends BaseComponent {
     private void drawColumn(Draw d, Theme t, int column, int mx, int my, boolean hovered) {
         Palette p = t.palette();
         Column<T> c = columns.get(column);
-        if (c.headerDirty) {
+        if (c.headerDirty || c.headerFont != TextMeasure.fontGeneration()) {
             refreshHeader(c);
         }
         int left = colX(column);
@@ -964,12 +969,16 @@ public class KanbanComponent<T> extends BaseComponent {
         PictureLook.flat(d, t, left, y, columnW, colH, true); // flat: the board sits in a panel already
         int ink = restInk;
         int soft = softInk;
-        boolean alert = active && (BaseComponent.clock.getAsLong() - refusedAt < REFUSED_MS && refusedCol == column
+        long sinceRefused = Redraw.quietClock() - refusedAt;
+        if (sinceRefused < REFUSED_MS) {
+            Redraw.ask();
+        }
+        boolean alert = active && (sinceRefused < REFUSED_MS && refusedCol == column
                 || (c.limit > 0 && c.items.size() > c.limit));
         if (colH >= HEADER) {
             d.text(c.fitTitle, left + CARD_PAD, y + 3, ink);
             int countW = d.width(c.count);
-            d.text(c.count, left + columnW - CARD_PAD - countW, y + 3, alert ? Ink.readable(p.bad(), DataLook.back(p), Ink.MARK) : soft);
+            d.text(c.count, left + columnW - CARD_PAD - countW, y + 3, alert ? Ink.readable(p, p.bad(), DataLook.back(p), Ink.MARK) : soft);
         }
         int vh = viewH();
         int vw = viewW(column);
@@ -1352,7 +1361,7 @@ public class KanbanComponent<T> extends BaseComponent {
         if (armed != null) {
             T item = armed;
             armed = null;
-            long now = BaseComponent.clock.getAsLong();
+            long now = BaseComponent.clock().getAsLong();
             boolean twice = lastClicked == item && now - lastClickAt <= DOUBLE_CLICK_MS;
             lastClicked = twice ? null : item;
             lastClickAt = now;
@@ -1427,7 +1436,7 @@ public class KanbanComponent<T> extends BaseComponent {
         T item = from.items.get(cursorRow);
         if (!accepts(item, cursorCol, toCol)) {
             refusedCol = toCol;
-            refusedAt = BaseComponent.clock.getAsLong();
+            refusedAt = BaseComponent.clock().getAsLong();
             return;
         }
         int most = toCol == cursorCol ? from.items.size() - 1 : columns.get(toCol).items.size();
@@ -1495,7 +1504,7 @@ public class KanbanComponent<T> extends BaseComponent {
             startCursor();
             return cursorCol >= 0;
         }
-        boolean ctrl = BaseComponent.keys != null && BaseComponent.keys.ctrl();
+        boolean ctrl = BaseComponent.heldKeys() != null && BaseComponent.heldKeys().ctrl();
         int size = columns.get(cursorCol).items.size();
         if (ctrl) {
             switch (key) {

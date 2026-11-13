@@ -28,4 +28,13 @@ public interface UiSound {
     /** A short bright confirmation. */
     default void confirm() {
     }
+
+    /**
+     * A button press in its role: the host may give the hero, a secondary and a destructive button a
+     * sound of their own. Plays {@link #click} by default, and for a null role.
+     */
+    @Incubating
+    default void press(ButtonComponent.Role role) {
+        click();
+    }
 }

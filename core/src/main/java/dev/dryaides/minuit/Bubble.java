@@ -53,6 +53,9 @@ public final class Bubble {
     private static final int TAIL_U = 48;
     /** The logo's navy outline: dark on the white and pale blue fill. */
     private static final int TEXT = 0xFF1E2434;
+    /** The thought cloud's body: the logo bubble's white. */
+    private static final int CLOUD = 0xFFFFFFFF;
+    private static final int BUMP_STEP = 8;
 
     private static final int FADE_IN_TICKS = 4;
     private static final int FADE_OUT_TICKS = 10;
@@ -175,6 +178,11 @@ public final class Bubble {
         int y = box.y();
         int w = Math.max(box.w(), CAP_LEFT + 1 + CAP_RIGHT);
         int h = Math.max(box.h(), ROWS_TOP + 1 + ROWS_MID + 1 + ROWS_BOTTOM);
+        if (style == BubbleStyle.THOUGHT) {
+            cloud(d, x, y, w, h, anchorX, a);
+            words(d, lines, x, y, w, a);
+            return;
+        }
         int extra = h - (ROWS_TOP + ROWS_MID + ROWS_BOTTOM);
         int[] rowSrc = {0, ROWS_TOP, ROWS_TOP + COPIES, ROWS_TOP + COPIES + ROWS_MID, BODY_H - ROWS_BOTTOM};
         int[] rowH = {ROWS_TOP, extra, ROWS_MID, 0, ROWS_BOTTOM};
@@ -193,6 +201,10 @@ public final class Bubble {
         }
         int tipX = Maths.clamp(anchorX, x + 5, x + w - 8);
         d.blit(TEXTURE, tipX - 1, y + h - 1, TAIL_U, 0, 4, 4, ATLAS, ATLAS, a);
+        words(d, lines, x, y, w, a);
+    }
+
+    private static void words(Draw d, List<String> lines, int x, int y, int w, float a) {
         int color = Shapes.alpha(TEXT, Math.round(255 * a));
         if (lines.size() == 1 && lines.get(0).equals(NO_WORDS)) {
             int dotX = x + (w - 8) / 2;
@@ -206,6 +218,49 @@ public final class Bubble {
             String line = lines.get(i);
             d.text(line, x + (w - d.width(line)) / 2, y + PAD_Y + i * LINE, color);
         }
+    }
+
+    /**
+     * The thought cloud, drawn in pixels rather than from the atlas: a rounded body, three-pixel bumps along the top
+     * and bottom edges every {@link #BUMP_STEP} pixels, and two circles stepping down to the speaker, the larger by
+     * the body.
+     */
+    private static void cloud(Draw d, int x, int y, int w, int h, int anchorX, float a) {
+        int ink = Shapes.alpha(TEXT, Math.round(255 * a));
+        int body = Shapes.alpha(CLOUD, Math.round(255 * a));
+        Shapes.rounded(d, x, y, w, h, 3, ink);
+        Shapes.rounded(d, x + 1, y + 1, w - 2, h - 2, 2, body);
+        int tipX = Maths.clamp(anchorX, x + 5, x + w - 8);
+        int bumps = Math.max(1, (w - 8) / BUMP_STEP);
+        int first = x + (w - (bumps - 1) * BUMP_STEP) / 2;
+        for (int i = 0; i < bumps; i++) {
+            int cx = first + i * BUMP_STEP;
+            bump(d, cx, y, -1, ink, body);
+            // The trail leaves the bottom edge at tipX: a bump there would merge with its first circle.
+            if (cx + 3 < tipX - 1 || cx - 3 > tipX + 5) {
+                bump(d, cx, y + h - 1, 1, ink, body);
+            }
+        }
+        int ty = y + h;
+        d.fill(tipX + 1, ty, tipX + 4, ty + 1, ink);
+        d.fill(tipX, ty + 1, tipX + 5, ty + 3, ink);
+        d.fill(tipX + 1, ty + 1, tipX + 4, ty + 3, body);
+        d.fill(tipX + 1, ty + 3, tipX + 4, ty + 4, ink);
+        d.fill(tipX - 2, ty + 4, tipX - 1, ty + 5, ink);
+        d.fill(tipX - 3, ty + 5, tipX, ty + 6, ink);
+        d.fill(tipX - 2, ty + 5, tipX - 1, ty + 6, body);
+        d.fill(tipX - 2, ty + 6, tipX - 1, ty + 7, ink);
+    }
+
+    /** One bump centred on {@code cx}, standing out of the edge row {@code edgeY} upward ({@code dir} -1) or downward. */
+    private static void bump(Draw d, int cx, int edgeY, int dir, int ink, int body) {
+        int outer = edgeY + 2 * dir;
+        int inner = edgeY + dir;
+        d.fill(cx - 1, outer, cx + 2, outer + 1, ink);
+        d.fill(cx - 2, inner, cx - 1, inner + 1, ink);
+        d.fill(cx + 2, inner, cx + 3, inner + 1, ink);
+        d.fill(cx - 1, inner, cx + 2, inner + 1, body);
+        d.fill(cx - 1, edgeY, cx + 2, edgeY + 1, body);
     }
 
     /** {@code w x h} at {@code x, y} filled with the atlas piece at {@code u, v}, repeated when it is smaller. */

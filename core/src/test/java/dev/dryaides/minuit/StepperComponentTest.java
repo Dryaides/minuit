@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +13,7 @@ class StepperComponentTest {
 
     @AfterEach
     void reset() {
-        BaseComponent.clock = System::currentTimeMillis;
+        HostState.clock(System::currentTimeMillis);
     }
 
     /** A held button steps once on press, waits the delay, then repeats ever faster down to the floor. */
@@ -39,7 +40,7 @@ class StepperComponentTest {
     /** Pressed, held 1 s, released: the value moved by the press plus the repeats, commit fired once. */
     @Test
     void aHeldPlusStepsOnTheClockAndCommitsOnce() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         int[] commits = {0};
         StepperComponent s = new StepperComponent(new Box("s", 0, 0, 60, 14), 0, 100, 10, v -> { })
                 .onCommit(v -> commits[0]++);
@@ -60,7 +61,7 @@ class StepperComponentTest {
      */
     @Test
     void canStepRefusesPastTheCapAndReportsThePressOnly() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         int players = 4;
         java.util.List<int[]> vetoes = new java.util.ArrayList<>();
         StepperComponent s = new StepperComponent(new Box("s", 0, 0, 60, 14), 1, 16, 3, v -> { })
@@ -85,10 +86,10 @@ class StepperComponentTest {
     /** Meccha's stepper moves 5 with Shift, a default one 10; the key path and the click path agree. */
     @Test
     void shiftMultiplierIsPerStepper() {
-        BaseComponent.keys = new HeldKeys() {
+        HostState.keys(new HeldKeys() {
             public boolean ctrl() { return false; }
             public boolean shift() { return true; }
-        };
+        });
         try {
             StepperComponent meccha = new StepperComponent(new Box("s", 0, 0, 60, 14), 0, 100, 0, v -> { }).shiftFactor(5);
             StepperComponent plain = new StepperComponent(new Box("s", 0, 0, 60, 14), 0, 100, 0, v -> { });
@@ -99,7 +100,7 @@ class StepperComponentTest {
             meccha.keyPressed(InputKey.RIGHT, true);
             assertEquals(10, meccha.value);
         } finally {
-            BaseComponent.keys = HeldKeys.NONE;
+            HostState.keys(HeldKeys.NONE);
         }
     }
 }

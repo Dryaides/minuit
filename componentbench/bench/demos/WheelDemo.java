@@ -1,7 +1,7 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
-import bench.api.Scene;
 import bench.api.Stage;
 import dev.dryaides.minuit.AsyncImage;
 import dev.dryaides.minuit.BaseComponent;
@@ -13,7 +13,6 @@ import dev.dryaides.minuit.WheelComponent;
 import dev.dryaides.minuit.WheelComponent.Segment;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Supplier;
 
 /** The prize wheel. Only the checks a state needs to show what it claims; the pictures are the point. */
 public final class WheelDemo implements Demo {
@@ -22,10 +21,17 @@ public final class WheelDemo implements Demo {
     private static final String GEM = "minecraft:textures/item/emerald.png";
     private static final String FACE = "minecraft:textures/mob_effect/luck.png";
 
+    private static final String[][] ORES = {
+        {"Iron", "minecraft:iron_ingot"}, {"Gold", "minecraft:gold_ingot"}, {"Coal", "minecraft:coal"},
+        {"Emerald", "minecraft:emerald"}, {"Copper", "minecraft:copper_ingot"}, {"Lapis", "minecraft:lapis_lazuli"},
+        {"Quartz", "minecraft:quartz"}, {"Diamond", "minecraft:diamond"},
+    };
+
+    /** Eight ores, each with its item: a segment too narrow for its name still shows what it holds. */
     private static WheelComponent labels(Box box) {
         WheelComponent w = new WheelComponent(box);
-        for (String s : new String[] {"Iron", "Gold", "Coal", "Emerald", "Copper", "Lapis", "Quartz", "Diamond"}) {
-            w.add(s);
+        for (String[] o : ORES) {
+            w.add(new Segment(o[0]).item(ItemView.of(o[1])));
         }
         return w;
     }
@@ -47,10 +53,6 @@ public final class WheelDemo implements Demo {
 
     private static Box box() {
         return new Box("w", 5, 5, W - 10, H - 10);
-    }
-
-    private static void note(Scene s, int y, Supplier<String> text) {
-        s.paint((d, t) -> d.text(text.get(), 4, y, t.palette().textSoft()));
     }
 
     @Override
@@ -154,18 +156,18 @@ public final class WheelDemo implements Demo {
         });
 
         stage.state("reduced_motion_jumps", W, H, s -> {
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 WheelComponent w = s.add(items(box(), 8)).muted(true);
                 w.spin(5, 3L);
                 s.waitMs(20);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
         stage.state("keyboard_space_spins", W, H, s -> {
-            WheelComponent w = s.add(items(box(), 8)).muted(true);
+            WheelComponent w = s.add(items(box(), 8)).muted(true).randomSource(() -> new java.util.Random(11L));
             s.focus(w);
             s.key(InputKey.SPACE);
             s.waitMs(600);
@@ -243,7 +245,7 @@ public final class WheelDemo implements Demo {
             b.open(s.panel());
             b.spin(1, 1L);
             s.waitMs(5000);
-            note(s, 30, () -> "both closed: nothing drawn");
+            s.caption(() -> "both closed: nothing drawn");
         });
     }
 }

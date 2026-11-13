@@ -58,27 +58,37 @@ public record ThemeFamily(String id, String owner, FrameStyle frame, List<Chroma
     }
 
     /**
-     * One colour set, with its light and dark halves, as a family draws it (its overrides applied).
+     * One colour set, with its light and dark halves and the glass mode derived from them, as a family draws it
+     * (its overrides applied).
      *
      * @param id      e.g. {@code "teal"}
      * @param nameKey its name's translation key, {@code minuit.chroma.<id>}
      * @param light   the light half, or null when the chroma ships only a dark one
      * @param dark    the dark half, or null when the chroma ships only a light one
+     * @param glass   the glass mode, {@link GlassPalette#of} the dark half (else the light one) when null
      */
-    public record Chroma(String id, String nameKey, Palette light, Palette dark) {
+    public record Chroma(String id, String nameKey, Palette light, Palette dark, Palette glass) {
 
         public Chroma {
             id = id.trim().toLowerCase(Locale.ROOT);
             if (light == null && dark == null) {
                 throw new IllegalArgumentException("chroma " + id + " has no palette");
             }
+            if (glass == null) {
+                glass = GlassPalette.of(dark != null ? dark : light);
+            }
+        }
+
+        /** A chroma whose glass mode is derived from its halves. */
+        public Chroma(String id, String nameKey, Palette light, Palette dark) {
+            this(id, nameKey, light, dark, null);
         }
 
         public boolean has(ThemeChoice.Variant variant) {
             return switch (variant) {
                 case LIGHT -> this.light != null;
                 case DARK -> this.dark != null;
-                case AUTO -> true;
+                case GLASS, AUTO -> true;
             };
         }
 
@@ -89,6 +99,9 @@ public record ThemeFamily(String id, String owner, FrameStyle frame, List<Chroma
 
         /** The palette for {@code variant}; a variant the chroma lacks gives the one it has. */
         public Palette palette(ThemeChoice.Variant variant) {
+            if (variant == ThemeChoice.Variant.GLASS) {
+                return this.glass;
+            }
             ThemeChoice.Variant shown = variant == ThemeChoice.Variant.AUTO || !has(variant) ? auto() : variant;
             return shown == ThemeChoice.Variant.DARK ? this.dark : this.light;
         }

@@ -68,7 +68,7 @@ final class NavLook {
         d.text(text, x + 2, y + 1, ink);
     }
 
-    /** A see-through family (glass) would show what is beneath through the words: hide it first. */
+    /** A see-through palette (the glass mode) would show what is beneath through the words: hide it first. */
     static void backing(Draw d, Theme t, int x, int y, int w, int h) {
         int surface = t.palette().surface();
         if (surface >>> 24 == 0xFF) {

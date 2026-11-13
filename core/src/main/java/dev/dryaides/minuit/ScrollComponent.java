@@ -8,13 +8,26 @@ import java.util.List;
  * at the place they would have unscrolled, in screen coordinates, and must leave {@link #BAR} pixels
  * free on the right; whatever leaves the box is cut. The wheel goes to a child that uses it first,
  * a slider for instance, then scrolls by {@link #step} pixels a notch; the thumb can be dragged.
+ * <p>The declared height is the most the box takes ({@link #max}); the layout reserves it and what sits below stays
+ * put. Content up to that height shows whole, the box hugging it, with no bar. Past it the box drops to
+ * {@link #NORMAL} of the declared height and scrolls, so a bar always hides a fifth or more of the box.
+ * {@link #fit} off keeps the box at its declared height, scrolling on any overflow. A box that fills a fixed
+ * region (a screen or page body, a showcase body, a dialog or drawer view) sets {@code fit} off: the drop to
+ * {@link #NORMAL} is for boxes whose height is a cap in a flowing layout (lists, popups, panels in a column).
  */
 public class ScrollComponent extends BaseComponent {
 
     /** Room kept on the right for the scrollbar. */
     public static final int BAR = 6;
 
+    /** The share of the declared height a scrolling box keeps. */
+    public static final double NORMAL = 0.8;
+
     private final List<BaseComponent> children = new ArrayList<>();
+    /** False keeps the box at its declared height and scrolls on any overflow. */
+    public boolean fit = true;
+    /** The declared height: the most the box takes. */
+    public int max;
     /** Pixels a wheel notch moves. */
     public int step = 10;
     /** Room kept under the lowest child, for what it draws below its box (a shadow, a ring). */
@@ -24,6 +37,7 @@ public class ScrollComponent extends BaseComponent {
 
     public ScrollComponent(Box box) {
         super(box);
+        this.max = this.h;
     }
 
     /** Adds a widget at its unscrolled place; the content grows to hold it. */
@@ -122,6 +136,26 @@ public class ScrollComponent extends BaseComponent {
         }
     }
 
+    /** Sizes the box to its content within {@link #max}, or to {@link #NORMAL} of it once the content overflows. */
+    private void fitContent() {
+        if (!this.fit) {
+            this.h = this.max;
+            return;
+        }
+        this.h = fitted(contentHeight(), this.max, true);
+    }
+
+    /**
+     * The scroll rule every scrolling box follows: {@code content} up to {@code max} shows whole, the box hugging
+     * it; past it the box keeps {@link #NORMAL} of {@code max}. With {@code fit} off the box stays at {@code max}.
+     */
+    static int fitted(int content, int max, boolean fit) {
+        if (!fit) {
+            return max;
+        }
+        return content <= max ? content : (int) Math.round(max * NORMAL);
+    }
+
     private int maxScroll() {
         this.bar.content(contentHeight(), this.h);
         return this.bar.max();
@@ -141,6 +175,8 @@ public class ScrollComponent extends BaseComponent {
         int cx = in ? mx : Integer.MIN_VALUE;
         int cy = in ? my : Integer.MIN_VALUE;
         this.bleed = FrameStyle.bleedOf(theme.frame()).bottom();
+        fitContent();
+        setScroll(this.bar.offset());
         d.scissor(this.x, this.y, this.x + this.w, this.y + this.h);
         for (BaseComponent child : this.children) {
             if (child.y < this.y + this.h && child.y + child.h > this.y) {

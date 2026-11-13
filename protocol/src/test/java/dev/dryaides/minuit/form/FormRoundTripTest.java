@@ -197,4 +197,31 @@ class FormRoundTripTest {
         session.close();
         assertEquals(new ScreenMessage.Close(1, CloseReason.SERVER), rig.last());
     }
+
+    @Test
+    void aShopLineKeepsPricesAboveTheIntRangeThroughTheWire() {
+        Form form = Form.custom("t:shop")
+                .cart("cart", Text.lit("Buy"), c -> c
+                        .product("line.pick", Text.lit("Pick"), new Image.Item("minecraft:iron_pickaxe"), 5_000_000_000L)
+                        .sale(4_000_000_000L).stock(7).category("tools").quantity(2))
+                .build();
+        ScreenMessage.Open open = assertInstanceOf(ScreenMessage.Open.class, ScreenMessage.decode(form.open(1).encode()));
+        dev.dryaides.minuit.wire.WireNode line = open.root().children().get(0).children().get(0);
+        assertEquals("product", line.kind());
+        assertEquals(5_000_000_000L, Fields.readVarlong(line.field(Fields.PRICE).orElseThrow()));
+        assertEquals(4_000_000_000L, Fields.readVarlong(line.field(Fields.SALE).orElseThrow()));
+        assertEquals(7, Fields.readSvarint(line.field(Fields.STOCK).orElseThrow()));
+        assertEquals("tools", Fields.readStr(line.field(Fields.CATEGORY).orElseThrow(), 64));
+        assertEquals(2, Fields.readVarint(line.field(Fields.QUANTITY).orElseThrow()));
+        assertEquals(new Image.Item("minecraft:iron_pickaxe"), Fields.readImage(line.field(Fields.IMAGE).orElseThrow()));
+    }
+
+    @Test
+    void aProductIdTooLongForItsCartLineIsRefusedAtBuildTime() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Form.custom("t:shop")
+                .product("mymod_enchanted_golden_apple", Text.lit("Apple"), null, 50));
+        assertTrue(e.getMessage().contains("mymod_enchanted_golden_apple"));
+        Form.custom("t:shop").product("mymod_enchanted_golden_appl", Text.lit("Apple"), null, 50)
+                .cart("cart", Text.lit("Buy"), lines -> { }).build();
+    }
 }

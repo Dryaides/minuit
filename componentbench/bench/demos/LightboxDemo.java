@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -83,18 +84,18 @@ public final class LightboxDemo implements Demo {
             s.waitMs(300);
         });
         stage.state("opening, reduced motion", W, H, s -> {
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 LightboxComponent v = gallery(s, W, H);
                 v.open(s.panel(), 3);
                 s.settle(16);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("item in the viewer", W, H, s -> {
             LightboxComponent v = s.add(new LightboxComponent(new Box("viewer", 0, 0, W, H))
-                    .pictures(List.of(Picture.item("minecraft:diamond_sword").caption("Diamond sword"), Shots.gem().caption("Gem, 16 x 16"))));
+                    .pictures(List.of(Picture.item("minecraft:diamond_sword").caption("Diamond sword"), Shots.emerald().caption("Emerald, 16 x 16"))));
             v.open(s.panel(), 0);
             s.waitMs(300);
         });

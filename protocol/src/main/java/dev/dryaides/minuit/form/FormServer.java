@@ -2,12 +2,14 @@ package dev.dryaides.minuit.form;
 
 import dev.dryaides.minuit.wire.InputMessage;
 import dev.dryaides.minuit.wire.ScreenMessage;
+import dev.dryaides.minuit.wire.Limits;
 import dev.dryaides.minuit.wire.WireException;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
@@ -29,7 +31,16 @@ public final class FormServer<P> {
     private Function<P, ?> key = p -> p;
     private Fallback.Dialogs<P> dialogs;
     private Predicate<P> required;
-    private int nextSession = 1;
+    private IntSupplier ids = new IntSupplier() {
+        private int next = 1;
+
+        @Override
+        public int getAsInt() {
+            return this.next++;
+        }
+    };
+    private BiConsumer<P, FormSession> shown = (player, session) -> {
+    };
 
     public FormServer(BiConsumer<P, byte[]> send) {
         this(send, System::currentTimeMillis);
@@ -67,12 +78,31 @@ public final class FormServer<P> {
     }
 
     /**
+     * Takes the session ids from {@code ids} instead of counting from 1, for servers where several
+     * {@code FormServer}s share the players' screens: give them one counter so no two sessions share an id.
+     */
+    public FormServer<P> sessionIds(IntSupplier ids) {
+        this.ids = ids;
+        return this;
+    }
+
+    /**
+     * Calls {@code shown} after a form went to the player's screen or dialog, so the owner of the
+     * players' screens knows which server shows what. A form a nested open replaced before it showed
+     * is not reported.
+     */
+    public FormServer<P> onShown(BiConsumer<P, FormSession> shown) {
+        this.shown = shown;
+        return this;
+    }
+
+    /**
      * Opens {@code form} on the player's screen; a form already open there closes as replaced. That
      * holds for a nested open too: opened from the outer form's own handler, the new form ends the
      * outer session, whose handler gets {@code closed(REPLACED)} before the new form shows.
      */
     public FormSession open(P player, Form form, FormHandler handler) {
-        int id = this.nextSession++;
+        int id = this.ids.getAsInt();
         if (this.required != null && !this.required.test(player)) {
             FormSession refused = new FormSession(id, form, handler, bytes -> {
             });
@@ -80,6 +110,7 @@ public final class FormServer<P> {
             return refused;
         }
         boolean vanilla = this.dialogs != null && !this.dialogs.hasForms(player);
+        byte[] opening = vanilla ? null : encodeOpen(form, id);
         Open<P> mine = new Open<>(player, vanilla);
         FormSession session = new FormSession(id, form, handler, vanilla
                 ? bytes -> toDialog(mine.player, bytes)
@@ -97,9 +128,24 @@ public final class FormServer<P> {
         if (vanilla) {
             this.dialogs.show(player, Fallback.dialog(session));
         } else {
-            this.send.accept(player, form.open(id).encode());
+            this.send.accept(player, opening);
         }
+        this.shown.accept(player, session);
         return session;
+    }
+
+    /**
+     * Encodes the open before any state changes, so a form over {@link Limits#SCREEN_BYTES} fails
+     * here and leaves the player's current form alone. The cap sits under every transport's own: the
+     * vanilla clientbound custom payload and Bukkit's {@code Messenger.MAX_MESSAGE_SIZE} are both 1 MiB.
+     */
+    private static byte[] encodeOpen(Form form, int id) {
+        try {
+            return form.open(id).encode();
+        } catch (WireException e) {
+            throw new IllegalArgumentException("Form " + form.screenId() + " is too big for minuit:screen ("
+                    + e.getMessage() + "); split it into tabs or several forms", e);
+        }
     }
 
     /** The player's open session, or null. */
@@ -155,7 +201,11 @@ public final class FormServer<P> {
         for (InputMessage input : Fallback.inputs(o.session, payload)) {
             o.session.accept(input);
         }
-        if (o.session.isOpen()) {
+        String confirm = o.session.isOpen() && payload.get(Fallback.CHECKOUT) instanceof String cart
+                ? Fallback.confirm(o.session, cart) : null;
+        if (confirm != null) {
+            this.dialogs.show(player, confirm);
+        } else if (o.session.isOpen()) {
             this.dialogs.show(player, Fallback.dialog(o.session));
         } else {
             if (this.open.get(k) == o) {
@@ -186,6 +236,17 @@ public final class FormServer<P> {
         Open<P> o = this.open.remove(this.key.apply(player));
         if (o != null) {
             o.session.end(CloseReason.PLAYER);
+        }
+    }
+
+    /**
+     * Another server's form took the player's screen: their session here ends as replaced, without a
+     * message, since the screen already shows the other form.
+     */
+    public void replaced(P player) {
+        Open<P> o = this.open.remove(this.key.apply(player));
+        if (o != null) {
+            o.session.end(CloseReason.REPLACED);
         }
     }
 

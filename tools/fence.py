@@ -1,8 +1,7 @@
 """Import fence for common/ (docs/MULTIVERSION.md, slice 5), after MyCompanion's tools/fence.py.
 
-    python tools/fence.py <tree>           check against <tree>/common/fence.tsv and port-fence.tsv
-    python tools/fence.py <tree> --write   rewrite both with today's counts (only after a drop, or
-                                           to add the row of a new variant dir)
+    python tools/fence.py <tree>           check against <tree>/common/fence.tsv
+    python tools/fence.py <tree> --write   rewrite fence.tsv with today's counts (only after a drop)
     ./gradlew :common:fence                    the same check, also run by :common:check
 
 Counts, per file under common/src/main/java/dev/dryaides/minuit, the distinct Minecraft names it
@@ -14,8 +13,8 @@ Fails if a file goes over its row or a file with no row has any Minecraft name.
 src/main stays Java 17 source, because common compiles at Java 25 in this build: no Math.clamp,
 getFirst/getLast/removeFirst/removeLast, guarded or record patterns in case, unnamed _.
 
-Variant dirs (common/port-fence.tsv): one row per common/src/port<dir> with its code line count,
-which only goes down. Fails when a variant file names no Minecraft type, when two version dirs of
+Variant dirs (common/src/port<dir>/java): fails when a variant file names no Minecraft type (except a
+main_overrides stand-in), when two version dirs of
 one generation (port_dirs in gradle/versions/*.properties) hold a file with the same code, or when
 a class sits in both the generation dir and a version dir of one port_dirs list.
 """
@@ -115,9 +114,17 @@ def code_lines(text):
 def port_check(tree):
     dirs = variant_files(tree)
     bad = []
+    # A version dir's stand-in for a src/main class (main_overrides) may name no Minecraft type.
+    overrides = set()
+    vdir = os.path.join(tree, 'gradle', 'versions')
+    for f in os.listdir(vdir):
+        with open(os.path.join(vdir, f), encoding='utf-8') as h:
+            for line in h:
+                if line.startswith('main_overrides='):
+                    overrides.update(x.strip() for x in line.split('=', 1)[1].split(',') if x.strip())
     for d, files in dirs.items():
         for rel, text in sorted(files.items()):
-            if not IMPORT.search(text) and not FQN.search(NOT_CODE.sub(' ', text)):
+            if rel not in overrides and not IMPORT.search(text) and not FQN.search(NOT_CODE.sub(' ', text)):
                 bad.append(f'port{d}/{rel}: names no Minecraft type, belongs in core or src/main')
     gens = {}
     for lst in port_lists(tree):
@@ -136,36 +143,12 @@ def port_check(tree):
     return bad, lines
 
 
-def port_fence(tree, write):
-    tsv = os.path.join(tree, 'common', 'port-fence.tsv')
+def port_fence(tree):
     bad, now = port_check(tree)
-    allowed = {}
-    if os.path.exists(tsv):
-        with open(tsv, encoding='utf-8') as h:
-            for line in h:
-                if line.strip() and not line.startswith('#'):
-                    k, v = line.rstrip('\n').split('\t')
-                    allowed[k] = int(v)
-    for k, n in sorted(now.items()):
-        if k in allowed and n > allowed[k]:
-            bad.append(f'port{k}: {n} code lines, allowed {allowed[k]}')
     for b in bad:
         print(f'port-fence: {b}')
-    if write and not bad:
-        with open(tsv, 'w', encoding='utf-8', newline='\n') as h:
-            h.write('# variant dir (common/src/port<dir>/java)\tallowed code lines; only goes down\n')
-            for k in sorted(now):
-                h.write(f'{k}\t{now[k]}\n')
-        print(f'port-fence: wrote {len(now)} dirs, {sum(now.values())} lines')
-        return 0
-    for k in sorted(now):
-        print(f'port-fence: port{k}\t{now[k]}\t' + (f'allowed {allowed[k]}' if k in allowed else 'no row'))
-    new = sorted(k for k in now if k not in allowed)
-    if new:
-        print(f'port-fence: no row for {", ".join(new)} (a first --write adds it)')
-    fail = bad or new
-    print('port-fence: ' + ('FAIL' if fail else 'ok'))
-    return 1 if fail else 0
+    print(f'port-fence: {len(now)} dirs, {sum(now.values())} code lines, ' + ('FAIL' if bad else 'ok'))
+    return 1 if bad else 0
 
 
 def main():
@@ -178,7 +161,7 @@ def main():
     for b in j17:
         print(f'java17: {b}')
     print(f'java17: {len(j17)} problems in common/src/main' + (' FAIL' if j17 else ' ok'))
-    port = port_fence(tree, write)
+    port = port_fence(tree)
     tsv = os.path.join(tree, 'common', 'fence.tsv')
     now = counts(tree)
     if write:

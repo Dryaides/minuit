@@ -6,8 +6,9 @@ import java.util.function.Consumer;
 
 /**
  * An entity in a well, turned by a drag: 1 px across is 2 degrees of yaw, 1 px up or down a degree of
- * pitch; Left and Right turn it 15 degrees. Where the renderer draws no entity (bench, site, title
- * screen) a cube stands in, its faces following the same angles.
+ * pitch; Left and Right turn it 15 degrees. Without the game (bench, site) the player and the pig are
+ * drawn from their textures by {@link EntitySketch}; where neither can draw the entity, a cube stands in,
+ * its faces following the same angles.
  */
 public class EntityPreviewComponent extends BaseComponent {
 
@@ -65,7 +66,7 @@ public class EntityPreviewComponent extends BaseComponent {
         if (this.followMouse) {
             float cx = this.x + this.w / 2F;
             float cy = this.y + this.h / 2F;
-            yaw = 180F + (float) Math.toDegrees(Math.atan((mx - cx) / 40F)) * 0.7F;
+            yaw = 180F + (float) Math.toDegrees(Math.atan((cx - mx) / 40F)) * 0.7F;
             pitch = Maths.clamp((float) Math.toDegrees(Math.atan((cy - my) / 40F)) * 0.35F, -30F, 30F);
         }
         if (this.view != null && d.entity(this.view, this.x + 1, this.y + 1, this.x + this.w - 1, this.y + this.h - 1, yaw, pitch)) {
@@ -116,7 +117,7 @@ public class EntityPreviewComponent extends BaseComponent {
         if (!this.dragging) {
             return false;
         }
-        turn((float) dx * DRAG_YAW_DEGREES, (float) dy * DRAG_PITCH_DEGREES);
+        turn((float) -dx * DRAG_YAW_DEGREES, (float) dy * DRAG_PITCH_DEGREES);
         return true;
     }
 

@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,14 +14,14 @@ class GlideTest {
 
     @AfterEach
     void restore() {
-        BaseComponent.clock = System::currentTimeMillis;
-        BaseComponent.reducedMotion = false;
+        HostState.clock(System::currentTimeMillis);
+        HostState.reducedMotion(false);
     }
 
     /** A drawer that opens starts a full distance away and lands exactly at its place after the duration. */
     @Test
     void startsAwayAndLandsAtItsPlace() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         Glide rows = new Glide(Slide.DOWN, 170);
         rows.replay();
         assertEquals(58F, rows.offsetY(58), 1e-4);
@@ -32,7 +33,7 @@ class GlideTest {
     /** The owner's case: the drawer folds while it unfolds; the rows turn back from where they are, no jump, and get home in the time spent. */
     @Test
     void turningBackMidWayDoesNotJump() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         Glide rows = new Glide(Slide.DOWN, 170);
         rows.snap(false);
         rows.show();
@@ -49,8 +50,8 @@ class GlideTest {
     /** A player with reduced motion sees the end state on the first frame. */
     @Test
     void reducedMotionGivesTheTargetAtOnce() {
-        BaseComponent.clock = () -> this.now;
-        BaseComponent.reducedMotion = true;
+        HostState.clock(() -> this.now);
+        HostState.reducedMotion(true);
         Glide rows = new Glide(Slide.DOWN, 170);
         rows.replay();
         assertEquals(0F, rows.offsetY(58), 1e-4);

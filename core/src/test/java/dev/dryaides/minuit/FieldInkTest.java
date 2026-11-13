@@ -23,7 +23,7 @@ class FieldInkTest {
      */
     @Test
     void fieldTextIsLightAndReadsInEveryChroma() {
-        for (String famId : List.of("bedrock", "slate", "glass", "bubbly", "soft")) {
+        for (String famId : List.of("bedrock", "slate", "bubbly", "soft")) {
             ThemeFamily fam = Themes.family("minuit", famId);
             for (ThemeFamily.Chroma chroma : fam.chromas()) {
                 for (ThemeChoice.Variant v : List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK)) {

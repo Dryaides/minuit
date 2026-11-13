@@ -10,7 +10,7 @@ final class SurfaceLook {
     private SurfaceLook() {
     }
 
-    /** A see-through family (glass) would show what is beneath through the words: hide it first. */
+    /** A see-through palette (the glass mode) would show what is beneath through the words: hide it first. */
     static void backing(Draw d, Theme t, int x, int y, int w, int h) {
         int surface = t.palette().surface();
         if (surface >>> 24 == 0xFF) {
@@ -59,8 +59,8 @@ final class SurfaceLook {
             if (!moving) {
                 return to;
             }
-            float t = (BaseComponent.clock.getAsLong() - start) / (float) ms;
-            if (t >= 1F || BaseComponent.reducedMotion) {
+            float t = (BaseComponent.clock().getAsLong() - start) / (float) ms;
+            if (t >= 1F || BaseComponent.reducedMotion()) {
                 moving = false;
                 return to;
             }
@@ -74,12 +74,12 @@ final class SurfaceLook {
             }
             from = value();
             to = target;
-            if (from == to || BaseComponent.reducedMotion) {
+            if (from == to || BaseComponent.reducedMotion()) {
                 moving = false;
                 from = to;
                 return;
             }
-            start = BaseComponent.clock.getAsLong();
+            start = BaseComponent.clock().getAsLong();
             moving = true;
         }
 

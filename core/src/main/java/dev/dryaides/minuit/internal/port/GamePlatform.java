@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.internal.port;
 
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.BaseComponent;
 import dev.dryaides.minuit.HeldKeys;
 import dev.dryaides.minuit.ItemLookup;
@@ -50,11 +51,11 @@ public interface GamePlatform {
     }
 
     default UiSound sound() {
-        return BaseComponent.sound;
+        return BaseComponent.sound();
     }
 
     default HeldKeys keys() {
-        return BaseComponent.keys;
+        return BaseComponent.heldKeys();
     }
 
     default TextFieldComponent.Clipboard clipboard() {
@@ -62,7 +63,7 @@ public interface GamePlatform {
     }
 
     default RichTextComponent.LinkOpener links() {
-        return RichTextComponent.links;
+        return HostState.links();
     }
 
     default ToIntFunction<String> font() {

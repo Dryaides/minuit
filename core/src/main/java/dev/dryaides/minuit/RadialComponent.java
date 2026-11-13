@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import dev.dryaides.minuit.internal.RadialMath;
 
 import java.util.ArrayList;
@@ -38,9 +39,12 @@ public final class RadialComponent<T> extends BaseComponent {
     private static final long TAP_MS = 150;
     private static final long SLIDE_MS = 160;
     private static final int CARD_W = 52;
-    private static final int CARD_H = 14;
+    /** The family's button height, read from the theme at each frame so hover and drawing agree. */
+    private int cardH = 20;
     private static final int GAP = 2;
     private static final int LIFT = 3;
+    /** How far a resting sector's face stands from the surface: 1.15:1, the step a light chroma's plates take. */
+    private static final double REST_CONTRAST = 1.15D;
 
     private final int radius;
     private final int slotW;
@@ -96,7 +100,7 @@ public final class RadialComponent<T> extends BaseComponent {
 
     /** Starts a new gesture: the tap guard counts from now. */
     public void open() {
-        this.openedAt = BaseComponent.clock.getAsLong();
+        this.openedAt = BaseComponent.clock().getAsLong();
         this.closed = false;
         this.selected = -1;
     }
@@ -143,7 +147,7 @@ public final class RadialComponent<T> extends BaseComponent {
     private Box card(int side) {
         int reach = outer() + LIFT + 8;
         int left = side == 0 ? cx() - reach - CARD_W : cx() + reach;
-        return new Box("card", left, cy() - CARD_H / 2, CARD_W, CARD_H);
+        return new Box("card", left, cy() - this.cardH / 2, CARD_W, this.cardH);
     }
 
     private void aim(int mx, int my) {
@@ -176,8 +180,8 @@ public final class RadialComponent<T> extends BaseComponent {
         this.page = RadialMath.pageStep(this.page, -dir, this.pages.size());
         this.selected = -1;
         this.slideDir = dir;
-        this.slideStart = BaseComponent.clock.getAsLong();
-        BaseComponent.sound.tap();
+        this.slideStart = BaseComponent.clock().getAsLong();
+        BaseComponent.sound().tap();
         this.onPage.accept(this.page);
     }
 
@@ -197,6 +201,7 @@ public final class RadialComponent<T> extends BaseComponent {
 
     @Override
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
+        this.cardH = theme.frame().buttonHeight();
         aim(mx, my);
         Palette p = theme.palette();
         if (this.dim) {
@@ -220,10 +225,12 @@ public final class RadialComponent<T> extends BaseComponent {
         if (this.pages.size() > 1) {
             for (int side = 0; side < 2; side++) {
                 Box card = card(side);
-                theme.frame().raised(d, p, card.x(), card.y(), card.w(), card.h(),
-                        side == this.hoveredCard ? p.raisedHover() : p.raised(), true);
+                theme.frame().button(d, p, card.x(), card.y(), card.w(), card.h(), null,
+                        side == this.hoveredCard ? p.raisedHover() : p.raised(), Shapes.Relief.RAISED);
                 Page<T> other = this.pages.get(Math.floorMod(this.page + (side == 0 ? -1 : 1), this.pages.size()));
-                d.textIn(other.title(), new Box("card", card.x() + 3, card.y(), card.w() - 6, card.h()), p.raisedText());
+                int fit = Math.min(d.width(other.title()), card.w() - 6);
+                d.textIn(other.title(), new Box("card", card.x() + (card.w() - fit) / 2, card.y(), card.w() - 6, card.h()),
+                        Shapes.textFor(p, p.raisedText(), side == this.hoveredCard ? p.raisedHover() : p.raised()));
             }
         }
         if (this.keyDown != null && !this.closed && !this.keyDown.getAsBoolean()) {
@@ -231,7 +238,10 @@ public final class RadialComponent<T> extends BaseComponent {
         }
     }
 
-    /** The sectors: resting faces {@code surface}, the aimed one {@code primary} over its shadow. */
+    /**
+     * The sectors: resting faces {@code surface} stepped toward the text until they reach {@link #REST_CONTRAST}
+     * against it, so they show on the panel they sit on; the aimed one {@code primary} over its shadow.
+     */
     private void ring(Draw d, Palette p, int n) {
         long key = ((long) n << 48) ^ ((long) (this.selected + 1) << 40) ^ ((long) cx() << 20) ^ cy();
         if (key != this.runsKey) {
@@ -254,9 +264,13 @@ public final class RadialComponent<T> extends BaseComponent {
                 }
             }
         }
+        int rest = p.surface() | 0xFF000000;
+        for (float t = 0.04F; Shapes.contrast(rest, p.surface() | 0xFF000000) < REST_CONTRAST && t <= 1F; t += 0.04F) {
+            rest = Shapes.mix(p.surface() | 0xFF000000, p.text() | 0xFF000000, t);
+        }
         for (int[] run : this.runs) {
             boolean hot = run[3] / 4 == this.selected;
-            int face = hot ? p.primary() : p.surface();
+            int face = hot ? p.primary() : rest;
             int color = switch (run[3] % 4) {
                 case RadialMath.SHADOW -> p.shadow();
                 case RadialMath.EDGE -> hot ? Shapes.bevelDark(face) : p.surfaceEdge();
@@ -297,7 +311,10 @@ public final class RadialComponent<T> extends BaseComponent {
         int stripY = cy() - outer() - LIFT - 16;
         int bandW = titleW + 40;
         theme.frame().section(d, p, cx() - bandW / 2, stripY - 3, bandW, STRIP_H);
-        float k = BaseComponent.reducedMotion ? 1F : RadialMath.slide(this.slideStart, BaseComponent.clock.getAsLong(), SLIDE_MS);
+        float k = BaseComponent.reducedMotion() ? 1F : RadialMath.slide(this.slideStart, Redraw.quietClock(), SLIDE_MS);
+        if (k < 1F) {
+            Redraw.ask();
+        }
         int shift = this.slideDir == 0 ? 0 : Math.round(this.slideDir * (1F - k) * (titleW / 2F + 40));
         if (k >= 1F) {
             this.slideDir = 0;
@@ -317,7 +334,7 @@ public final class RadialComponent<T> extends BaseComponent {
             return;
         }
         if (this.selected < 0 && this.hoveredCard < 0
-                && BaseComponent.clock.getAsLong() - this.openedAt < TAP_MS) {
+                && BaseComponent.clock().getAsLong() - this.openedAt < TAP_MS) {
             this.closed = true;
             this.onCancel.run();
             return;
@@ -343,6 +360,27 @@ public final class RadialComponent<T> extends BaseComponent {
             releaseOrTap();
         }
         return true;
+    }
+
+    /**
+     * Turns one page, +1 to the next and -1 to the previous, as a wheel notch does: for a mod that pages a held
+     * wheel with its own keys. False when the wheel is closed or has one page.
+     */
+    public boolean turnPage(int dir) {
+        if ((this.closed && this.keyDown != null) || this.pages.size() <= 1 || dir == 0) {
+            return false;
+        }
+        turn(dir > 0 ? 1 : -1);
+        return true;
+    }
+
+    /** Left and right turn the page while the wheel has the keyboard. */
+    @Override
+    public boolean keyPressed(InputKey key, boolean shift) {
+        if (key == InputKey.LEFT || key == InputKey.RIGHT) {
+            return turnPage(key == InputKey.RIGHT ? 1 : -1);
+        }
+        return false;
     }
 
     @Override

@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -60,6 +61,7 @@ public final class HoverCardDemo implements Demo {
             Rig r = new Rig(s, near(8, 8));
             r.card.onOpen(() -> opened[0]++);
             r.rest();
+            s.keepHeight();
             inside(r.card, W, H);
         });
 
@@ -90,16 +92,16 @@ public final class HoverCardDemo implements Demo {
         });
 
         stage.state("reduced motion keeps the delay, not the glide", W, H, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             Rig r = new Rig(s, near(8, 8));
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
                 s.move(12, 12);
                 s.waitMs(300);
                 s.waitMs(120);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

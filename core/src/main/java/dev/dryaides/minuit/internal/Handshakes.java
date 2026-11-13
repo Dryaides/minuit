@@ -28,7 +28,7 @@ public final class Handshakes {
     public static byte[] clientHello() {
         byte[] now = ownHello;
         if (now == null) {
-            now = new Hello(Hello.PROTOCOL, version(), List.of(Caps.HELLO_1, Caps.FORM_1)).encode();
+            now = new Hello(Hello.PROTOCOL, version(), List.of(Caps.HELLO_1, Caps.FORM_1, Caps.FORM_SHOP)).encode();
             ownHello = now;
         }
         return now;

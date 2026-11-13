@@ -218,10 +218,10 @@ public final class ColorPickerComponent extends BaseComponent {
     }
 
     private static void checker(Draw d, int x0, int y0, int x1, int y1) {
+        d.fill(x0, y0, x1, y1, 0xFF888888);
         for (int yy = y0; yy < y1; yy += 4) {
-            for (int xx = x0; xx < x1; xx += 4) {
-                boolean light = ((xx - x0) / 4 + (yy - y0) / 4) % 2 == 0;
-                d.fill(xx, yy, Math.min(xx + 4, x1), Math.min(yy + 4, y1), light ? 0xFFCCCCCC : 0xFF888888);
+            for (int xx = x0 + ((yy - y0) / 4 % 2) * 4; xx < x1; xx += 8) {
+                d.fill(xx, yy, Math.min(xx + 4, x1), Math.min(yy + 4, y1), 0xFFCCCCCC);
             }
         }
     }

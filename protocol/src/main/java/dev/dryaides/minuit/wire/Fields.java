@@ -53,6 +53,30 @@ public final class Fields {
     /** {@code dropdown}: varint count, then each Text. */
     public static final int OPTIONS = 17;
 
+    /** {@code product}: varlong, the full price. */
+    public static final int PRICE = 16;
+    /** {@code product}: varlong, the price while on sale; absent when not on sale. */
+    public static final int SALE = 18;
+    /** {@code product}: svarint, how many are left; -1 or absent when there is no limit. */
+    public static final int STOCK = 19;
+    /** {@code product}: str, the tab or filter it belongs to. */
+    public static final int CATEGORY = 20;
+    /** {@code product} as a cart line: varint, how many the player wants. The value a client sends back. */
+    public static final int QUANTITY = 21;
+    /** {@code cart}: varint, checkouts the server accepted; the client shows a purchase toast when it grows. */
+    public static final int PURCHASES = 16;
+    /** {@code cart}: varint, checkouts the server refused; the client shows {@link #REASON} when it grows. */
+    public static final int REFUSALS = 17;
+    /** {@code cart}: text, why the last checkout was refused; empty once the cart moves on. */
+    public static final int REASON = 18;
+    /** {@code balance}: varlong, what the player has. */
+    public static final int AMOUNT = 16;
+
+    /** The tag of the value a node of {@code kind} sends back: {@link #QUANTITY} for a product, else {@link #VALUE}. */
+    public static int valueTag(String kind) {
+        return kind.equals("product") ? QUANTITY : VALUE;
+    }
+
     private Fields() {
     }
 
@@ -72,6 +96,15 @@ public final class Fields {
     public static int readVarint(byte[] value) {
         ByteReader in = new ByteReader(value);
         return end(in, in.varint());
+    }
+
+    public static byte[] varlong(long value) {
+        return new ByteWriter().varlong(value).toBytes();
+    }
+
+    public static long readVarlong(byte[] value) {
+        ByteReader in = new ByteReader(value);
+        return end(in, in.varlong());
     }
 
     public static byte[] svarint(int value) {

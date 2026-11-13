@@ -7,10 +7,13 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import dev.dryaides.minuit.FrameStyle;
 import dev.dryaides.minuit.FrameStyles;
+import dev.dryaides.minuit.GlassPalette;
 import dev.dryaides.minuit.Palette;
+import dev.dryaides.minuit.ScreenBackground;
 import dev.dryaides.minuit.TextMeasure;
 import dev.dryaides.minuit.ThemeChoice;
 import dev.dryaides.minuit.ThemeFamily;
+import dev.dryaides.minuit.TextMeasure;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -48,6 +52,7 @@ public final class ThemeFiles {
     private static final Map<Palette, int[]> SERIES_OF = new java.util.concurrent.ConcurrentHashMap<>();
     private static final String PALETTES = "palettes";
     private static final String ACCENTS = "accents";
+    private static final String BACKGROUNDS = "backgrounds";
     private static volatile Map<String, int[]> seriesPalettes = Map.of();
     private static final String FAMILY_FILE = "family.json";
     private static final int DEFAULT_ORDER = 100;
@@ -84,9 +89,10 @@ public final class ThemeFiles {
      * @param privateOnly true when only the theme page of the namespace's mod offers it
      * @param chromas     the shared chromas it recommends, in order
      * @param override    the roles it draws its own way in every chroma, by variant
+     * @param sprites     the parts it draws from PNGs, or null
      */
     public record FamilyFile(FrameStyle style, int order, boolean privateOnly, List<String> chromas,
-                             Map<ThemeChoice.Variant, List<Override>> override) {
+                             Map<ThemeChoice.Variant, List<Override>> override, ImageFamily.Sheet sprites) {
     }
 
     /** One role of {@link Palette}, by index, that a family replaces, or whose alpha alone it sets. */
@@ -125,10 +131,11 @@ public final class ThemeFiles {
                 chromas.add(id.getAsString().trim().toLowerCase(Locale.ROOT));
             }
         }
-        return new FamilyFile(style, order(root), privateOnly, chromas, override(root.get("override")));
+        ImageFamily.Sheet sprites = root.has("sprites") ? ImageFamily.parse(root.get("sprites")) : null;
+        return new FamilyFile(style, order(root), privateOnly, chromas, override(root.get("override")), sprites);
     }
 
-    /** {@code "override": {"light": {"surface": "#9E", "trim": "#FFD9B26A"}}}: an alpha alone, or a colour. */
+    /** {@code "override": {"light": {"surface": "#9E", "trim": "#FFD9B26A"}}}: an alpha alone, or a colour; light, dark or glass. */
     private static Map<ThemeChoice.Variant, List<Override>> override(JsonElement element) throws BadFile {
         Map<ThemeChoice.Variant, List<Override>> out = new EnumMap<>(ThemeChoice.Variant.class);
         if (element == null) {
@@ -143,7 +150,8 @@ public final class ThemeFiles {
             ThemeChoice.Variant variant = switch (half.getKey()) {
                 case "light" -> ThemeChoice.Variant.LIGHT;
                 case "dark" -> ThemeChoice.Variant.DARK;
-                default -> throw new BadFile(where, "unknown variant, use light or dark");
+                case "glass" -> ThemeChoice.Variant.GLASS;
+                default -> throw new BadFile(where, "unknown variant, use light, dark or glass");
             };
             if (!half.getValue().isJsonObject()) {
                 throw new BadFile(where, "not an object");
@@ -188,7 +196,10 @@ public final class ThemeFiles {
         return new ChromaFile(order(root), light, dark);
     }
 
-    /** The 30 roles of {@link Palette}, every one required, by their record names. */
+    /** Roles a chroma may leave out; they stay 0, which {@link Palette} reads as its fallback. */
+    private static final Set<String> OPTIONAL = Set.of("link", "backdrop", "line", "mark", "slot");
+
+    /** The roles of {@link Palette} by their record names, every one required but {@link #OPTIONAL}. */
     public static Palette palette(JsonElement element, String where) throws BadFile {
         if (!element.isJsonObject()) {
             throw new BadFile(where, "not an object");
@@ -205,6 +216,9 @@ public final class ThemeFiles {
             String field = where + "." + Roles.ALL[i].getName();
             JsonElement value = o.get(Roles.ALL[i].getName());
             if (value == null) {
+                if (OPTIONAL.contains(Roles.ALL[i].getName())) {
+                    continue;
+                }
                 throw new BadFile(field, "missing");
             }
             colours[i] = colour(value, field);
@@ -344,7 +358,7 @@ public final class ThemeFiles {
     }
 
     /** A chroma file as read, before a family draws it. */
-    private record Found(String id, String nameKey, ChromaFile file) {
+    private record Found(String id, String nameKey, ChromaFile file, boolean official) {
     }
 
     /**
@@ -360,17 +374,22 @@ public final class ThemeFiles {
         Map<String, int[]> palettes = new LinkedHashMap<>();
         Map<String, Accent> accents = new LinkedHashMap<>();
         Map<String, Integer> accentOrder = new LinkedHashMap<>();
+        Map<String, ScreenBackground> backgrounds = new LinkedHashMap<>();
         for (Entry entry : entries) {
             String[] parts = entry.path().toLowerCase(Locale.ROOT).split("/");
             try {
                 if (parts.length == 2 && parts[0].equals(CHROMAS) && parts[1].endsWith(".json")) {
                     String id = stem(parts[1]);
-                    shared.put(id, new Found(id, "minuit.chroma." + id, chroma(entry.text())));
+                    shared.put(id, new Found(id, "minuit.chroma." + id, chroma(entry.text()),
+                            entry.namespace().equals("minuit")));
                 } else if (parts.length == 2 && parts[0].equals(ACCENTS) && parts[1].endsWith(".json")) {
                     String id = stem(parts[1]);
                     JsonObject root = object(entry.text());
                     accents.put(id, accent(id, root));
                     accentOrder.put(id, order(root));
+                } else if (parts.length == 2 && parts[0].equals(BACKGROUNDS) && parts[1].endsWith(".json")) {
+                    String id = stem(parts[1]);
+                    backgrounds.put(id, background(id, object(entry.text())));
                 } else if (parts.length == 2 && parts[0].equals(PALETTES) && parts[1].endsWith(".json")) {
                     palettes.put(entry.namespace() + ":" + stem(parts[1]), seriesPaletteFile(entry.text()));
                 } else if (parts.length == 3 && parts[0].equals(THEMES) && parts[2].equals(FAMILY_FILE)) {
@@ -379,16 +398,18 @@ public final class ThemeFiles {
                 } else if (parts.length == 3 && parts[0].equals(THEMES) && parts[2].endsWith(".json")) {
                     String id = stem(parts[2]);
                     local.computeIfAbsent(parts[1], k -> new LinkedHashMap<>())
-                            .put(id, new Found(id, "minuit.chroma." + parts[1] + "." + id, chroma(entry.text())));
+                            .put(id, new Found(id, "minuit.chroma." + parts[1] + "." + id, chroma(entry.text()),
+                                    entry.namespace().equals("minuit")));
                 } else {
                     log.accept("minuit theme file " + entry.source()
-                            + " skipped: not at chromas/<chroma>.json, accents/<id>.json, palettes/<id>.json or themes/<family>/<file>.json");
+                            + " skipped: not at chromas/<chroma>.json, accents/<id>.json, backgrounds/<id>.json, palettes/<id>.json or themes/<family>/<file>.json");
                 }
             } catch (BadFile e) {
                 log.accept("minuit theme file " + entry.source() + " skipped: " + e.getMessage());
             }
         }
         seriesPalettes = Map.copyOf(palettes);
+        ScreenBackground.load(List.copyOf(backgrounds.values()));
         if (!accents.isEmpty()) {
             Accent.load(accents.values().stream()
                     .sorted(Comparator.comparingInt((Accent a) -> accentOrder.get(a.id())).thenComparing(Accent::id))
@@ -418,8 +439,11 @@ public final class ThemeFiles {
                 return;
             }
             String owner = file.privateOnly() ? owners.get(id) : null;
-            out.add(new Ordered(file.order(), new ThemeFamily(id, owner, file.style(),
-                    dress(recommended, file), dress(others, file))));
+            FrameStyle style = file.sprites() == null ? file.style() : new ImageFamily(file.style(), file.sprites(),
+                    owners.get(id) + ":" + ROOT + "/" + THEMES + "/" + id + "/" + file.sprites().folder() + "/");
+            out.add(new Ordered(file.order(), new ThemeFamily(id, owner, style,
+                    dress(recommended, file, "minuit".equals(owners.get(id))),
+                    dress(others, file, "minuit".equals(owners.get(id))))));
         });
         local.keySet().stream().filter(id -> !families.containsKey(id)).forEach(id ->
                 log.accept("minuit theme family " + id + " skipped: chroma files but no family.json"));
@@ -429,13 +453,24 @@ public final class ThemeFiles {
                 .toList();
     }
 
-    /** The chromas as {@code family} draws them, its overrides applied. */
-    private static List<ThemeFamily.Chroma> dress(List<Found> chromas, FamilyFile family) {
+    /** The chromas as {@code family} draws them, its overrides applied, each with its glass mode derived once. */
+    private static List<ThemeFamily.Chroma> dress(List<Found> chromas, FamilyFile family, boolean minuitFamily) {
         List<Override> light = family.override().get(ThemeChoice.Variant.LIGHT);
         List<Override> dark = family.override().get(ThemeChoice.Variant.DARK);
+        List<Override> glass = family.override().get(ThemeChoice.Variant.GLASS);
         return chromas.stream()
-                .map(f -> new ThemeFamily.Chroma(f.id(), f.nameKey(),
-                        apply(f.file().light(), light), apply(f.file().dark(), dark)))
+                .map(f -> {
+                    Palette l = apply(f.file().light(), light);
+                    Palette d = apply(f.file().dark(), dark);
+                    Palette g = apply(GlassPalette.of(d != null ? d : l), glass);
+                    DarkTwin.pair(l, d);
+                    if (f.official() && minuitFamily) {
+                        OfficialPalettes.mark(l);
+                        OfficialPalettes.mark(d);
+                        OfficialPalettes.mark(g);
+                    }
+                    return new ThemeFamily.Chroma(f.id(), f.nameKey(), l, d, g);
+                })
                 .toList();
     }
 
@@ -455,6 +490,7 @@ public final class ThemeFiles {
                 .toList();
         Themes.load(assemble(entries, warn));
         TextMeasure.fontChanged();
+        ImageFamily.reloaded();
         return "minuit: " + Themes.families(null).size() + " theme families from " + entries.size() + " files";
     }
 
@@ -481,13 +517,52 @@ public final class ThemeFiles {
             ChromaFile file = chroma(new String(in.readAllBytes(), StandardCharsets.UTF_8));
             Palette half = variant == ThemeChoice.Variant.DARK
                     || (variant == ThemeChoice.Variant.AUTO && file.dark() != null) ? file.dark() : file.light();
+            if (variant == ThemeChoice.Variant.GLASS) {
+                return OfficialPalettes.mark(GlassPalette.of(file.dark() != null ? file.dark() : file.light()));
+            }
             if (half == null) {
                 throw new IllegalStateException("minuit built-in theme file " + path + " has no " + variant.id());
             }
-            return half;
+            return OfficialPalettes.mark(half);
         } catch (IOException | BadFile e) {
             throw new IllegalStateException("minuit built-in theme file " + path + ": " + e.getMessage(), e);
         }
+    }
+
+    /** One background file: a tile texture, see {@link ScreenBackground}. */
+    private static ScreenBackground background(String id, JsonObject root) throws BadFile {
+        for (String key : root.keySet()) {
+            if (!Set.of("texture", "size", "scale", "tint", "order").contains(key)) {
+                throw new BadFile(key, "unknown field, use texture, size, scale, tint and order");
+            }
+        }
+        String texture = string(root, "texture");
+        int size = number(root, "size", 16);
+        int scale = number(root, "scale", 2);
+        if (size < 1 || size > 512 || scale < 1 || scale > 8) {
+            throw new BadFile("size", "size 1 to 512 and scale 1 to 8");
+        }
+        JsonElement tint = root.get("tint");
+        float strength = 0.6F;
+        if (tint != null) {
+            if (!tint.isJsonPrimitive() || !tint.getAsJsonPrimitive().isNumber()) {
+                throw new BadFile("tint", "not a number");
+            }
+            strength = Math.max(0F, Math.min(1F, tint.getAsFloat()));
+        }
+        return new ScreenBackground(id, "minuit.background." + id, order(root),
+                ScreenBackground.tile(texture, size, scale, strength));
+    }
+
+    private static int number(JsonObject o, String key, int fallback) throws BadFile {
+        JsonElement value = o.get(key);
+        if (value == null) {
+            return fallback;
+        }
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+            throw new BadFile(key, "not a number");
+        }
+        return value.getAsInt();
     }
 
     private static JsonObject object(String text) throws BadFile {

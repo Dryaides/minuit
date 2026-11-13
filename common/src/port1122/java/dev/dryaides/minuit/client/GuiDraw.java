@@ -233,6 +233,28 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
+    protected void shaded(int x0, int y0, int x1, int y1, int topLeft, int topRight, int bottomLeft,
+                          int bottomRight) {
+        GlStateManager.disableTexture2D();
+        GlStateManager.shadeModel(GL11.GL_SMOOTH);
+        translucent(() -> {
+            BufferBuilder buffer = Tessellator.getInstance().getBuffer();
+            buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR);
+            corner(buffer, x0, y1, bottomLeft);
+            corner(buffer, x1, y1, bottomRight);
+            corner(buffer, x1, y0, topRight);
+            corner(buffer, x0, y0, topLeft);
+            Tessellator.getInstance().draw();
+        });
+        GlStateManager.shadeModel(GL11.GL_FLAT);
+        GlStateManager.enableTexture2D();
+    }
+
+    private static void corner(BufferBuilder buffer, int x, int y, int argb) {
+        buffer.pos(x, y, 0D).color(argb >> 16 & 0xFF, argb >> 8 & 0xFF, argb & 0xFF, argb >>> 24).endVertex();
+    }
+
+    @Override
     protected void string(String text, int x, int y, int argb) {
         if ((argb & FONT_ALPHA_FLOOR) == 0) {
             return;
@@ -246,7 +268,7 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    protected String cut(String text, int maxWidth) {
+    public String cut(String text, int maxWidth) {
         return this.font.trimStringToWidth(text, maxWidth);
     }
 
@@ -322,14 +344,14 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    public void push(float x, float y, float scale) {
+    protected void pushPose(float x, float y, float scale) {
         GlStateManager.pushMatrix();
         GlStateManager.translate(x, y, 0F);
         GlStateManager.scale(scale, scale, 1F);
     }
 
     @Override
-    public void pop() {
+    protected void popPose() {
         GlStateManager.popMatrix();
     }
 

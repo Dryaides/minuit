@@ -292,7 +292,7 @@ public final class Shapes {
 
     /**
      * {@code preferred} when it reaches 4.5:1 on {@code face}, else {@link #textOn}. A translucent
-     * face (a glass family's plate) is judged as it shows: blended over the palette's surface.
+     * face (a plate in the glass mode) is judged as it shows: blended over the palette's surface.
      */
     public static int textFor(Palette p, int preferred, int face) {
         int alpha = face >>> 24;
@@ -303,13 +303,19 @@ public final class Shapes {
     /**
      * The face of a toggled-on choice: the hover face held, pushed a little further the same way
      * while {@code hover} (0 to 1) is on it. A chroma whose hover face sits too close to the plate
-     * (under 1.3:1) gets a face stepped from the plate toward the text until it reaches that, so a
-     * selected tab or segment never reads as an idle one.
+     * (under 1.3:1) gets a face stepped from the plate toward the text until it reaches that against
+     * both the plate and the hover face, so a selected tab or segment never reads as an idle or a
+     * hovered one.
      */
+    /** The least contrast between a face and the plate it stands for, so a chosen or lit face reads as another state. */
+    static final double FACE_STEP = 1.3;
+
     public static int selectedFace(Palette p, float hover) {
         int off = p.raised() | 0xFF000000;
-        int on = p.raisedHover() | 0xFF000000;
-        for (float t = 0.05F; contrast(on, off) < 1.3 && t <= 1F; t += 0.05F) {
+        int lit = p.raisedHover() | 0xFF000000;
+        int on = lit;
+        boolean close = contrast(lit, off) < FACE_STEP;
+        for (float t = 0.05F; close && (contrast(on, off) < FACE_STEP || contrast(on, lit) < FACE_STEP) && t <= 1F; t += 0.05F) {
             on = mix(off, p.text() | 0xFF000000, t);
         }
         on = (on & 0xFFFFFF) | (p.raisedHover() & 0xFF000000);

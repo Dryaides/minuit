@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -202,12 +203,12 @@ public final class OtpInputDemo implements Demo {
         stage.state("reduced motion keeps the caret", W, H, s -> {
             OtpInputComponent o = six(s);
             s.focus(o);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.waitMs(700);
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("narrow box falls back to text", W, H, s -> {

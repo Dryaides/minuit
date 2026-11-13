@@ -18,8 +18,12 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
     private final ItemView[] items;
     private final long[] counts;
     private final boolean[] marks;
+    private final boolean[] dragged;
     private BiConsumer<Integer, Integer> onClick;
+    private BiConsumer<Integer, Integer> onPress;
     private BiPredicate<Integer, ItemView> onDrop;
+    private boolean keys;
+    private BiPredicate<Integer, Boolean> menuKey;
     private int cursor;
     private int tipCell = -1;
     private final int pitch;
@@ -48,6 +52,7 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
         this.items = new ItemView[rows * cols];
         this.counts = new long[rows * cols];
         this.marks = new boolean[rows * cols];
+        this.dragged = new boolean[rows * cols];
     }
 
     /** Display mode: the items in reading order, null for an empty cell; cells past the list empty. */
@@ -76,9 +81,47 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
         return this;
     }
 
+    /**
+     * Display mode: a mouse press on a cell goes here instead of {@link #onClick}, for a host that plays the
+     * whole gesture (press, drag, release); Enter on the cursor still clicks.
+     */
+    public SlotGridComponent onPress(BiConsumer<Integer, Integer> indexAndButton) {
+        this.onPress = indexAndButton;
+        return this;
+    }
+
     /** Display mode: takes an item handed in from outside the kit on a cell; the test says whether it took it. */
     public SlotGridComponent onDrop(BiPredicate<Integer, ItemView> indexAndItem) {
         this.onDrop = indexAndItem;
+        return this;
+    }
+
+    /**
+     * Over menu slots: the grid becomes a keyboard and controller stop. The arrows move the cell cursor,
+     * Enter or Space is a left click on the menu slot under it and Shift+Enter a quick move, sent by the
+     * container screen as the mouse would. Off by default.
+     */
+    public SlotGridComponent keys(boolean on) {
+        this.keys = on;
+        return this;
+    }
+
+    /**
+     * Set by the container screen: what Enter ({@code false}) or Shift+Enter ({@code true}) does on a cell
+     * while the grid holds the menu; true when the screen sent a click.
+     */
+    @Incubating
+    public void menuKey(BiPredicate<Integer, Boolean> cellAndQuick) {
+        this.menuKey = cellAndQuick;
+    }
+
+    private boolean menuKeys() {
+        return this.keys && this.menuKey != null && holdsMenu();
+    }
+
+    /** Lights a cell like the hover while a carried stack is dragged over it, as the game lights the drag. */
+    public SlotGridComponent dragged(int index, boolean on) {
+        this.dragged[index] = on;
         return this;
     }
 
@@ -89,7 +132,7 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
 
     /** True over menu slots: nothing shown and nothing to call, so the container screen gives the click to the game. */
     public boolean holdsMenu() {
-        if (this.onClick != null || this.onDrop != null) {
+        if (this.onClick != null || this.onPress != null || this.onDrop != null) {
             return false;
         }
         for (ItemView view : this.items) {
@@ -151,9 +194,9 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
             Box cell = cellBox(i);
             boolean game = this.wells
                     ? SlotComponent.cell(d, theme, cell.x(), cell.y(), this.items[i], this.counts[i], null,
-                            i == over, this.marks[i], mx, my)
+                            i == over || this.dragged[i], i == over, this.marks[i], mx, my)
                     : SlotComponent.items(d, theme, cell.x(), cell.y(), (this.pitch - 16) / 2, this.items[i],
-                            this.counts[i], null, i == over, mx, my);
+                            this.counts[i], null, i == over || this.dragged[i], i == over, mx, my);
             if (game) {
                 this.tipCell = i;
             }
@@ -201,23 +244,53 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         int cell = cellAt(mx, my);
-        if (this.onClick == null || !this.active || cell < 0) {
+        if (this.onClick == null && this.onPress == null || !this.active || cell < 0) {
             return false;
         }
         this.cursor = cell;
-        click();
-        this.onClick.accept(cell, button);
+        (this.onPress != null ? this.onPress : this.onClick).accept(cell, button);
         return true;
     }
 
     @Override
     protected boolean navigable() {
-        return this.onClick != null;
+        return this.onClick != null || menuKeys();
     }
 
     @Override
     protected void enter(boolean forward) {
         this.cursor = forward ? 0 : this.items.length - 1;
+    }
+
+    /**
+     * Down or Up enters on the top or bottom row, in the column under {@code from}'s centre; Right or Left
+     * enters on the first or last column, in the row beside it. A chest grid's bottom row then goes down
+     * to the inventory cell below it, as a pad player expects.
+     */
+    @Override
+    protected void enterFrom(InputKey key, Box from) {
+        int cx = from.x() + from.w() / 2;
+        int cy = from.y() + from.h() / 2;
+        int r;
+        int c;
+        if (key == InputKey.DOWN || key == InputKey.UP) {
+            r = key == InputKey.DOWN ? 0 : this.rows - 1;
+            c = nearest(this.cols, i -> cellBox(i).x() + cellBox(i).w() / 2, cx);
+        } else {
+            c = key == InputKey.RIGHT ? 0 : this.cols - 1;
+            r = nearest(this.rows, i -> cellBox(i * this.cols).y() + cellBox(i * this.cols).h() / 2, cy);
+        }
+        this.cursor = Math.min(r * this.cols + c, this.items.length - 1);
+    }
+
+    private static int nearest(int count, java.util.function.IntUnaryOperator pos, int target) {
+        int best = 0;
+        for (int i = 1; i < count; i++) {
+            if (Math.abs(pos.applyAsInt(i) - target) < Math.abs(pos.applyAsInt(best) - target)) {
+                best = i;
+            }
+        }
+        return best;
     }
 
     /** The arrows move the cursor inside the grid; at an edge the key goes on to the next stop. */
@@ -230,6 +303,14 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
             case RIGHT -> c++;
             case UP -> r--;
             case DOWN -> r++;
+            case ENTER, SPACE -> {
+                if (!shift || !menuKeys() || !this.active) {
+                    return false;
+                }
+                // Shift+Enter where the menu has no quick move must not fall through to activate()'s PICKUP.
+                this.menuKey.test(this.cursor, true);
+                return true;
+            }
             default -> {
                 return false;
             }
@@ -243,10 +324,12 @@ public class SlotGridComponent extends BaseComponent implements ItemSource, Item
 
     @Override
     protected boolean activate() {
+        if (menuKeys() && this.active) {
+            return this.menuKey.test(this.cursor, false);
+        }
         if (this.onClick == null || !this.active) {
             return false;
         }
-        click();
         this.onClick.accept(this.cursor, 0);
         return true;
     }

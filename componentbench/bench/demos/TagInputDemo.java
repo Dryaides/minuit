@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -136,7 +137,7 @@ public final class TagInputDemo implements Demo {
 
         stage.state("chips at rest", W, H, s -> {
             Rig r = new Rig(s);
-            TagInputComponent c = r.with(THREE);
+            TagInputComponent c = r.with(List.of("Stone", "Oak Planks", "Glass"));
             Box a = BenchAccess.chipBox(c, 0);
             Box b = BenchAccess.chipBox(c, 1);
         });
@@ -358,18 +359,18 @@ public final class TagInputDemo implements Demo {
 
         stage.state("duplicate under reduced motion", W, H, s -> {
             Rig r = new Rig(s);
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             TagInputComponent c = r.with(THREE);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
+            s.paint((d, t) -> HostState.reducedMotion(false));
             s.focus(c);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.type("stone");
                 s.key(InputKey.ENTER);
                 s.waitMs(64);
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
@@ -413,18 +414,18 @@ public final class TagInputDemo implements Demo {
 
         stage.state("full under reduced motion", W, H, s -> {
             Rig r = new Rig(s);
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             TagInputComponent c = r.field().maxTags(3);
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
+            s.paint((d, t) -> HostState.reducedMotion(false));
             c.setTags(THREE);
             s.focus(c);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.type("x");
                 s.settle(0);
                 s.waitMs(16);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
@@ -460,7 +461,7 @@ public final class TagInputDemo implements Demo {
         stage.state("invalid look", W, H, s -> {
             Rig r = new Rig(s);
             TagInputComponent c = r.field().validator(t -> t.contains(":") ? null : "Needs a namespace");
-            c.setTags(tags("minecraft:stone", "oak", "mymod:gem"));
+            c.setTags(tags("minecraft:stone", "oak", "minecraft:emerald"));
         });
 
         stage.state("invalid typed stays with the look", W, H, s -> {
@@ -923,17 +924,17 @@ public final class TagInputDemo implements Demo {
 
         stage.state("list opens at once under reduced motion", W, 126, s -> {
             Rig r = new Rig(s);
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             TagInputComponent c = r.field().suggestions(KNOWN);
             s.add(c.popup());
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
+            s.paint((d, t) -> HostState.reducedMotion(false));
             s.focus(c);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.type("st");
                 s.settle(0);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

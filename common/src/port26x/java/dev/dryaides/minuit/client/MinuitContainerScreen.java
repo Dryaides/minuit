@@ -9,7 +9,9 @@ import dev.dryaides.minuit.SlotLayout;
 import dev.dryaides.minuit.SlotPlacement;
 import dev.dryaides.minuit.internal.ContainerLogic;
 import dev.dryaides.minuit.internal.port.Platform;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.CharacterEvent;
@@ -18,7 +20,10 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +38,13 @@ import java.util.List;
  * the inventory key switches to it on the same menu ({@link #toVanilla()}). {@link #drawsBackground()}
  * and {@link #closesOnMovement()} set how it sits over the world.
  *
+ * <p>Over a crafting or furnace menu the kit gives up the recipe book: the screen listens to no recipe
+ * update and draws no recipe book button; the vanilla screen behind {@code toVanilla()} keeps it. A recipe
+ * viewer (JEI, REI, EMI) still fills the craft slots through the menu, hidden or not, and draws its slot
+ * highlights at the slot's vanilla place, not at {@code slotOffsetX/Y} (not tested). Its plugin reads
+ * {@code itemUnderMouse} for its R and U keys, {@code extraAreas} for its exclusion zones and
+ * {@code dropTargets} for items dragged from its list; minuit ships no such plugin.
+ *
  * <p>Client only.
  */
 public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> extends AbstractContainerScreen<M> {
@@ -42,6 +54,7 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
 
     {
         this.host.themeTab(this::showsThemeTab);
+        this.host.viewers(this::showsContainerAddons);
     }
     private final ContainerLogic logic = new ContainerLogic(this.host, new ContainerLogic.MenuView() {
         @Override
@@ -59,6 +72,46 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
             Slot slot = hoveredSlot;
             return slot == null ? null : new SlotLayout.Cell(slot.index,
                     leftPos + slot.x + Math.round(slotOffsetX(slot)), topPos + slot.y + Math.round(slotOffsetY(slot)));
+        }
+
+        @Override
+        public ItemView carried() {
+            return menu.getCarried().isEmpty() ? null : MinuitItems.view(menu.getCarried());
+        }
+
+        @Override
+        public void click(int slot) {
+            slotClicked(menu.slots.get(slot), slot, 0, ContainerInput.PICKUP);
+        }
+
+        @Override
+        public boolean quickMove(int slot) {
+            slotClicked(menu.slots.get(slot), slot, 0, ContainerInput.QUICK_MOVE);
+            return true;
+        }
+
+        @Override
+        public boolean takes(int slot) {
+            Slot s = menu.slots.get(slot);
+            ItemStack c = menu.getCarried();
+            return !c.isEmpty() && s.mayPlace(c) && AbstractContainerMenu.canItemQuickReplace(s, c, false)
+                    && s.getItem().getCount() + c.getCount() <= s.getMaxStackSize(c);
+        }
+
+        @Override
+        public boolean mayPlace(int slot) {
+            return menu.slots.get(slot).mayPlace(menu.getCarried());
+        }
+
+        @Override
+        public void clearCarried() {
+            menu.setCarried(ItemStack.EMPTY);
+        }
+
+        @Override
+        public boolean playerSlot(int slot) {
+            Slot s = menu.slots.get(slot);
+            return s.container instanceof Inventory && s.getContainerSlot() < 36;
         }
     });
 
@@ -91,6 +144,11 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         return false;
     }
 
+    /** The mod's own key that keeps the panel's expandable hotbar unfolded while held; null for none. */
+    protected KeyMapping hotbarHoldKey() {
+        return null;
+    }
+
     /** Shows the vanilla screen of the same menu; the menu stays open and the server sees nothing. */
     public void toVanilla() {
         if (this.vanilla == null || this.minecraft == null) {
@@ -102,20 +160,20 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
     }
 
     /**
-     * Whether the screen draws this menu slot and lets the pointer reach it, read on every frame and
-     * every pointer event. A hidden slot is drawn, hovered and clicked as an inactive one: no item, no
-     * hover, no tooltip, no click, drag or number key. The menu's own rules still reach it: a shift-click
-     * or a double-click gather elsewhere can move items in or out, as the server decides.
-     * Return {@link #placedByPanel} to hide every slot no component places.
+     * Whether the screen draws this menu slot, read on every frame. The default shows the slots a slot part of
+     * the panel places ({@link #placedByPanel}), and every slot on a screen without a panel. A hidden slot is
+     * not drawn, item and ghost included. The pointer never finds a slot no part places, shown or not: no hover,
+     * tooltip, click, drag or number key reaches it. The menu's own rules still reach a hidden slot: a
+     * shift-click or a double-click gather elsewhere can move items in or out, as the server decides.
      */
     public boolean showsSlot(Slot slot) {
-        return true;
+        return this.logic.placement().finds(slot.index);
     }
 
     /**
      * True when a slot part of the panel ({@code SlotComponent}, {@code SlotGridComponent},
      * {@code PlayerInventoryComponent}, or your own through {@code menuWells}) draws this menu slot's well at
-     * the menu's place. Return it from {@link #showsSlot} to hide every slot the panel leaves out: vanilla's
+     * the menu's place. {@link #showsSlot} hides by default every slot the panel leaves out: vanilla's
      * armour, offhand and crafting slots under a kit that only lays out the inventory. Reads the placement of
      * the last frame; a slot moved for good with {@link #slotOffsetX} counts as not placed.
      */
@@ -173,8 +231,18 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         return true;
     }
 
+    /**
+     * False keeps recipe viewers (JEI, REI) off this screen: their item list, search bar and buttons; read on
+     * every frame. The vanilla screen behind {@code toVanilla()} keeps them.
+     */
+    protected boolean showsContainerAddons() {
+        return true;
+    }
+
     /** Called on every {@code init}, with the container's corner on screen; build the panel there. */
     protected abstract PanelComponent build(int leftPos, int topPos);
+
+    private List<GuiEventListener> ownWidgets = new ArrayList<>();
 
     @Override
     protected void init() {
@@ -194,6 +262,22 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         if (label != null) {
             this.inventoryLabelX = label.x() - this.leftPos;
             this.inventoryLabelY = label.y() - this.topPos;
+        }
+        this.ownWidgets = new ArrayList<>(this.children());
+    }
+
+    /**
+     * Buttons other mods add to every container screen after {@code init} (inventory sorters, viewer
+     * toggles) leave with the viewers when {@link #showsContainerAddons} is false; the screen's own widgets stay.
+     */
+    private void sweepAddons() {
+        if (showsContainerAddons() || this.children().size() == this.ownWidgets.size()) {
+            return;
+        }
+        for (GuiEventListener child : new ArrayList<>(this.children())) {
+            if (!this.ownWidgets.contains(child)) {
+                this.removeWidget(child);
+            }
         }
     }
 
@@ -225,6 +309,7 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
+        sweepAddons();
         super.extractRenderState(graphics, mouseX, mouseY, partial);
         this.logic.drawTop(new GuiDraw(graphics), this.panel, mouseX, mouseY);
     }
@@ -319,7 +404,8 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (this.logic.keyPressed(this.panel, Platform.screens().stroke(event))) {
+        if (this.logic.keyPressed(this.panel, Platform.screens().stroke(event))
+                || hotbarHoldKey() != null && hotbarHoldKey().matches(event) && this.logic.holdHotbar(this.panel, true)) {
             return true;
         }
         switch (MinuitMenuScreens.overKey(key -> key.matches(event), this.vanilla != null, closesOnMovement())) {
@@ -333,6 +419,13 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
     }
 
     @Override
+    public boolean keyReleased(KeyEvent event) {
+        return this.logic.keyReleased(this.panel, Platform.screens().stroke(event))
+                || hotbarHoldKey() != null && hotbarHoldKey().matches(event) && this.logic.holdHotbar(this.panel, false)
+                || super.keyReleased(event);
+    }
+
+    @Override
     public boolean charTyped(CharacterEvent event) {
         return this.logic.charTyped(this.panel, event.codepoint()) || super.charTyped(event);
     }
@@ -341,6 +434,9 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
     protected void containerTick() {
         super.containerTick();
         this.logic.tick(this.panel);
+        if (GamepadPoll.tick(this.host, this.panel)) {
+            onClose();
+        }
     }
 
     @Override
@@ -358,5 +454,53 @@ public abstract class MinuitContainerScreen<M extends AbstractContainerMenu> ext
         if (this.logic.removed(this.panel) && !back) {
             super.removed();
         }
+    }
+
+    /**
+     * Keeps a shift-click and the offhand key off armour and offhand slots no panel part places: the game would
+     * move the stack there, out of sight. The shift-click then goes through left clicks to the hotbar or rows.
+     */
+    @Override
+    protected void slotClicked(Slot slot, int slotId, int button, ContainerInput type) {
+        int size = this.menu.slots.size();
+        if (slot != null && type == ContainerInput.QUICK_MOVE) {
+            List<Integer> to = this.logic.quickTargets(slotId, size, this::playerSlot);
+            if (to != null) {
+                ContainerLogic.route(slotId, to, new ContainerLogic.QuickMove() {
+                    public boolean carrying() {
+                        return !carried().isEmpty();
+                    }
+
+                    public boolean empty(int s) {
+                        Slot t = menu.slots.get(s);
+                        return !t.hasItem() && t.mayPlace(carried());
+                    }
+
+                    public boolean merges(int s) {
+                        Slot t = menu.slots.get(s);
+                        return t.hasItem() && AbstractContainerMenu.canItemQuickReplace(t, carried(), true)
+                                && t.getItem().getCount() < t.getMaxStackSize(carried());
+                    }
+
+                    public void click(int s) {
+                        MinuitContainerScreen.super.slotClicked(menu.slots.get(s), s, 0, ContainerInput.PICKUP);
+                    }
+                });
+                return;
+            }
+        }
+        if (type == ContainerInput.SWAP && button == 40 && this.logic.blocksOffhandSwap(size, this::playerSlot)) {
+            return;
+        }
+        super.slotClicked(slot, slotId, button, type);
+    }
+
+    private ItemStack carried() {
+        return this.menu.getCarried();
+    }
+
+    private int playerSlot(int index) {
+        Slot slot = this.menu.slots.get(index);
+        return slot.container instanceof Inventory ? slot.getContainerSlot() : -1;
     }
 }

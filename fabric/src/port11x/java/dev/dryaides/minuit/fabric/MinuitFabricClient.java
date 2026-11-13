@@ -4,9 +4,10 @@ import dev.dryaides.minuit.client.MinuitClient;
 import dev.dryaides.minuit.client.ThemeReload;
 import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
+import dev.dryaides.minuit.port.mc.HudFeed;
 import dev.dryaides.minuit.port.mc.GameIds;
 import dev.dryaides.minuit.client.form.FormScreen;
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.internal.port.Platform;
@@ -53,6 +54,7 @@ public final class MinuitFabricClient implements ClientModInitializer {
             }
         });
         HudRenderCallback.EVENT.register(BubbleLayer::render);
+        HudRenderCallback.EVENT.register(HudFeed::render);
 
         ClientPlayNetworking.registerGlobalReceiver(WirePayload.HELLO,
                 (client, handler, buf, sender) -> sender.sendPacket(WirePayload.HELLO, hello().buf()));

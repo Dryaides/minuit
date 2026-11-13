@@ -15,7 +15,7 @@ public final class RangeSliderDemo implements Demo {
     private static final int W = 196;
     private static final int H = 42;
 
-    /** A widget, its callback counts, and a line printed under it. */
+    /** A widget, its callback counts, and a caption line under it. */
     private static final class Rig {
         final Scene scene;
         RangeSliderComponent r;
@@ -24,11 +24,7 @@ public final class RangeSliderDemo implements Demo {
 
         Rig(Scene scene) {
             this.scene = scene;
-            scene.paint((d, t) -> {
-                if (r != null) {
-                    d.text(line(), 8, 30, t.palette().textSoft());
-                }
-            });
+            scene.caption(() -> r == null ? "" : line());
         }
 
         RangeSliderComponent make(Box box, int min, int max, int low, int high) {
@@ -62,6 +58,10 @@ public final class RangeSliderDemo implements Demo {
     }
 
     private static void looks(Stage stage) {
+        stage.state("spawn heights", W, H, s -> {
+            RangeSliderComponent r = s.add(new RangeSliderComponent(new Box("r", 8, 10, 180, 16), -64, 320, 0, 128, (l, h) -> { }));
+            s.caption(() -> "Spawn between Y " + r.low + " and Y " + r.high);
+        });
         stage.state("default", W, H, s -> {
             Rig g = new Rig(s);
             g.make(0, 100, 25, 75);
@@ -72,7 +72,7 @@ public final class RangeSliderDemo implements Demo {
             s.move(g.r.xOf(80), 18);
             s.settle(600);
         });
-        stage.state("tooltip", W, 70, s -> {
+        stage.state("tooltip", W, 78, s -> {
             Rig g = new Rig(s);
             g.make(new Box("r", 8, 46, 180, 16), 0, 100, 25, 75).tooltip("Price range", "Items outside it are hidden");
             s.move(g.r.xOf(50), 54);
@@ -102,7 +102,7 @@ public final class RangeSliderDemo implements Demo {
             Rig g = new Rig(s);
             g.make(0, 100, 20, 60).label(v -> v + "%");
         });
-        stage.state("whole label, no label", W, 60, s -> {
+        stage.state("whole label, no label", W, 70, s -> {
             Rig g = new Rig(s);
             g.make(0, 100, 20, 60).label((l, h) -> h - l + " wide");
             s.add(new RangeSliderComponent(new Box("none", 8, 42, 180, 12), 0, 100, 20, 60, null)

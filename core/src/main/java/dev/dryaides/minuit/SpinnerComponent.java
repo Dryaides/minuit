@@ -40,8 +40,9 @@ public class SpinnerComponent extends BaseComponent {
         int dot = Math.max(1, size / 8);
         int left = this.x + (this.w - size) / 2;
         int top = this.y + (this.h - size) / 2;
-        int head = motion() == MotionStyle.NONE ? 0 : head(clock.getAsLong());
-        int lit = this.color != 0 ? this.color : p.accent();
+        int head = motion() == MotionStyle.NONE ? 0 : head(clock().getAsLong());
+        // The head is the mark the eye follows: 3:1 on the panel, as any other part of a control.
+        int lit = Ink.readable(p, this.color != 0 ? this.color : p.accent(), Ink.seen(p, p.surface()), Ink.MARK);
         for (int i = 0; i < DOTS; i++) {
             int behind = Math.floorMod(head - i, DOTS);
             float keep = behind < TRAIL.length ? TRAIL[behind] : 0F;

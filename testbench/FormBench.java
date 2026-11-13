@@ -1,3 +1,4 @@
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.ButtonComponent;
 import dev.dryaides.minuit.TextFieldComponent;
@@ -18,8 +19,8 @@ import dev.dryaides.minuit.form.Role;
 import dev.dryaides.minuit.form.Size;
 import dev.dryaides.minuit.form.Text;
 import dev.dryaides.minuit.form.Value;
-import dev.dryaides.minuit.formui.FormClient;
-import dev.dryaides.minuit.formui.FormPanel;
+import dev.dryaides.minuit.internal.formui.FormClient;
+import dev.dryaides.minuit.internal.formui.FormPanel;
 import dev.dryaides.minuit.wire.Fields;
 import dev.dryaides.minuit.wire.InputMessage;
 import dev.dryaides.minuit.wire.ScreenMessage;
@@ -44,7 +45,7 @@ public class FormBench {
     public static void main(String[] args) {
         File out = new File(args.length > 0 ? args[0] : "out");
         BenchMock.McFont font = new BenchMock.McFont();
-        BaseComponent.clock = () -> now;
+        HostState.clock(() -> now);
         for (String family : List.of("slate", "leather")) {
             for (ThemeChoice.Variant v : List.of(ThemeChoice.Variant.LIGHT, ThemeChoice.Variant.DARK)) {
                 Theme theme = Themes.resolve(Themes.SLATE, new ThemeChoice(family, "default", v));

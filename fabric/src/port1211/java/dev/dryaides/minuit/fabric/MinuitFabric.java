@@ -17,6 +17,7 @@ public final class MinuitFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        FabricBundling.check();
         PayloadTypeRegistry.playC2S().register(WirePayload.HELLO, WirePayload.codec(WirePayload.HELLO));
         PayloadTypeRegistry.playS2C().register(WirePayload.HELLO, WirePayload.codec(WirePayload.HELLO));
         PayloadTypeRegistry.playS2C().register(WirePayload.SCREEN, WirePayload.codec(WirePayload.SCREEN));

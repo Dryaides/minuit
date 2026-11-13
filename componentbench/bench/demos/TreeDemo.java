@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -55,16 +56,16 @@ public final class TreeDemo implements Demo {
 
         stage.state("items", 180, 88, s -> {
             dev.dryaides.minuit.TreeComponent<String> t = s.add(new dev.dryaides.minuit.TreeComponent<String>(new Box("t", 6, 6, 168, 76),
-                    java.util.List.of("minecraft:chest"), n -> n.equals("minecraft:chest") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of(), n -> n.substring(n.indexOf(':') + 1).replace('_', ' '))
-                    .iconArt(n -> dev.dryaides.minuit.ItemView.of(n, n.endsWith("log") ? 32 : 1)));
-            t.expand("minecraft:chest");
+                    java.util.List.of("minecraft:bundle"), n -> n.equals("minecraft:bundle") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of(), Mc::name)
+                    .iconArt(n -> dev.dryaides.minuit.ItemView.of(n)));
+            t.expand("minecraft:bundle");
             s.move(80, 26);
         });
         stage.state("items disabled", 180, 64, s -> {
             dev.dryaides.minuit.TreeComponent<String> t = s.add(new dev.dryaides.minuit.TreeComponent<String>(new Box("t", 6, 6, 168, 52),
-                    java.util.List.of("minecraft:chest"), n -> n.equals("minecraft:chest") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of(), n -> n.substring(n.indexOf(':') + 1).replace('_', ' '))
+                    java.util.List.of("minecraft:bundle"), n -> n.equals("minecraft:bundle") ? java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple") : java.util.List.of(), Mc::name)
                     .iconArt(n -> dev.dryaides.minuit.ItemView.of(n)).active(false));
-            t.expand("minecraft:chest");
+            t.expand("minecraft:bundle");
         });
         stage.state("default", 150, 76, s -> {
             TreeComponent<String> t = s.add(tree(new Box("t", 6, 6, 138, 64)));
@@ -223,9 +224,9 @@ public final class TreeDemo implements Demo {
 
         stage.state("reduced motion snaps", 190, 88, s -> {
             TreeComponent<String> t = s.add(tree(new Box("t", 6, 6, 178, 76)));
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             s.click(13, 13);
-            BaseComponent.reducedMotion = false;
+            HostState.reducedMotion(false);
             s.settle(0);
         });
 

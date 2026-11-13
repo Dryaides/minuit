@@ -113,7 +113,7 @@ public class ReelComponent<T> extends BaseComponent {
         this.landing = spin.landing();
         this.start = spin.start();
         this.landed = spin.landed();
-        this.lastTick = this.start < 0 || clock.getAsLong() < this.start ? -1
+        this.lastTick = this.start < 0 || clock().getAsLong() < this.start ? -1
                 : ReelMath.under(ReelMath.offset(progress(), this.landing, step()), step());
         return this;
     }
@@ -155,7 +155,7 @@ public class ReelComponent<T> extends BaseComponent {
         ReelMath.Strip s = ReelMath.strip(this.cards.size(), target, new Random(seed), this.noRepeat);
         this.strip = s.cards();
         this.landing = s.landing();
-        this.start = clock.getAsLong() + this.delay;
+        this.start = clock().getAsLong() + this.delay;
         this.lastTick = -1;
         this.landed = false;
         return this;
@@ -186,7 +186,7 @@ public class ReelComponent<T> extends BaseComponent {
     }
 
     private double progress() {
-        return this.start < 0 || clock.getAsLong() < this.start ? 0 : ReelMath.progress(clock.getAsLong() - this.start, reducedMotion);
+        return this.start < 0 || clock().getAsLong() < this.start ? 0 : ReelMath.progress(clock().getAsLong() - this.start, reducedMotion());
     }
 
     /** Plays the ticks and the landing for the current time; the draw calls it every frame. */
@@ -197,23 +197,23 @@ public class ReelComponent<T> extends BaseComponent {
     }
 
     void update() {
-        if (this.start < 0 || this.landed || clock.getAsLong() < this.start) {
+        if (this.start < 0 || this.landed || clock().getAsLong() < this.start) {
             return;
         }
         double t = progress();
-        if (!reducedMotion && t < 1.0) {
+        if (!reducedMotion() && t < 1.0) {
             int under = ReelMath.under(ReelMath.offset(t, this.landing, step()), step());
             if (under != this.lastTick) {
                 this.lastTick = under;
                 if (!this.muted) {
-                    sound.tick((float) t);
+                    sound().tick((float) t);
                 }
             }
         }
         if (t >= 1.0) {
             this.landed = true;
             if (!this.muted) {
-                sound.land();
+                sound().land();
             }
             this.onLand.accept(result());
         }
@@ -231,12 +231,18 @@ public class ReelComponent<T> extends BaseComponent {
         int half = this.w / 2 - 2;
 
         d.scissor(this.x + 2, this.y + 2, this.x + this.w - 2, this.y + this.h - 2);
-        int first = Math.max(0, (int) Math.floor((offset - half) / step()) - 1);
-        int last = Math.min(this.strip.size() - 1, (int) Math.ceil((offset + half) / step()) + 1);
+        // At rest the strip has not been dealt yet: the cards repeat both ways, so the marker never sits on an empty half.
+        boolean rest = this.start < 0;
+        int first = (int) Math.floor((offset - half) / step()) - 1;
+        int last = (int) Math.ceil((offset + half) / step()) + 1;
+        if (!rest) {
+            first = Math.max(0, first);
+            last = Math.min(this.strip.size() - 1, last);
+        }
         for (int i = first; i <= last; i++) {
             int sx = (int) Math.round(cx - this.cardW / 2.0 + i * step() - offset);
             boolean prize = this.landed && i == this.landing;
-            T card = this.cards.get(this.strip.get(i));
+            T card = this.cards.get(rest ? Math.floorMod(i, this.cards.size()) : this.strip.get(i));
             f.section(d, p, sx, top, this.cardW, this.cardH);
             if (prize) {
                 Shapes.ring(d, sx - 1, top - 1, this.cardW + 2, this.cardH + 2, f.corner() + 1,

@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.internal;
 
+import dev.dryaides.minuit.ButtonComponent;
 import dev.dryaides.minuit.UiSound;
 
 /** Which game sound, pitch and volume each of the kit's cues plays. Not API. */
@@ -24,6 +25,24 @@ public final class SoundCues {
             public void click() {
                 // the game's own button click: forUI(holder, pitch) plays at 0.25
                 player.play(CLICK, 1.0F, 0.25F);
+            }
+
+            @Override
+            public void press(ButtonComponent.Role role) {
+                if (role == null) {
+                    click();
+                    return;
+                }
+                switch (role) {
+                    case HERO -> {
+                        player.play(CLICK, 1.0F, 0.25F);
+                        player.play(BELL, 1.5F, 0.3F);
+                    }
+                    case PRIMARY -> click();
+                    // lighter and higher than a plain click, lower and duller for a destructive one
+                    case SECONDARY -> player.play(CLICK, 1.2F, 0.2F);
+                    case DESTRUCTIVE -> player.play(CLICK, 0.75F, 0.3F);
+                }
             }
 
             @Override

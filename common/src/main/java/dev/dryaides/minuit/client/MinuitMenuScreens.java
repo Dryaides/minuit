@@ -1,10 +1,12 @@
 package dev.dryaides.minuit.client;
 
+import dev.dryaides.minuit.internal.Bundling;
 import dev.dryaides.minuit.internal.ContainerLogic;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.MenuAccess;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
@@ -34,13 +36,21 @@ public final class MinuitMenuScreens {
     private MinuitMenuScreens() {
     }
 
+    /**
+     * Adds a factory, asked in order for each menu screen the game opens. Plan for the creative inventory
+     * staying vanilla: its item picker clicks run in the screen, not through the server, so a kit over its
+     * menu cannot work, and a kit over the player's inventory menu never shows in creative, where the
+     * inventory key opens the creative screen.
+     */
     public static void over(BiFunction<AbstractContainerMenu, Screen, Screen> factory) {
         FACTORIES.add(factory);
     }
 
     /** From the screen-opening hook: the screen to open in place of {@code next}. */
     public static Screen swap(Screen next) {
-        if (!(next instanceof MenuAccess<?>) || next instanceof MinuitContainerScreen<?> || FACTORIES.isEmpty()) {
+        Bundling.onScreen();
+        if (!(next instanceof MenuAccess<?>) || next instanceof MinuitContainerScreen<?> || next instanceof CreativeModeInventoryScreen
+                || FACTORIES.isEmpty()) {
             return next;
         }
         AbstractContainerMenu menu = ((MenuAccess<?>) next).getMenu();

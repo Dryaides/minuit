@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Redraw;
 import java.util.List;
 
 /**
@@ -54,9 +55,9 @@ final class RowLook {
      */
     static int ink(Palette p, int face, boolean selected, boolean active) {
         if (!active) {
-            // The palette's own disabled text, as on a Button and a TextArea. A selected row's wash takes that
+            // The palette's faint text, which reads on the well where the disabled text is made for the disabled button. A selected row's wash takes that
             // down to 1.4:1 in some themes (vanilla dark, soft light), so that row keeps a faded ink instead.
-            return selected ? Shapes.mix(inkOn(p, p.well()), p.well() | 0xFF000000, DISABLED_FADE) : p.disabledText();
+            return selected ? Shapes.mix(inkOn(p, p.well()), p.well() | 0xFF000000, DISABLED_FADE) : Ink.readable(p, p.textFaint(), p.well() | 0xFF000000, Ink.MARK);
         }
         if (!selected) {
             return inkOn(p, p.well());
@@ -129,14 +130,17 @@ final class RowLook {
 
         /** Once a frame, with the row under the pointer, or -1. */
         void step(int rowNow) {
-            long now = BaseComponent.clock.getAsLong();
+            long now = Redraw.quietClock();
             long elapsed = lastFrame < 0L ? 0L : Math.max(0L, now - lastFrame);
             lastFrame = now;
             if (rowNow != row) {
                 row = rowNow;
                 fade = 0F;
             }
-            fade = BaseComponent.reducedMotion ? 1F : Math.min(1F, fade + elapsed / (float) BaseComponent.HOVER_IN_MS);
+            fade = BaseComponent.reducedMotion() ? 1F : Math.min(1F, fade + elapsed / (float) BaseComponent.HOVER_IN_MS);
+            if (fade < 1F) {
+                Redraw.ask();
+            }
         }
 
         int row() {

@@ -429,7 +429,7 @@ public class CalendarComponent extends BaseComponent {
         year = to.getYear();
         month = to.getMonthValue();
         rebuild();
-        if (BaseComponent.reducedMotion) {
+        if (BaseComponent.reducedMotion()) {
             slide = null;
         } else {
             slide = forward ? slideRight : slideLeft;
@@ -534,7 +534,7 @@ public class CalendarComponent extends BaseComponent {
     }
 
     private boolean sliding() {
-        return slide != null && slide.moving() && !BaseComponent.reducedMotion;
+        return slide != null && slide.moving() && !BaseComponent.reducedMotion();
     }
 
     @Override
@@ -647,7 +647,7 @@ public class CalendarComponent extends BaseComponent {
             }
             drawNumber(d, cell, cx, cy, cw, ch, ink, dayOff && inMonth && active);
             if (day == today) {
-                int edge = end || !active ? ink : Ink.readable(p.accent(), surface, Ink.MARK);
+                int edge = end || !active ? ink : Ink.readable(p, p.accent(), surface, Ink.MARK);
                 frame.plate(d, p, cx, cy, cw, ch, 0, edge);
             }
         }
@@ -740,7 +740,7 @@ public class CalendarComponent extends BaseComponent {
         int nav = navAt(mx, my);
         if (nav != NO_NAV) {
             if (nav == PREV ? canGoBack() : canGoOn()) {
-                BaseComponent.sound.tap();
+                BaseComponent.sound().tap();
                 heldNav = nav;
                 turn(nav == PREV ? -1 : 1);
             }
@@ -765,7 +765,7 @@ public class CalendarComponent extends BaseComponent {
             return false;
         }
         if (amount > 0D ? canGoBack() : canGoOn()) {
-            BaseComponent.sound.tap();
+            BaseComponent.sound().tap();
             turn(amount > 0D ? -1 : 1);
         }
         return true;

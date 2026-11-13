@@ -227,7 +227,7 @@ final class PictureLook {
 
     /**
      * A flat inner backing, for a part inside a component that has its own frame: the well colour
-     * and a faint hairline except over a see-through family (glass), where fill alone reads.
+     * and a faint hairline except over a see-through palette (the glass mode), where fill alone reads.
      */
     static void flat(Draw d, Theme t, int x, int y, int w, int h, boolean hairline) {
         Palette p = t.palette();

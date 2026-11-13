@@ -1,6 +1,7 @@
 package dev.dryaides.minuit;
 
 import dev.dryaides.minuit.internal.Maths;
+import dev.dryaides.minuit.internal.OfficialPalettes;
 
 /**
  * How a theme draws its surfaces. The palette says which colours; this says which shapes: a
@@ -82,6 +83,11 @@ public interface FrameStyle {
     /** A sunken area: a list, a field, a meter. */
     void well(Draw d, Palette p, int x, int y, int w, int h, boolean focused);
 
+    /** A well that answers the mouse, {@code lit} under it; the default draws it the same lit or not. */
+    default void well(Draw d, Palette p, int x, int y, int w, int h, boolean focused, boolean lit) {
+        well(d, p, x, y, w, h, focused);
+    }
+
     /** A button or a chip; {@code highlight} false draws it without its bevel. */
     default void raised(Draw d, Palette p, int x, int y, int w, int h, int color, boolean highlight) {
         raised(d, p, x, y, w, h, color, highlight ? Shapes.Relief.RAISED : Shapes.Relief.FLAT);
@@ -120,6 +126,69 @@ public interface FrameStyle {
         return Shapes.Relief.RAISED;
     }
 
+    /**
+     * The dark square a {@link FramedIcon} sits in, {@code size} square at {@code x, y}, as Bedrock frames the icons
+     * of its settings list: a 1 px outline in the well's edge, a face darker than the frame, lit top left. Rounded by
+     * the family's {@link #corner}, at most 2 px.
+     */
+    default void iconFrame(Draw d, Palette p, int x, int y, int size) {
+        int r = Math.min(2, corner());
+        int face = Shapes.mix(p.frameDark() | 0xFF000000, 0xFF000000, 0.45F);
+        Shapes.rounded(d, x, y, size, size, r, Shapes.mix(p.wellEdge() | 0xFF000000, 0xFF000000, 0.5F));
+        Shapes.rounded(d, x + 1, y + 1, size - 2, size - 2, Math.max(0, r - 1), face);
+        Shapes.bevel(d, x + 1, y + 1, size - 2, size - 2, Math.max(0, r - 1), face, Shapes.Relief.RAISED);
+    }
+
+    /** The colour of a glyph inside {@link #iconFrame}: light, tinted by the accent, to read on the dark face. */
+    default int iconFrameInk(Palette p) {
+        return Shapes.mix(p.accent() | 0xFF000000, 0xFFFFFFFF, 0.6F);
+    }
+
+    /** The style for a button that carries no text (an icon, a swatch); a family whose lip depends on text returns its own. */
+    default FrameStyle iconStyle() {
+        return this;
+    }
+
+    /** How many pixels a button's label moves down while the button is held; it follows the face {@link #raised} sinks. */
+    default int pressTravel() {
+        return 1;
+    }
+
+    /**
+     * Milliseconds a held button takes to sink its {@link #pressTravel}, and to rise back; 0, the default,
+     * draws the press at once through {@link #button}'s relief.
+     */
+    default int pressMs() {
+        return 0;
+    }
+
+    /**
+     * A button {@code sunk} whole pixels into its press, 0 up to {@link #pressTravel}, for a family with a
+     * {@link #pressMs}; the default draws it pressed for any depth.
+     */
+    default void button(Draw d, Palette p, int x, int y, int w, int h, ButtonComponent.Role role, int color,
+                        Shapes.Relief relief, int sunk) {
+        button(d, p, x, y, w, h, role, color, sunk > 0 ? Shapes.Relief.PRESSED : relief);
+    }
+
+    /**
+     * The rows at the foot of a button {@code h} px tall that its face does not cover at rest (a lip the face
+     * sinks into); the label centres on the face above them. 0, the default, centres it on the whole box.
+     */
+    default int buttonLip(int h) {
+        return 0;
+    }
+
+    /** How many pixels a held button's label moves right. */
+    default int pressShiftX() {
+        return 1;
+    }
+
+    /** How many pixels the label of a toggled-on choice sits lower, for a family whose {@link #selectedRelief} sinks the face. */
+    default int selectedTravel() {
+        return 0;
+    }
+
     /** A bar from 0 to 1. */
     default void bar(Draw d, Palette p, int x, int y, int w, int h, float value, int color) {
         int r = Math.min(3, h / 2);
@@ -147,6 +216,15 @@ public interface FrameStyle {
         Shapes.rounded(d, x, y, w, h, h / 2, color);
     }
 
+    /**
+     * The 1 px rim of an off toggle's groove, round {@link #track}'s shape. The groove grey sits a step off the
+     * panel in most palettes, too close to read as a switch; the rim takes a role made to be seen on the panel.
+     * A family whose groove already carries its own outline draws nothing.
+     */
+    default void trackEdge(Draw d, Palette p, int x, int y, int w, int h, int color) {
+        Shapes.band(d, x, y, w, h, h / 2, 1, color);
+    }
+
     /** The knob of a toggle, 8 by 8; {@code active} false draws it flat. */
     default void toggleKnob(Draw d, Palette p, int x, int y, int face, boolean active) {
         Shapes.rounded(d, x, y, 8, 8, 4, face);
@@ -172,13 +250,23 @@ public interface FrameStyle {
      * hover face at half strength on the item area; {@code marked} rings the cell in the accent.
      */
     default void slot(Draw d, Palette p, int x, int y, boolean hovered, boolean marked) {
-        well(d, p, x, y, 18, 18, false);
+        well(d, p.slot() == 0 ? p : slotWell(p), x, y, 18, 18, false);
         if (hovered) {
             d.fill(x + 1, y + 1, x + 17, y + 17, Shapes.SLOT_HOVER_BACK);
         }
         if (marked) {
             Shapes.ring(d, x, y, 18, 18, 0, p.accent());
         }
+    }
+
+    /** {@code p} with its well turned into the slot face, for a family whose slot is its plain well. */
+    private static Palette slotWell(Palette p) {
+        return OfficialPalettes.derive(p, new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(), p.surface(),
+                p.surfaceEdge(), p.section(), p.slot(), p.wellEdge(), p.text(), p.textSoft(), p.textFaint(), p.raised(),
+                p.raisedHover(), p.raisedText(), p.primary(), p.primaryHover(), p.primaryText(), p.accent(),
+                p.accentDeep(), p.good(), p.warn(), p.bad(), p.destructive(), p.destructiveHover(),
+                p.destructiveText(), p.track(), p.disabled(), p.disabledText(), p.shadow(), p.link(), p.backdrop(), p.line(),
+                p.mark(), p.slot()));
     }
 
     /**
@@ -258,6 +346,19 @@ public interface FrameStyle {
                 selected ? selectedRelief() : Shapes.Relief.RAISED);
     }
 
+    /**
+     * The height of a button a component sizes itself (a {@link RadialComponent}'s page cards), not one a caller
+     * laid out: the game's 20 by default.
+     */
+    default int buttonHeight() {
+        return 20;
+    }
+
+    /** The height of a {@link TabsComponent} row the family asks for; {@code base} is what a caller would use without it. */
+    default int tabHeight(int base) {
+        return base;
+    }
+
     /** How far below its box's top a {@link #tab} of height {@code h} starts. */
     default int tabInset(int h, boolean selected) {
         return 0;
@@ -265,6 +366,14 @@ public interface FrameStyle {
 
     /** The rule under a row of {@link #tab}s, in a gap between two of them; the default draws none. */
     default void tabRule(Draw d, Palette p, int x, int y, int w, int h) {
+    }
+
+    /**
+     * The columns between two tabs of a {@link TabsComponent} row; negative overlaps them, the shown
+     * tab drawn over its neighbours.
+     */
+    default int tabGap() {
+        return TabsComponent.GAP;
     }
 
     /** The label colour of a {@link #tab}. */
@@ -280,10 +389,8 @@ public interface FrameStyle {
     /** A scroll bar BAR wide at x, its track from y over h, its thumb from {@code thumbY} over {@code thumbH}. */
     default void scroller(Draw d, Palette p, int x, int y, int h, int thumbY, int thumbH, boolean lit) {
         int track = FormLook.solid(p.track());
-        int thumb = FormLook.solid(lit ? p.raisedHover() : p.raised());
-        if (Shapes.contrast(thumb, track) < 1.5D) {
-            thumb = Shapes.mix(track, FormLook.solid(p.text()), lit ? 0.45F : 0.3F);
-        }
+        // The faint ink is made to be seen on the panel; the raised face sat a step off the track and vanished.
+        int thumb = FormLook.solid(lit ? p.textSoft() : p.textFaint());
         Shapes.rounded(d, x + 1, y, 3, h, 1, track);
         Shapes.rounded(d, x + 1, thumbY, 3, thumbH, 1, thumb);
     }
@@ -299,7 +406,8 @@ public interface FrameStyle {
             Shapes.rounded(d, x, y, w, h, r, fill);
         }
         if (edge != 0) {
-            Shapes.ring(d, x, y, w, h, r, edge);
+            // A bare 1 px ring with a 3 px corner loses one pixel per corner and reads square: it takes one more.
+            Shapes.ring(d, x, y, w, h, fill == 0 && r > 0 ? Math.min(r + 1, Math.min(w, h) / 2) : r, edge);
         }
     }
 
@@ -341,10 +449,10 @@ public interface FrameStyle {
         }
     }
 
-    /** A list row's highlight in {@code face}; a 0 face draws nothing. */
+    /** A list row's highlight in {@code face}, a clean fill without the plate's relief; a 0 face draws nothing. */
     default void row(Draw d, Palette p, int x, int y, int w, int h, int face) {
         if (face != 0) {
-            plate(d, p, x, y, w, h, face, 0);
+            Shapes.rounded(d, x, y, w, h, Math.min(corner(), Math.min(w, h) / 2), face);
         }
     }
 

@@ -1,11 +1,16 @@
 package dev.dryaides.minuit.neoforge;
 
+import dev.dryaides.minuit.client.ThemeScreen;
+import dev.dryaides.minuit.internal.ContainerTab;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import dev.dryaides.minuit.client.MinuitClient;
 import dev.dryaides.minuit.client.ThemeReload;
 import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
+import dev.dryaides.minuit.port.mc.HudFeed;
 import dev.dryaides.minuit.client.form.FormScreen;
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.internal.port.Platform;
@@ -28,19 +33,23 @@ import net.neoforged.neoforge.common.NeoForge;
 /**
  * Reads the player's theme choice before any screen asks for a theme, and the theme files on each
  * reload. Sends the hello at join when the server accepts {@code minuit:hello}, and the form input.
- * Draws the speech bubbles over entities under the chat.
+ * Draws the speech bubbles over entities under the chat, and the mods' HUD parts over them.
  */
 @Mod(value = "minuit", dist = Dist.CLIENT)
 public final class MinuitNeoForgeClient {
 
-    public MinuitNeoForgeClient(IEventBus modBus) {
+    public MinuitNeoForgeClient(IEventBus modBus, ModContainer container) {
         Bridges.install();
+        dev.dryaides.minuit.client.MinuitKeys.modifiers(new NeoForgeKeys());
         Platform.development(!FMLLoader.getCurrent().isProduction());
+        container.registerExtensionPoint(IConfigScreenFactory.class, (mod, parent) -> new ThemeScreen(parent, ContainerTab.THEME_ID));
         modBus.addListener(FMLClientSetupEvent.class, event -> event.enqueueWork((Runnable) MinuitClient::themeChoices));
         modBus.addListener(AddClientReloadListenersEvent.class, event -> event.addListener(
                 Identifier.fromNamespaceAndPath("minuit", ThemeReload.ID), new ThemeReload()));
         modBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerBelow(VanillaGuiLayers.CHAT,
                 Identifier.fromNamespaceAndPath("minuit", "bubbles"), BubbleLayer::render));
+        modBus.addListener(RegisterGuiLayersEvent.class, event -> event.registerBelow(VanillaGuiLayers.CHAT,
+                Identifier.fromNamespaceAndPath("minuit", "hud"), HudFeed::render));
         modBus.addListener(RegisterClientPayloadHandlersEvent.class, event -> event.register(WirePayload.HELLO,
                 (payload, context) -> context.reply(new WirePayload(WirePayload.HELLO, Handshakes.clientHello()))));
         ClientForms.connect((channel, bytes) -> ClientPacketDistributor.sendToServer(WirePayload.of(channel, bytes)), FormScreen.HOST);

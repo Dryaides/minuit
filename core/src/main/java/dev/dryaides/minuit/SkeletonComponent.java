@@ -98,13 +98,13 @@ public class SkeletonComponent extends BaseComponent {
 
     /** True when the band is moving: not with reduced motion, not with {@code active = false}. */
     public boolean shimmering() {
-        return shimmer && active && !reducedMotion;
+        return shimmer && active && !reducedMotion();
     }
 
     /** The band's left edge from the box's left; negative while it is off the box. */
     public int bandAt() {
         int travel = Math.max(1, w) + 2 * (BAND + 2 * EDGE);
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         int at = (int) ((now % PERIOD_MS) * travel / PERIOD_MS) - BAND - 2 * EDGE;
         return Math.floorDiv(at, STEP) * STEP;
     }

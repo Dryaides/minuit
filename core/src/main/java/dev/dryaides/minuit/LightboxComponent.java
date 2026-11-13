@@ -183,7 +183,7 @@ public final class LightboxComponent extends BaseComponent {
         viewer.picture(current());
         viewer.resetZoom();
         change.snap(1F);
-        if (reducedMotion) {
+        if (reducedMotion()) {
             shown.snap(1F);
         } else {
             shown.snap(0F);
@@ -222,7 +222,7 @@ public final class LightboxComponent extends BaseComponent {
         before = current();
         index = next;
         viewer.picture(current());
-        if (reducedMotion || !open) {
+        if (reducedMotion() || !open) {
             change.snap(1F);
             before = null;
         } else {
@@ -488,7 +488,7 @@ public final class LightboxComponent extends BaseComponent {
         if (!open) {
             return false;
         }
-        if (keys != null && keys.shift()) {
+        if (heldKeys() != null && heldKeys().shift()) {
             if (amount > 0) {
                 previous();
             } else if (amount < 0) {

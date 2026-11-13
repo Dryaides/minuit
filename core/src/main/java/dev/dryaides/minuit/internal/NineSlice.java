@@ -25,6 +25,71 @@ public final class NineSlice {
         blit(d, r, pieces(r, x, y, w, h), alpha);
     }
 
+    /** What {@link #draw(Draw, PartTable.Region, int, int, int, int, float)} draws, without building the pieces. */
+    public static void tile(Draw d, PartTable.Region r, int x, int y, int w, int h, float alpha) {
+        int left = Math.min(r.left(), w / 2);
+        int right = Math.min(r.right(), w / 2);
+        int top = Math.min(r.top(), h / 2);
+        int bottom = Math.min(r.bottom(), h / 2);
+        for (int row = 0; row < 3; row++) {
+            int ty = cut(row, y, top, bottom, h);
+            int th = cut(row + 1, y, top, bottom, h) - ty;
+            int sv = cut(row, r.v(), top, bottom, r.h());
+            int vh = cut(row + 1, r.v(), top, bottom, r.h()) - sv;
+            for (int col = 0; col < 3; col++) {
+                int tx = cut(col, x, left, right, w);
+                int tw = cut(col + 1, x, left, right, w) - tx;
+                int su = cut(col, r.u(), left, right, r.w());
+                int uw = cut(col + 1, r.u(), left, right, r.w()) - su;
+                repeat(d, r, tx, ty, tw, th, su, sv, uw, vh, alpha);
+            }
+        }
+    }
+
+    /** The {@code i}th of the four cuts {start, start + low, start + length - high, start + length}. */
+    static int cut(int i, int start, int low, int high, int length) {
+        return switch (i) {
+            case 0 -> start;
+            case 1 -> start + low;
+            case 2 -> start + length - high;
+            default -> start + length;
+        };
+    }
+
+    /** The other {@code repeat}, blitted as it goes. */
+    private static void repeat(Draw d, PartTable.Region r, int x, int y, int w, int h, int u, int v, int uw, int vh,
+                               float alpha) {
+        if (w <= 0 || h <= 0 || uw <= 0 || vh <= 0) {
+            return;
+        }
+        int nx = (w + uw - 1) / uw;
+        int ny = (h + vh - 1) / vh;
+        int px = x;
+        int cx = 0;
+        for (int i = 0; i < nx; i++) {
+            int pw = w / nx;
+            cx += w % nx;
+            if (cx >= nx) {
+                cx -= nx;
+                pw++;
+            }
+            int py = y;
+            int cy = 0;
+            for (int j = 0; j < ny; j++) {
+                int ph = h / ny;
+                cy += h % ny;
+                if (cy >= ny) {
+                    cy -= ny;
+                    ph++;
+                }
+                d.blitRegion(r.texture(), px, py, pw, ph, u + (uw - pw) / 2, v + (vh - ph) / 2, pw, ph, r.texW(),
+                        r.texH(), alpha);
+                py += ph;
+            }
+            px += pw;
+        }
+    }
+
     /** A {@link PartTable.Region} or {@link PartTable.Framed}; false for a sprite or no art, which the caller draws. */
     public static boolean draw(Draw d, PartTable.Art art, int x, int y, int w, int h, float alpha) {
         if (art instanceof PartTable.Region r) {

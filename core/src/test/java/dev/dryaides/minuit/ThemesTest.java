@@ -14,11 +14,12 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The order the decision of 2026-10-26 sets: the mod's choice, else the global one, else the mod's own theme. */
 class ThemesTest {
 
-    private static final ThemeChoice GLASS = new ThemeChoice("glass", "clear", ThemeChoice.Variant.LIGHT);
+    private static final ThemeChoice GLASS = new ThemeChoice("bedrock", "bedrock", ThemeChoice.Variant.GLASS);
     private static final ThemeChoice SOFT = new ThemeChoice("soft", "sand", ThemeChoice.Variant.DARK);
     private static final ThemeChoice LEATHER = new ThemeChoice("leather", "paper", ThemeChoice.Variant.LIGHT);
 
@@ -67,8 +68,8 @@ class ThemesTest {
     @Test
     void modChoiceBeatsGlobalWhichBeatsOwn() {
         Themes.choose(new ThemeChoices(GLASS, Map.of()).with("goodboy", SOFT));
-        assertSame(FrameStyles.GLASS, Themes.byId("sesame").frame());
-        assertEquals(0x78ECF6FA, Themes.byId("sesame").palette().surface());
+        assertSame(FrameStyles.BEDROCK, ((GlassFrame) Themes.byId("sesame").frame()).base());
+        assertEquals(0x990B0D10, Themes.byId("sesame").palette().surface(), "the glass smoke, #0B0D10 at 0.6");
         assertSame(FrameStyles.SOFT, Themes.byId("goodboy").frame());
         assertEquals("goodboy", Themes.byId("goodboy").id());
     }
@@ -109,5 +110,23 @@ class ThemesTest {
         assertEquals(bw.text(), blue.text());
         assertEquals(bw.raised(), blue.raised());
         assertEquals(bw.track(), blue.track());
+    }
+
+    /**
+     * The owner's call (2026-11-10): Wiki joins Bedrock. A config saved while Wiki was a family draws Bedrock's
+     * shapes in the wiki colours (#F6F9FA page grey in chromas/wiki.json), and one that named no chroma keeps them.
+     */
+    @Test
+    void aSavedWikiFamilyWearsBedrockInTheWikiChroma() {
+        for (String text : new String[] {
+                "{\"global\": {\"family\": \"wiki\", \"chroma\": \"wiki\", \"variant\": \"light\"}, \"mods\": {}}",
+                "{\"global\": {\"family\": \"wiki\", \"variant\": \"light\"}, \"mods\": {}}"}) {
+            ThemeChoices read = ClientConfigFile.parse(text).choices();
+            Themes.choose(read);
+            assertSame(FrameStyles.BEDROCK, Themes.byId("sesame").frame(), text);
+            assertEquals(0xFFF6F9FA, Themes.byId("sesame").palette().surface(), text);
+            assertTrue(ClientConfigFile.write(new ClientConfigFile.Settings(read, false))
+                    .contains("\"family\": \"bedrock\""), text);
+        }
     }
 }

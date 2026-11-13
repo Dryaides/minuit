@@ -5,7 +5,8 @@ import dev.dryaides.minuit.internal.GuiPart;
 import dev.dryaides.minuit.internal.NineSlice;
 import dev.dryaides.minuit.internal.PartTable;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.resources.model.Material;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.List;
  * Atlas sprites on 1.20.1, which has no GUI atlas (it came with 1.20.2): the vanilla parts come from
  * the textures the game binds itself ({@link PartTable#WIDGETS}), cut in nine, so resource packs still
  * restyle them. Map markers have neither their atlas nor their own files (both came with 1.20.5): they
- * come from the one sheet {@code map_icons.png}. Any other atlas goes through its {@code Material}.
+ * come from the one sheet {@code map_icons.png}. Any other atlas goes through {@code ModelManager.getAtlas}.
  * Client only, not API.
  */
 public final class GameSprites {
@@ -43,7 +44,11 @@ public final class GameSprites {
             marker(g, id.getPath(), x, y, w, h, alpha);
             return;
         }
-        g.blit(x, y, 0, w, h, new Material(atlas, id).sprite(), 1F, 1F, 1F, alpha);
+        TextureAtlas found = atlasOf(atlas);
+        if (found == null) {
+            return;
+        }
+        g.blit(x, y, 0, w, h, found.getSprite(id), 1F, 1F, 1F, alpha);
     }
 
     /**
@@ -68,5 +73,15 @@ public final class GameSprites {
     /** The game's art for a vanilla part, false when 1.20.1 draws that part with fills, not a texture. */
     public static boolean part(GuiGraphics g, GuiPart part, int x, int y, int w, int h, float alpha) {
         return NineSlice.draw(new GuiDraw(g), PartTable.WIDGETS.resolve(part), x, y, w, h, alpha);
+    }
+
+    /**
+     * The atlas a sprite lives in, null when the game has none by that id. Before 26.1 items and blocks
+     * share one atlas, under its texture path ({@code minecraft:items} names nothing there).
+     */
+    private static TextureAtlas atlasOf(ResourceLocation atlas) {
+        boolean shared = atlas.getNamespace().equals("minecraft")
+                && (atlas.getPath().equals("items") || atlas.getPath().equals("blocks"));
+        return Minecraft.getInstance().getModelManager().getAtlas(shared ? TextureAtlas.LOCATION_BLOCKS : atlas);
     }
 }

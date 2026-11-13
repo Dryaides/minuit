@@ -32,7 +32,7 @@ class ScreenLogicTest {
         }
 
         @Override
-        protected String cut(String text, int maxWidth) {
+        public String cut(String text, int maxWidth) {
             return text;
         }
 
@@ -41,11 +41,11 @@ class ScreenLogicTest {
         }
 
         @Override
-        public void push(float x, float y, float scale) {
+        protected void pushPose(float x, float y, float scale) {
         }
 
         @Override
-        public void pop() {
+        protected void popPose() {
         }
 
         @Override
@@ -90,8 +90,8 @@ class ScreenLogicTest {
     void aClickMidGlideLandsOnTheWidgetDrawnUnderIt() {
         int[] pressed = {0};
         PanelComponent panel = panel(new ButtonComponent(new Box("b", 40, 30, 20, 20), "", () -> pressed[0]++));
-        LongSupplier clock = BaseComponent.clock;
-        BaseComponent.clock = () -> 1000L;
+        LongSupplier clock = BaseComponent.clock();
+        HostState.clock(() -> 1000L);
         try {
             ScreenLogic logic = new ScreenLogic(new HostCore(null));
             logic.slideFrom(Slide.RIGHT);
@@ -102,7 +102,7 @@ class ScreenLogicTest {
             logic.mouseClicked(panel, screenX, drawnAt[1], 0);
             logic.mouseReleased(panel, screenX, drawnAt[1], 0);
         } finally {
-            BaseComponent.clock = clock;
+            HostState.clock(clock);
         }
         assertEquals(1, pressed[0]);
     }

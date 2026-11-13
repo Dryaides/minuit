@@ -87,7 +87,7 @@ public final class DropdownComponent extends BaseComponent {
     protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
         Palette p = theme.palette();
         int textColor;
-        if (!this.active && !FrameStyle.bleedOf(theme.frame()).equals(Insets.NONE)) {
+        if (!this.active && (theme.frame().buttonLip(this.h) > 0 || !FrameStyle.bleedOf(theme.frame()).equals(Insets.NONE))) {
             theme.frame().button(d, p, this.x, this.y, this.w, this.h, null, p.disabled(), Shapes.Relief.RAISED);
             textColor = p.disabledText();
         } else if (!this.active) {
@@ -126,8 +126,13 @@ public final class DropdownComponent extends BaseComponent {
             return false;
         }
         click();
-        this.show.accept(new Popup());
+        open();
         return true;
+    }
+
+    /** Opens the list with no click sound, for a demo that shows it open. */
+    public void open() {
+        this.show.accept(new Popup());
     }
 
     private static boolean clickable(Entry entry) {
@@ -149,13 +154,26 @@ public final class DropdownComponent extends BaseComponent {
                     listHeight(DropdownComponent.this.lines));
         }
 
+        /** Under the dropdown, above it when the area holds more there, and kept inside the area. */
+        @Override
+        protected void placeOverlay(Theme theme, Box area) {
+            DropdownComponent o = DropdownComponent.this;
+            Insets bleed = FrameStyle.bleedOf(theme.frame());
+            this.h = listHeight(theme.frame(), o.lines);
+            // clear of the band a family draws under and over the dropdown's box
+            int below = o.y + o.h + 1 + bleed.bottom();
+            int above = o.y - 1 - bleed.top() - this.h;
+            boolean up = below + this.h > area.bottom() && o.y - area.y() > area.bottom() - (o.y + o.h);
+            this.y = up ? above : below;
+            this.y = Math.max(area.y(), Math.min(this.y, area.bottom() - this.h));
+            this.w = Math.min(o.listW, area.w());
+            this.x = Math.max(area.x(), Math.min(o.listX, area.right() - this.w));
+        }
+
         @Override
         protected void render(Draw d, Theme theme, int mx, int my, boolean hovered) {
             Palette p = theme.palette();
             this.in = PopupList.inset(theme.frame());
-            this.h = listHeight(theme.frame(), DropdownComponent.this.lines);
-            // below the band a family draws under the dropdown's box
-            this.y = DropdownComponent.this.y + DropdownComponent.this.h + 1 + FrameStyle.bleedOf(theme.frame()).bottom();
             this.tooltip = null;
             theme.frame().popup(d, p, this.x, this.y, this.w, this.h);
             int y = this.y + this.in.top();
@@ -217,8 +235,8 @@ public final class DropdownComponent extends BaseComponent {
                 d.textIn(entry.detail(), new Box("", detailX, y + 1, detailW, LINE - 2),
                         entry.state() == State.FAILED ? p.bad() : quiet);
             }
-            d.textInRight(entry.size(), new Box("", sizeRight - 48, y + 1, 48, LINE - 2), quiet);
-            d.textInRight(entry.ram(), new Box("", this.x + this.w - 86, y + 1, 80, LINE - 2), quiet);
+            d.textFitRight(entry.size(), sizeRight, y + 3, 48, quiet);
+            d.textFitRight(entry.ram(), this.x + this.w - 6, y + 3, 80, quiet);
         }
 
         /**

@@ -2,6 +2,7 @@ package dev.dryaides.minuit.port.mc;
 
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
+import dev.dryaides.minuit.Draw;
 import dev.dryaides.minuit.EntityView;
 import dev.dryaides.minuit.internal.EntityPose;
 import net.minecraft.client.Minecraft;
@@ -36,10 +37,10 @@ public final class EntityDraw {
     }
 
     /** False with no level (the title screen) or an unknown id, so the caller draws its stand-in. */
-    public static boolean draw(GuiGraphics g, EntityView view, int x0, int y0, int x1, int y1, float yaw, float pitch) {
+    public static boolean draw(Draw d, GuiGraphics g, EntityView view, int x0, int y0, int x1, int y1, float yaw, float pitch) {
         Minecraft mc = Minecraft.getInstance();
         if (view.isBlock()) {
-            return block(g, view.type(), x0, y0, x1, y1);
+            return block(g, view.type(), x0, y0, x1, y1, yaw, pitch);
         }
         Entity entity = view.entity() instanceof Entity live ? live : view.isPlayer() ? mc.player : made(mc.level, view.type());
         if (entity == null) {
@@ -48,7 +49,8 @@ public final class EntityDraw {
         EntityPose pose = EntityPose.of(y0, y1, entity.getBbHeight(), pitch);
         Quaternionf tilt = new Quaternionf().rotateX(pose.tilt());
         Quaternionf rotation = new Quaternionf().rotateZ((float) Math.PI).mul(tilt);
-        g.enableScissor(x0, y0, x1, y1);
+        // Draw.scissor, as GuiGraphics.enableScissor ignores the pose (a scaled or moved stage) before 26.x
+        d.scissor(x0, y0, x1, y1);
         if (entity instanceof LivingEntity living) {
             float body = living.yBodyRot;
             float head = living.yHeadRot;
@@ -69,7 +71,7 @@ public final class EntityDraw {
         } else {
             render(g, entity, (x0 + x1) / 2F, (y0 + y1) / 2F, pose, rotation, tilt, yaw);
         }
-        g.disableScissor();
+        d.endScissor();
         return true;
     }
 
@@ -105,8 +107,11 @@ public final class EntityDraw {
                 .map(entityType -> entityType.create(level)).orElse(null));
     }
 
-    /** The block's item model, scaled to the box: the block display path is not spiked yet. */
-    private static boolean block(GuiGraphics g, String id, int x0, int y0, int x1, int y1) {
+    /**
+     * The block's item model, scaled to the box and turned by the same angles as an entity (210 is the
+     * model's own GUI view): the block display path is not spiked yet.
+     */
+    private static boolean block(GuiGraphics g, String id, int x0, int y0, int x1, int y1, float yaw, float pitch) {
         ResourceLocation parsed = GameIds.id(id);
         ItemStack stack = parsed == null ? ItemStack.EMPTY
                 : GameIds.ITEMS.getOptional(parsed).map(ItemStack::new).orElse(ItemStack.EMPTY);
@@ -115,9 +120,12 @@ public final class EntityDraw {
         }
         float scale = Math.min(x1 - x0, y1 - y0) / 16F;
         g.pose().pushPose();
-        g.pose().translate(x0 + (x1 - x0 - 16 * scale) / 2F, y0 + (y1 - y0 - 16 * scale) / 2F, 0F);
         // depth unscaled, so the block keeps the depth an item has and later layers still cover it
+        g.pose().translate((x0 + x1) / 2F, (y0 + y1) / 2F, 100F);
         g.pose().scale(scale, scale, 1F);
+        g.pose().mulPose(new Quaternionf().rotateX((float) Math.toRadians(-pitch)).rotateY((float) Math.toRadians(yaw - 210F)));
+        // renderItem moves to (8, 8, 150) before drawing: the turn pivots on the model's centre
+        g.pose().translate(-8F, -8F, -150F);
         g.renderItem(stack, 0, 0);
         g.pose().popPose();
         return true;

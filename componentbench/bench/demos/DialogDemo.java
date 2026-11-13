@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -36,14 +37,14 @@ public final class DialogDemo implements Demo {
 
         Rig(Scene s) {
             this.s = s;
-            s.add(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Behind", () -> behind++));
-            s.add(new SliderComponent(new Box("level", 106, 8, 120, 16), 0, 100, 40, v -> behind++));
+            s.fixture(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Settings", () -> behind++));
+            s.fixture(new SliderComponent(new Box("level", 106, 8, 120, 16), 0, 100, 40, v -> behind++));
             s.caption(() -> note.isEmpty() ? log : note);
         }
 
         DialogComponent confirm() {
             return DialogComponent.confirm(AREA, "Leave this world?", SHORT, "Leave", "Stay",
-                    () -> log += "confirm ", () -> log += "cancel ");
+                    () -> log += "Left the world. ", () -> log += "Stayed. ");
         }
 
         DialogComponent open(DialogComponent dialog) {
@@ -424,14 +425,14 @@ public final class DialogDemo implements Demo {
             Rig r = new Rig(s);
             DialogComponent d = r.confirm();
             s.add(d);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 d.open(s.panel());
                 s.settle(0);
                 s.key(InputKey.ESCAPE);
                 d.open(s.panel());
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("slides from the left", W, H, s -> {

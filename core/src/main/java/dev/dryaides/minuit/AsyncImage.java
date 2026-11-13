@@ -74,7 +74,7 @@ public final class AsyncImage {
         Shapes.ring(d, x, y, w, h, 0, p.wellEdge());
         if (image != null && image.state == State.PENDING && w >= 12 && h >= 6) {
             // Three dots that light in turn, so a picture on its way does not read as a missing one.
-            int lit = BaseComponent.reducedMotion ? -1 : (int) (BaseComponent.clock.getAsLong() / 300 % 3);
+            int lit = BaseComponent.reducedMotion() ? -1 : (int) (BaseComponent.clock().getAsLong() / 300 % 3);
             int cx = x + w / 2 - 4;
             int cy = y + h / 2 - 1;
             for (int i = 0; i < 3; i++) {

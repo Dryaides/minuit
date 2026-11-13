@@ -1,0 +1,100 @@
+// The site's still renders, run headless on the box (remotebuild.py) or here:
+//   ./gradlew :testbench:siteRenders -Psite_dir=<site worktree> [-Pmc_version=26.1.2]
+// SiteExport (in the site worktree's bench/) draws only its FALLBACK_LOOKS; the jar of the result is
+// core/build/libs/minuit-site-renders-<mc>-x.jar, where remotebuild --fetch collects it.
+// Not part of the mod build: nothing here goes into a mod jar.
+
+plugins {
+    id 'java'
+}
+
+def mcVersion = (findProperty('mc_version') ?: '26.1.2').toString()
+def siteDir = findProperty('site_dir') ?: System.getenv('SITE_DIR')
+def siteRoot = siteDir ? file(siteDir) : null
+
+repositories { mavenCentral() }
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(java_version as int) }
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
+evaluationDependsOn(':core')
+evaluationDependsOn(':protocol')
+
+// Sources by file: every bench class sits in the default package beside the mod and the scenes (SiteScenes,
+// SlotScenes, McScenes) in core (internal/showcase), so the benches compile from this repo alone. Only
+// siteRenders needs the site worktree, for SiteExport and the gallery scenes (site/GalleryScenes).
+sourceSets.main.java.srcDirs = []
+tasks.named('compileJava') {
+    source(fileTree("$rootDir/testbench") { include '*.java' })
+    source(fileTree("$rootDir/componentbench/bench") { include 'api/*.java', 'demos/*.java', 'access/dev/dryaides/minuit/BenchAccess.java' })
+    if (siteRoot) {
+        source(fileTree("$siteRoot/bench") { include 'SiteExport.java', 'site/*.java' })
+    }
+    dependsOn ':core:classes', ':protocol:classes'
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.11.0'
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'org.slf4j:slf4j-api:2.0.13'
+    implementation files(rootProject.project(":core").sourceSets.main.output, rootProject.project(":protocol").sourceSets.main.output)
+}
+
+def texcp = layout.buildDirectory.dir('site-texcp')
+def renderRoot = layout.buildDirectory.dir('site-renders/www')
+
+// The item textures the scenes show, and the component bench's pictures, as /assets/<ns>/... on the classpath.
+def siteTex = tasks.register('siteTex', Sync) {
+    from("$siteRoot/www/data/tex") { include '*/textures/**', 'minuit_components_bench/**' ; into 'assets' }
+    from("$rootDir/componentbench/bench/images") { include '*.png'; into 'assets/minuit_components_bench/textures/bench' }
+    into texcp
+}
+
+// SiteExport reads fonts/ and the map thumbnails from the folder it writes to.
+def siteInputs = tasks.register('siteInputs', Sync) {
+    from("$siteRoot/www") { include 'fonts/monocraft.*', 'data/tex/bench/thumb/**' }
+    into renderRoot
+}
+
+def mcJar = new File(gradle.gradleUserHomeDir, "caches/fabric-loom/${mcVersion}/minecraft-merged.jar")
+
+tasks.register('siteRenders', JavaExec) {
+    group = 'site'
+    description = 'Draws the still renders of the site (SiteExport, FALLBACK_LOOKS only) into build/site-renders/www.'
+    if (!siteRoot) {
+        throw new GradleException('pass -Psite_dir=<site worktree> (or SITE_DIR)')
+    }
+    dependsOn siteTex, siteInputs, 'compileJava'
+    finalizedBy 'siteRendersJar'
+    if (rootProject.findProject(':common')) {
+        dependsOn ':common:compileJava'
+    }
+    mainClass = 'SiteExport'
+    workingDir = rootDir
+    maxHeapSize = '1g'
+    jvmArgs '-XX:ActiveProcessorCount=4', '-Djava.util.concurrent.ForkJoinPool.common.parallelism=4'
+    systemProperty 'java.awt.headless', 'true'
+    systemProperty 'file.encoding', 'UTF-8'
+    systemProperty 'minuit.mod', rootDir.absolutePath
+    args renderRoot.get().asFile.absolutePath
+    doFirst {
+        if (!mcJar.isFile()) {
+            throw new GradleException("no merged Minecraft jar at $mcJar (the font and sprite assets come from it); run :common:compileJava for $mcVersion first")
+        }
+        classpath = files(sourceSets.main.runtimeClasspath, texcp, mcJar)
+    }
+    classpath = sourceSets.main.runtimeClasspath
+}
+
+// The jar is the way back: remotebuild --fetch copies jars from core/build/libs whose name holds -<mc>-.
+tasks.register('siteRendersJar', Jar) {
+    group = 'site'
+    dependsOn 'siteRenders'
+    from(renderRoot) { include 'renders/**', 'data/themes.json', 'data/tex/bench/head/**' }
+    destinationDirectory = project(':core').layout.buildDirectory.dir('libs')
+    archiveFileName = "minuit-site-renders-${mcVersion}-x.jar"
+}

@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -103,15 +104,18 @@ public final class TableDemo implements Demo {
         return ROW0_MID + row * ROW;
     }
 
+    /** A chest's contents for the item table; the pickaxe does not stack. */
+    private static final java.util.Map<String, Integer> CHEST = java.util.Map.of("minecraft:diamond", 12,
+            "minecraft:iron_pickaxe", 1, "minecraft:oak_log", 64, "minecraft:redstone", 37, "minecraft:apple", 5);
+
     @Override
     public void states(Stage stage) {
 
         stage.state("items", 220, 100, s -> {
             dev.dryaides.minuit.TableComponent<String> t = s.add(new dev.dryaides.minuit.TableComponent<String>(new Box("t", 6, 6, 208, 88),
                     dev.dryaides.minuit.TableComponent.ITEM_ROW)
-                    .itemColumn("Item", n -> dev.dryaides.minuit.ItemView.of(n, n.length() % 7 + 1))
-                    .column("Icon", c -> c.iconArt(n -> dev.dryaides.minuit.ItemView.of(n)).fixed(30).align(dev.dryaides.minuit.TableComponent.Align.CENTER))
-                    .textColumn("Mod", n -> n.substring(0, n.indexOf(':'))));
+                    .itemColumn("Item", n -> dev.dryaides.minuit.ItemView.of(n))
+                    .column("Count", c -> c.text(n -> String.valueOf(CHEST.get(n))).fixed(44).align(dev.dryaides.minuit.TableComponent.Align.RIGHT)));
             t.setItems(java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple"));
             s.move(40, 40);
         });
@@ -311,11 +315,11 @@ public final class TableDemo implements Demo {
             s.scroll(NAME_X, rowMid(1), -1);
             s.scroll(NAME_X, rowMid(1), 1);
             s.waitMs(400);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.scroll(NAME_X, rowMid(1), -1);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
         stage.state("5000 rows, visible rows only", W, H, s -> {

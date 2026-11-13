@@ -384,6 +384,7 @@ public class DrawerComponent extends BaseComponent {
         boolean overflow = flowH > room;
         ScrollComponent view = overflow ? new ScrollComponent(new Box("view", left, flowTop, inner, viewH)) : null;
         if (view != null) {
+            view.fit = false;
             view.step = LINE;
         }
         List<BaseComponent> flow = new ArrayList<>();
@@ -677,6 +678,11 @@ public class DrawerComponent extends BaseComponent {
     }
 
     @Override
+    public boolean keyReleasedCaptured(KeyPress press) {
+        return open && active && body != null && body.rawKeyReleased(press);
+    }
+
+    @Override
     protected boolean activate() {
         return ready() && active && body.keyPressed(InputKey.ENTER, false);
     }
@@ -727,7 +733,7 @@ public class DrawerComponent extends BaseComponent {
         dragStart = along(mx, my);
         dragShown = shown.value();
         lastPos = dragStart;
-        lastTime = clock.getAsLong();
+        lastTime = clock().getAsLong();
         speed = 0F;
     }
 
@@ -746,7 +752,7 @@ public class DrawerComponent extends BaseComponent {
         double moved = towardsEdge(pos - dragStart);
         // Never further in than it rests: a sheet has nothing behind it to show.
         shown.snap(Math.max(0F, Math.min(1F, dragShown - (float) (moved / Math.max(1, reach())))));
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         if (now > lastTime) {
             speed = (float) (towardsEdge(pos - lastPos) / (now - lastTime));
             lastTime = now;
@@ -760,7 +766,7 @@ public class DrawerComponent extends BaseComponent {
         if (dragging) {
             dragging = false;
             BaseComponent.click();
-            boolean fresh = clock.getAsLong() - lastTime <= FLICK_FRESH_MS;
+            boolean fresh = clock().getAsLong() - lastTime <= FLICK_FRESH_MS;
             if (1F - shown.value() >= CLOSE_AT || (fresh && speed >= FLICK)) {
                 close();
             } else {

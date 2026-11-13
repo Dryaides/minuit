@@ -232,11 +232,11 @@ public class BadgeComponent extends BaseComponent {
             return p.disabledText();
         }
         return switch (variant) {
-            case PRIMARY -> Ink.readable(p.primary(), under, Ink.TEXT);
+            case PRIMARY -> Ink.readable(p, p.markInk(), under, Ink.TEXT);
             case SECONDARY, OUTLINE -> p.text();
-            case GOOD -> Ink.readable(p.good(), under, Ink.TEXT);
-            case WARN -> Ink.readable(p.warn(), under, Ink.TEXT);
-            case BAD -> Ink.readable(p.bad(), under, Ink.TEXT);
+            case GOOD -> Ink.readable(p, p.good(), under, Ink.TEXT);
+            case WARN -> Ink.readable(p, p.warn(), under, Ink.TEXT);
+            case BAD -> Ink.readable(p, p.bad(), under, Ink.TEXT);
         };
     }
 
@@ -251,11 +251,13 @@ public class BadgeComponent extends BaseComponent {
         Palette p = t.palette();
         String label = capped(count, DEFAULT_MAX);
         int width = Math.max(HEIGHT, TextMeasure.width(label) - 1 + 2 * 2);
+        d.push(0F, 0F, 1F);
         d.nextLayer();
         t.frame().plate(d, p, right - width - 1, top - 1, width + 2, HEIGHT + 2, FormLook.surface(p), 0);
         t.frame().plate(d, p, right - width, top, width, HEIGHT, p.destructive(), 0);
         int ink = inkOn(p, p.destructive(), true);
         d.text(label, right - width + (width - TextMeasure.width(label) + 2) / 2, top + 2, ink);
+        d.pop();
     }
 
     @Override

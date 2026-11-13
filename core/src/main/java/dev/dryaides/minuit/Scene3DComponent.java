@@ -361,7 +361,7 @@ public class Scene3DComponent extends BaseComponent {
 
     /** True while the scene is turning by itself: on, not paused, not dragged, not disabled, motion allowed. */
     boolean rotating() {
-        return autoRotate && !paused && !dragging && !resetting && active && !reducedMotion;
+        return autoRotate && !paused && !dragging && !resetting && active && !reducedMotion();
     }
 
     public boolean atHome() {
@@ -378,7 +378,7 @@ public class Scene3DComponent extends BaseComponent {
     /** Goes back to the view of the start, smoothly unless {@link BaseComponent#reducedMotion} is on. */
     public void reset() {
         dragging = false;
-        if (reducedMotion) {
+        if (reducedMotion()) {
             resetting = false;
             home();
         } else {
@@ -416,11 +416,11 @@ public class Scene3DComponent extends BaseComponent {
 
     /** Moves time on: the rotation and a reset under way. Once a frame. */
     void step() {
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         long elapsed = lastFrame < 0L ? 0L : Math.max(0L, Math.min(MAX_STEP_MS, now - lastFrame));
         lastFrame = now;
         if (resetting) {
-            if (reducedMotion || !resetGlide.moving()) {
+            if (reducedMotion() || !resetGlide.moving()) {
                 resetting = false;
                 home();
             } else {

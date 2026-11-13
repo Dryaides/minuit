@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -51,8 +52,8 @@ public final class ContextMenuDemo implements Demo {
 
         Rig(Scene s) {
             this.s = s;
-            button = s.add(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Behind", () -> behind++));
-            slider = s.add(new SliderComponent(new Box("level", 106, 8, 120, 16), 0, 100, 40, v -> behind++));
+            button = s.fixture(new ButtonComponent(new Box("behind", 8, 8, 90, 20), "Settings", () -> behind++));
+            slider = s.fixture(new SliderComponent(new Box("level", 106, 8, 120, 16), 0, 100, 40, v -> behind++));
             s.caption(() -> note.isEmpty() ? log : note);
         }
 
@@ -386,13 +387,13 @@ public final class ContextMenuDemo implements Demo {
         stage.state("reduced motion snaps", W, H, s -> {
             Rig r = new Rig(s);
             ContextMenuComponent m = r.menu();
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 m.open(60, 34);
                 s.settle(0);
                 s.move(1, 1);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
     }

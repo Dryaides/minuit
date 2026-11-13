@@ -4,8 +4,9 @@ import dev.dryaides.minuit.client.MinuitClient;
 import dev.dryaides.minuit.client.ThemeReload;
 import dev.dryaides.minuit.port.mc.Bridges;
 import dev.dryaides.minuit.port.mc.BubbleLayer;
+import dev.dryaides.minuit.port.mc.HudFeed;
 import dev.dryaides.minuit.client.form.FormScreen;
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.port.mc.WirePayload;
 import dev.dryaides.minuit.internal.port.Platform;
@@ -23,7 +24,7 @@ import net.minecraft.server.packs.PackType;
 /**
  * Reads the player's theme choice before any screen asks for a theme, and the theme files on each
  * reload. Sends the hello once the server accepts {@code minuit:hello}, and shows the forms it sends.
- * Draws the speech bubbles over entities under the chat.
+ * Draws the speech bubbles over entities under the chat, and the mods' HUD parts over them.
  */
 public final class MinuitFabricClient implements ClientModInitializer {
 
@@ -40,6 +41,8 @@ public final class MinuitFabricClient implements ClientModInitializer {
                 Identifier.fromNamespaceAndPath("minuit", ThemeReload.ID), new ThemeReload());
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT,
                 Identifier.fromNamespaceAndPath("minuit", "bubbles"), BubbleLayer::render);
+        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT,
+                Identifier.fromNamespaceAndPath("minuit", "hud"), HudFeed::render);
 
         ClientPlayNetworking.registerGlobalReceiver(WirePayload.HELLO,
                 (payload, context) -> ClientPlayNetworking.send(hello()));

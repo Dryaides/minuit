@@ -14,10 +14,18 @@ public final class KeyRouter {
 
     /** Hands {@code stroke} to {@code panel}: a capturing widget takes it raw first. False lets the screen use it. */
     public static boolean press(PanelComponent panel, KeyStroke stroke, KeyCodes codes) {
+        if (Inspector.ENABLED && Inspector.toggle(stroke.code(), codes)) {
+            return true;
+        }
         if (panel.capturing() && panel.rawKey(KeyPress.key(stroke.code(), 0))) {
             return true;
         }
         return panel.keyPressed(key(stroke, codes), stroke.shift());
+    }
+
+    /** Hands a let-go key to the capturing widget of {@code panel}; false lets the screen use it. */
+    public static boolean release(PanelComponent panel, KeyStroke stroke) {
+        return panel.capturing() && panel.rawKeyReleased(KeyPress.key(stroke.code(), 0));
     }
 
     /** The kit's name for a key, Ctrl shortcuts included. */

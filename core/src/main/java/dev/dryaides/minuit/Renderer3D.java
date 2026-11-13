@@ -151,7 +151,10 @@ final class Renderer3D {
         madeCam = null;
     }
 
-    /** Clears the grid and takes up the camera and the theme's colours. {@code w} and {@code h} are in cells. */
+    /**
+     * Clears the grid and takes up the camera and the theme's colours. {@code w} and {@code h} are in cells. A null
+     * palette shades toward black with no theme tones, for a picture that keeps its own colours (an entity's texels).
+     */
     public void begin(Camera3D camera, Palette p, int w, int h) {
         startedAt = System.nanoTime();
         outW = Math.max(0, w);
@@ -188,6 +191,13 @@ final class Renderer3D {
     }
 
     private void resolveTheme(Palette p) {
+        if (p == null) {
+            ambient = LIGHT_AMBIENT;
+            shadowR = 0;
+            shadowG = 0;
+            shadowB = 0;
+            return;
+        }
         int surface = p.surface() | 0xFF000000;
         boolean dark = Shapes.luminance(surface) < DARK_THEME_LUMINANCE;
         ambient = dark ? DARK_AMBIENT : LIGHT_AMBIENT;

@@ -54,9 +54,26 @@ final class BenchDraw extends Draw {
         g.dispose();
     }
 
+    /**
+     * Snapped to device pixels as the game's rasterizer does: a pixel is filled when its centre lies in the rect,
+     * edges half-open, so the picture does not depend on how a region is split into rects. Under a fractional push
+     * a plain fillRect did (Dialog's slide state changed when Bubbly's fills were merged). Whole-pixel offsets fill
+     * exactly what a plain fillRect fills.
+     */
     @Override protected void rect(int x1, int y1, int x2, int y2, int color) {
+        AffineTransform t = g.getTransform();
+        int dx0 = snap(t.getScaleX() * Math.min(x1, x2) + t.getTranslateX());
+        int dx1 = snap(t.getScaleX() * Math.max(x1, x2) + t.getTranslateX());
+        int dy0 = snap(t.getScaleY() * Math.min(y1, y2) + t.getTranslateY());
+        int dy1 = snap(t.getScaleY() * Math.max(y1, y2) + t.getTranslateY());
         g.setColor(new Color(color, true));
-        g.fillRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+        g.setTransform(new AffineTransform());
+        g.fillRect(Math.min(dx0, dx1), Math.min(dy0, dy1), Math.abs(dx1 - dx0), Math.abs(dy1 - dy0));
+        g.setTransform(t);
+    }
+
+    private static int snap(double device) {
+        return (int) Math.ceil(device - 0.5);
     }
 
     @Override protected void string(String text, int x, int y, int color) {
@@ -64,7 +81,7 @@ final class BenchDraw extends Draw {
     }
 
     @Override public int width(String text) { return font.width(text); }
-    @Override protected String cut(String text, int width) { return font.cut(text, width); }
+    @Override public String cut(String text, int width) { return font.cut(text, width); }
     @Override public int guiScale() { return guiScale; }
 
     @Override public void blit(String texture, int x, int y, int u, int v, int w, int h, int texW, int texH, float alpha) {
@@ -110,7 +127,7 @@ final class BenchDraw extends Draw {
 
     /**
      * The game's own flat item picture from the cached game jar; a block item (no item picture) is drawn as the
-     * game's GUI block icon, three shaded faces from its block textures. Anything not found keeps the library's stand-in.
+     * game's GUI block icon, three shaded faces from its block textures. Anything not found stays an empty slot.
      */
     @Override public void item(dev.dryaides.minuit.ItemView item, int x, int y) {
         String id = item.id();
@@ -211,13 +228,13 @@ final class BenchDraw extends Draw {
         g.fillRect(x + w / 2, y + h / 2, w - w / 2, h - h / 2);
     }
 
-    @Override public void push(float x, float y, float scale) {
+    @Override protected void pushPose(float x, float y, float scale) {
         poses.push(g.getTransform());
         g.translate(x, y);
         g.scale(scale, scale);
     }
 
-    @Override public void pop() {
+    @Override protected void popPose() {
         g.setTransform(poses.pop());
     }
 

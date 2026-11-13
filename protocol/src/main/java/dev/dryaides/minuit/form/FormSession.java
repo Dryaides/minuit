@@ -7,9 +7,12 @@ import dev.dryaides.minuit.wire.ScreenMessage;
 import dev.dryaides.minuit.wire.WireException;
 import dev.dryaides.minuit.wire.WireNode;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -22,6 +25,7 @@ import java.util.regex.Pattern;
  */
 public final class FormSession {
 
+    private static final Set<String> PRESSABLE = Set.of("button", "product", "cart");
     private static final Pattern ID_SAFE = Pattern.compile("[a-z0-9_.-]*");
 
     private final int id;
@@ -58,14 +62,14 @@ public final class FormSession {
         if (slot == null) {
             return null;
         }
-        byte[] raw = slot.fields.get(Fields.VALUE);
+        byte[] raw = slot.fields.get(Fields.valueTag(slot.kind));
         return raw == null ? null : read(slot.kind, raw);
     }
 
     /** Sets an input's value; the client moves its widget. */
     public void set(String nodeId, Value value) {
         Slot slot = require(nodeId);
-        patch(nodeId, Fields.VALUE, write(slot.kind, value));
+        patch(nodeId, Fields.valueTag(slot.kind), write(slot.kind, value));
     }
 
     /** The label of a node, or the body of a text node. */
@@ -84,6 +88,109 @@ public final class FormSession {
 
     public void visible(String nodeId, boolean visible) {
         patch(nodeId, Fields.VISIBLE, Fields.bool(visible));
+    }
+
+    /** What a {@code balance} node shows the player has. */
+    public void amount(String nodeId, long amount) {
+        patch(nodeId, Fields.AMOUNT, Fields.varlong(amount));
+    }
+
+    /** How many of a {@code product} are left; -1 for no limit. */
+    public void stock(String nodeId, int stock) {
+        patch(nodeId, Fields.STOCK, Fields.svarint(Math.max(-1, stock)));
+    }
+
+    /** A {@code product}'s price as sold now; a {@code salePrice} of -1, or not below {@code price}, ends a sale. */
+    public void price(String nodeId, long price, long salePrice) {
+        long unit = salePrice >= 0 && salePrice < price ? salePrice : price;
+        patch(nodeId, Fields.PRICE, Fields.varlong(price));
+        patch(nodeId, Fields.SALE, Fields.varlong(unit));
+        byte[] name = require(nodeId).fields.get(Fields.LABEL);
+        if (name != null) {
+            patch(nodeId, Fields.FALLBACK, Fields.text(Form.Nodes.priced(Fields.readText(name), unit)));
+        }
+    }
+
+    /** Tells the player of a {@code cart} why its checkout was refused; an empty text clears it. */
+    public void refusal(String nodeId, Text reason) {
+        boolean clear = reason instanceof Text.Lit lit && lit.text().isEmpty();
+        byte[] now = require(nodeId).fields.get(Fields.REASON);
+        if (clear && (now == null || java.util.Arrays.equals(now, Fields.text(reason)))) {
+            return;
+        }
+        patch(nodeId, Fields.REASON, Fields.text(reason));
+        if (!clear) {
+            byte[] count = require(nodeId).fields.get(Fields.REFUSALS);
+            patch(nodeId, Fields.REFUSALS, Fields.varint(count == null ? 1 : Fields.readVarint(count) + 1));
+        }
+    }
+
+    /**
+     * Replaces the children of a node, such as the lines of a {@code cart}; the new ids must not be
+     * in use elsewhere in the form.
+     */
+    public void children(String nodeId, Consumer<Form.Column> body) {
+        Slot slot = require(nodeId);
+        List<WireNode> kids = Form.Nodes.children(body);
+        byte[] value = WireNode.encodeChildren(kids);
+        WireNode.decodeChildren(value);
+        Map<String, Slot> kept = new HashMap<>(this.slots);
+        forget(slot.kids, kept);
+        Set<String> seen = new HashSet<>(kept.keySet());
+        for (WireNode kid : kids) {
+            unique(kid, seen, nodeId);
+        }
+        this.slots.keySet().retainAll(kept.keySet());
+        slot.kids = kids;
+        for (WireNode kid : kids) {
+            index(kid, slot);
+        }
+        if (this.open) {
+            this.send.accept(new ScreenMessage.Patch(this.id, this.lastSeq,
+                    List.of(new ScreenMessage.FieldSet(nodeId, Fields.CHILDREN, value))).encode());
+        }
+    }
+
+    /** The ids of a node's children with an id, in order. */
+    List<String> childIds(String nodeId) {
+        List<String> ids = new ArrayList<>();
+        for (WireNode kid : require(nodeId).kids) {
+            if (!kid.id().isEmpty()) {
+                ids.add(kid.id());
+            }
+        }
+        return ids;
+    }
+
+    /** Sets one field of a node and sends it. */
+    void field(String nodeId, int tag, byte[] value) {
+        patch(nodeId, tag, value);
+    }
+
+    /** The raw field of a node with an id, or null. */
+    byte[] field(String nodeId, int tag) {
+        Slot slot = this.slots.get(nodeId);
+        return slot == null ? null : slot.fields.get(tag);
+    }
+
+    /** The kind of a node with an id, or null. */
+    String kind(String nodeId) {
+        Slot slot = this.slots.get(nodeId);
+        return slot == null ? null : slot.kind;
+    }
+
+    private void forget(List<WireNode> nodes, Map<String, Slot> from) {
+        for (WireNode node : nodes) {
+            Slot slot = node.id().isEmpty() ? null : from.remove(node.id());
+            forget(slot == null ? node.children() : slot.kids, from);
+        }
+    }
+
+    private static void unique(WireNode node, Set<String> seen, String under) {
+        if (!node.id().isEmpty() && !seen.add(node.id())) {
+            throw new IllegalArgumentException("node id " + node.id() + " twice under " + under);
+        }
+        node.children().forEach(child -> unique(child, seen, under));
     }
 
     /** Folds or unfolds a section. */
@@ -141,23 +248,24 @@ public final class FormSession {
         }
         if (input instanceof InputMessage.Press press) {
             Slot slot = this.slots.get(press.nodeId());
-            if (slot == null || !slot.kind.equals("button") || !live(slot)) {
+            if (slot == null || !PRESSABLE.contains(slot.kind) || !live(slot)) {
                 return false;
             }
-            this.handler.pressed(this, press.nodeId());
+            this.handler.pressed(this, press.nodeId(), press.confirmed());
             return true;
         }
         if (input instanceof InputMessage.Change change) {
             Slot slot = this.slots.get(change.nodeId());
-            if (slot == null || !slot.fields.containsKey(Fields.VALUE) || !live(slot)) {
+            int tag = slot == null ? Fields.VALUE : Fields.valueTag(slot.kind);
+            if (slot == null || !slot.fields.containsKey(tag) || !live(slot)) {
                 return false;
             }
             Value value = checked(slot, change.value());
             if (value == null) {
-                patch(change.nodeId(), Fields.VALUE, slot.fields.get(Fields.VALUE));
+                patch(change.nodeId(), tag, slot.fields.get(tag));
                 return false;
             }
-            slot.fields.put(Fields.VALUE, write(slot.kind, value));
+            slot.fields.put(tag, write(slot.kind, value));
             this.handler.changed(this, change.nodeId(), value);
             return true;
         }
@@ -189,6 +297,11 @@ public final class FormSession {
                     int max = svarint(slot, Fields.MAX, 0);
                     int step = Math.max(1, svarint(slot, Fields.STEP, 1));
                     return n.value() >= min && n.value() <= max && (n.value() - min) % step == 0 ? n : null;
+                }
+                if (slot.kind.equals("product")) {
+                    int stock = svarint(slot, Fields.STOCK, -1);
+                    int max = stock < 0 ? Limits.QUANTITY : Math.min(stock, Limits.QUANTITY);
+                    return n.value() >= 0 && n.value() <= max ? n : null;
                 }
                 if (slot.kind.equals("dropdown")) {
                     return n.value() >= 0 && n.value() < Fields.readOptions(slot.fields.get(Fields.OPTIONS)).size() ? n : null;
@@ -231,7 +344,7 @@ public final class FormSession {
             case "toggle" -> new Value.Bool(Fields.readBool(raw));
             case "slider" -> new Value.Num(Fields.readSvarint(raw));
             case "field" -> new Value.Str(Fields.readStr(raw, Limits.FIELD_LENGTH));
-            case "dropdown", "tabs" -> new Value.Num(Fields.readVarint(raw));
+            case "dropdown", "tabs", "product" -> new Value.Num(Fields.readVarint(raw));
             default -> throw new WireException("no value for " + kind);
         };
     }
@@ -243,7 +356,7 @@ public final class FormSession {
         if (value instanceof Value.Num n && kind.equals("slider")) {
             return Fields.svarint(n.value());
         }
-        if (value instanceof Value.Num n && (kind.equals("dropdown") || kind.equals("tabs"))) {
+        if (value instanceof Value.Num n && (kind.equals("dropdown") || kind.equals("tabs") || kind.equals("product"))) {
             return Fields.varint(n.value());
         }
         if (value instanceof Value.Str s && kind.equals("field")) {
@@ -263,8 +376,8 @@ public final class FormSession {
     }
 
     private WireNode now(WireNode node) {
-        List<WireNode> children = node.children().stream().map(this::now).toList();
         Slot slot = node.id().isEmpty() ? null : this.slots.get(node.id());
+        List<WireNode> children = (slot == null ? node.children() : slot.kids).stream().map(this::now).toList();
         if (slot == null) {
             return new WireNode(node.kind(), node.id(), node.fields(), children);
         }
@@ -278,7 +391,7 @@ public final class FormSession {
         Slot slot = parent;
         boolean gate = node.field(Fields.VISIBLE).isPresent() || node.field(Fields.ENABLED).isPresent();
         if (!node.id().isEmpty() || gate) {
-            slot = new Slot(node.kind(), parent, node.children().size());
+            slot = new Slot(node.kind(), parent, node.children().size(), node.children());
             for (WireNode.Field f : node.fields()) {
                 slot.fields.put(f.tag(), f.value());
             }
@@ -296,11 +409,13 @@ public final class FormSession {
         final Slot parent;
         final int pages;
         final Map<Integer, byte[]> fields = new TreeMap<>();
+        List<WireNode> kids;
 
-        Slot(String kind, Slot parent, int pages) {
+        Slot(String kind, Slot parent, int pages, List<WireNode> kids) {
             this.kind = kind;
             this.parent = parent;
             this.pages = pages;
+            this.kids = kids;
         }
     }
 }

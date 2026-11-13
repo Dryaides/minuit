@@ -41,6 +41,7 @@ public class CardComponent extends BaseComponent {
     private static final int MIN_ROOM = 12;
 
     private final List<ButtonComponent> buttons = new ArrayList<>();
+    private final List<Boolean> buttonsOn = new ArrayList<>();
     private final SurfaceLook.Tween lifted = new SurfaceLook.Tween(LIFT_MS, 0F);
     private final RowLook.HoverFade hoverFade = new RowLook.HoverFade();
 
@@ -143,7 +144,16 @@ public class CardComponent extends BaseComponent {
         ButtonComponent button = new ButtonComponent(new Box("card-action", x, y, BUTTON_MIN, BUTTON_H), label, onPress);
         button.role(role == null ? ButtonComponent.Role.SECONDARY : role);
         buttons.add(button);
+        buttonsOn.add(true);
         lastButtonsW = -1;
+        return this;
+    }
+
+    /** Turns one footer button off or back on, by its index; the card's own {@code active} still wins. */
+    public CardComponent footerButtonActive(int index, boolean on) {
+        if (index >= 0 && index < buttonsOn.size()) {
+            buttonsOn.set(index, on);
+        }
         return this;
     }
 
@@ -219,7 +229,7 @@ public class CardComponent extends BaseComponent {
         return liftNow;
     }
 
-    /** The footer's buttons, to read or to turn off one at a time. */
+    /** The footer's buttons, to read or to give a tooltip; {@link #footerButtonActive} turns one off. */
     public List<ButtonComponent> buttons() {
         return List.copyOf(buttons);
     }
@@ -251,10 +261,21 @@ public class CardComponent extends BaseComponent {
     }
 
     private int footerH() {
+        int lead = footerLeadH();
         if (!buttons.isEmpty()) {
-            return RULE_GAP + 1 + RULE_GAP + BUTTON_H;
+            return RULE_GAP + 1 + RULE_GAP + Math.max(BUTTON_H, lead);
         }
-        return footerText.isEmpty() ? 0 : RULE_GAP + 1 + RULE_GAP + FONT_H;
+        return lead <= 0 ? 0 : RULE_GAP + 1 + RULE_GAP + Math.max(FONT_H, lead);
+    }
+
+    /** How tall the footer's lead is, 0 for none: the footer text by default. */
+    int footerLeadH() {
+        return footerText.isEmpty() ? 0 : FONT_H;
+    }
+
+    /** Draws the footer's lead in the bar from {@code left}, {@code room} wide, {@code barH} tall from {@code top}. */
+    void drawFooterLead(Draw d, Theme t, int left, int top, int room, int barH, int soft) {
+        d.textFit(footerText, left, top + (barH - FONT_H) / 2 + 1, room, soft);
     }
 
     private int innerW() {
@@ -304,7 +325,7 @@ public class CardComponent extends BaseComponent {
             button.x = right;
             button.y = by;
             right -= BUTTON_GAP;
-            button.active = active;
+            button.active = active && buttonsOn.get(i);
             button.visible = h >= footerH() + 2 * PAD;
         }
     }
@@ -444,24 +465,24 @@ public class CardComponent extends BaseComponent {
             d.text(row, left, line, soft);
             line += LINE;
         }
-        drawFooter(d, p, cy, soft);
+        drawFooter(d, t, p, cy, soft);
     }
 
-    private void drawFooter(Draw d, Palette p, int cy, int soft) {
+    private void drawFooter(Draw d, Theme t, Palette p, int cy, int soft) {
         int footer = footerH();
         if (footer == 0 || h < footer + 2 * PAD) {
             return;
         }
         int ruleY = cy + h - PAD - footer + RULE_GAP - 1;
         d.fill(x + PAD, ruleY, x + w - PAD, ruleY + 1, p.surfaceEdge());
-        if (!footerText.isEmpty()) {
+        if (footerLeadH() > 0) {
             int room = innerW();
             int barH = footer - RULE_GAP - 1 - RULE_GAP;
             if (!buttons.isEmpty()) {
                 room = buttons.get(0).x - BUTTON_GAP - (x + PAD);
             }
             if (room >= MIN_ROOM) {
-                d.textFit(footerText, x + PAD, cy + h - PAD - barH + (barH - FONT_H) / 2 + 1, room, soft);
+                drawFooterLead(d, t, x + PAD, cy + h - PAD - barH, room, barH, soft);
             }
         }
     }

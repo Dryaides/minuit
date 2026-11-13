@@ -13,8 +13,8 @@ public final class ScreenAreas {
     }
 
     /**
-     * The panel, its visible windows and its open overlay, each one left out when it lies inside
-     * {@code container} (the vanilla container box the viewer already avoids), or every one for null.
+     * The panel, its visible windows, its expandable hotbar as far as it shows now and its open overlay,
+     * each one left out when it lies inside {@code container} (the vanilla container box the viewer already avoids), or every one for null.
      */
     public static List<Box> outside(PanelComponent panel, Box container) {
         List<Box> out = new ArrayList<>();
@@ -22,6 +22,8 @@ public final class ScreenAreas {
         for (BaseComponent widget : panel.widgets()) {
             if (widget.visible && widget instanceof WindowComponent) {
                 add(out, widget.box(), container);
+            } else if (widget.visible && widget instanceof ExpandableHotbarComponent) {
+                add(out, ((ExpandableHotbarComponent) widget).coveredArea(), container);
             }
         }
         BaseComponent open = panel.overlay();
@@ -31,7 +33,7 @@ public final class ScreenAreas {
         return out;
     }
 
-    /** True when the point lies under the panel, one of its visible windows or its open overlay. */
+    /** True when the point lies under the panel, one of its visible windows, its hotbar or its open overlay. */
     public static boolean covers(PanelComponent panel, int x, int y) {
         for (Box area : outside(panel, null)) {
             if (area.contains(x, y)) {

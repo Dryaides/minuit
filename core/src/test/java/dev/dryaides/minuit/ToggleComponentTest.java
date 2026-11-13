@@ -1,5 +1,6 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.HostState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +27,7 @@ class ToggleComponentTest {
         }
 
         @Override
-        protected String cut(String text, int maxWidth) {
+        public String cut(String text, int maxWidth) {
             return text;
         }
 
@@ -35,11 +36,11 @@ class ToggleComponentTest {
         }
 
         @Override
-        public void push(float x, float y, float scale) {
+        protected void pushPose(float x, float y, float scale) {
         }
 
         @Override
-        public void pop() {
+        protected void popPose() {
         }
 
         @Override
@@ -59,8 +60,8 @@ class ToggleComponentTest {
 
     @AfterEach
     void reset() {
-        BaseComponent.clock = System::currentTimeMillis;
-        BaseComponent.screenMotion = MotionStyle.SUBTLE;
+        HostState.clock(System::currentTimeMillis);
+        HostState.screenMotion(MotionStyle.SUBTLE);
     }
 
     /** The x the theme's frame style is asked to draw the knob at, the style itself drawing as usual. */
@@ -89,13 +90,13 @@ class ToggleComponentTest {
      */
     @Test
     void unflippedKnobStaysOnItsSide() {
-        BaseComponent.clock = () -> this.now;
+        HostState.clock(() -> this.now);
         Theme[] themes = {Themes.MINIMALIST, Themes.SLATE, Themes.LEATHER};
         ToggleComponent hints = new ToggleComponent(new Box("hints", 10, 42, 140, 12), "Show hints", false, v -> { });
         int off = 10 + 1;
         for (int loop = 0; loop < 6; loop++) {
             for (MotionStyle m : MotionStyle.values()) {
-                BaseComponent.screenMotion = m;
+                HostState.screenMotion(m);
                 for (Theme theme : themes) {
                     for (int frame = 0; frame < 40; frame++) {
                         this.now += 16;
@@ -107,7 +108,7 @@ class ToggleComponentTest {
         }
         hints.value = true;
         for (MotionStyle m : new MotionStyle[]{MotionStyle.SUBTLE, MotionStyle.BOUNCY, MotionStyle.NONE}) {
-            BaseComponent.screenMotion = m;
+            HostState.screenMotion(m);
             this.now += 16;
             assertEquals(off + ToggleComponent.SWITCH - 10, knobLeft(hints, Themes.MINIMALIST), m.toString());
         }

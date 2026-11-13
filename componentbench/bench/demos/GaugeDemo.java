@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Stage;
 import dev.dryaides.minuit.BaseComponent;
@@ -13,7 +14,7 @@ public final class GaugeDemo implements Demo {
     private static final int H = 86;
 
     private static GaugeComponent load(double value) {
-        return new GaugeComponent(new Box("g", 6, 6, W - 12, H - 12), 0, 100, value).zones(60, 85).label("Load").unit("%");
+        return new GaugeComponent(new Box("g", 8, 8, W - 16, H - 16), 0, 100, value).zones(60, 85).label("Load").unit("%");
     }
 
     @Override
@@ -31,16 +32,16 @@ public final class GaugeDemo implements Demo {
         });
 
         stage.state("no zones takes primary", W, H, s -> {
-            GaugeComponent c = s.add(new GaugeComponent(new Box("g", 6, 6, W - 12, H - 12), 0, 20, 13).label("Render").unit(" ch"));
+            GaugeComponent c = s.add(new GaugeComponent(new Box("g", 8, 8, W - 16, H - 16), 0, 20, 13).label("Render").unit(" ch"));
         });
 
-        stage.state("half dial", W, 70, s -> s.add(new GaugeComponent(new Box("g", 6, 6, W - 12, 58), 0, 100, 64)
+        stage.state("half dial", W, 74, s -> s.add(new GaugeComponent(new Box("g", 8, 8, W - 16, 58), 0, 100, 64)
                 .sweep(180).zones(30, 70).label("Hunger").unit("%")));
 
-        stage.state("full circle", W, H, s -> s.add(new GaugeComponent(new Box("g", 6, 6, W - 12, H - 12), 0, 1, 0.7)
+        stage.state("full circle", W, H, s -> s.add(new GaugeComponent(new Box("g", 8, 8, W - 16, H - 16), 0, 1, 0.7)
                 .sweep(360).zones(0.5).valueFormat(v -> Math.round(v * 100) + "%").label("Share")));
 
-        stage.state("thick own colours", W, H, s -> s.add(new GaugeComponent(new Box("g", 6, 6, W - 12, H - 12), 0, 10, 8)
+        stage.state("thick own colours", W, H, s -> s.add(new GaugeComponent(new Box("g", 8, 8, W - 16, H - 16), 0, 10, 8)
                 .thickness(10).zones(3, 6, 9).zoneColors(0xFF3366FF, 0xFF33CCCC, 0xFFFFCC33, 0xFFFF3366).label("Heat")));
 
         stage.state("empty and full", 170, 60, s -> {
@@ -76,17 +77,17 @@ public final class GaugeDemo implements Demo {
             GaugeComponent c = s.add(load(10));
             s.settle(0);
             s.waitMs(20);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 c.setValue(77);
                 s.waitMs(16);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
         stage.state("very long words", 220, H, s -> {
-            GaugeComponent c = s.add(new GaugeComponent(new Box("g", 6, 6, W - 12, H - 12), 0, 1000000, 987654)
+            GaugeComponent c = s.add(new GaugeComponent(new Box("g", 8, 8, W - 16, H - 16), 0, 1000000, 987654)
                     .label("A really very long label for it").unit(" blocks per hour"));
             s.move(50, 40);
             List<String> tip = s.panel().tooltipAt(50, 40);

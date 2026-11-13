@@ -7,6 +7,7 @@
     python build.py gallery --demo Button --themes soft:grey:light,glass:clear:dark --scale 3
     python build.py gallery --demo Button --state hover,disabled    redraw only these states, keep the rest
     python build.py ingame     run the repo's Gradle wrapper in ingame/ (build, runClient ...)
+    python build.py ingame1201 the same in ingame1201/, the 1.20.1 Fabric frame bench (no runClient: see its README)
 
 Tools: a JDK 17 or newer, from $MINUIT_JDK (the JDK folder) or else the java and javac on PATH; Gson from
 $MINUIT_GSON (the jar) or else the newest Gson in the Gradle cache (~/.gradle). Nothing is downloaded.
@@ -63,7 +64,7 @@ RELEASE = "17"
 def setup():
     """Checks the tools and makes the test pictures (bench/images/*.png are not in git)."""
     print("javac:", find_tool("javac"), " Gson:", find_gson())
-    subprocess.run([find_tool("java"), "bench/images/MakeImages.java", "bench/images"], cwd=ROOT, check=True)
+    subprocess.run([find_tool("java"), "-Dbench.mcjar=" + mc_jar(), "bench/images/MakeImages.java", "bench/images"], cwd=ROOT, check=True)
 
 
 def sources(*dirs):
@@ -99,7 +100,9 @@ def compile_all(out):
 
 def merged_assets(d):
     out = d / "assets"
-    for a in ASSET_DIRS:
+    # BENCH_PACKS: resource packs' assets folders, merged over the kit's, so a family drawn from PNGs previews here
+    packs = [Path(p) for p in os.environ.get("BENCH_PACKS", "").split(os.pathsep) if p]
+    for a in ASSET_DIRS + packs:
         shutil.copytree(a, out, dirs_exist_ok=True)
     return out
 
@@ -180,10 +183,33 @@ def run(cmd, args):
                                      *args[1:]]).returncode)
         finally:
             shutil.rmtree(d, ignore_errors=True)
-    elif cmd == "ingame":
+    elif cmd == "imgfamily":
+        # imgfamily <family> <chroma> <light|dark> <outdir>: export a code family to sprites, load it back, diff
+        d = run_dir()
+        try:
+            cp = compile_all(d)
+            code = subprocess.run([find_tool("java"), "-Xms32m", "-Xmx768m", "-Djava.awt.headless=true",
+                                   "-Dfile.encoding=UTF-8", "-Dbench.classes=" + str(cp[0]),
+                                   "-Dbench.assets=" + str(merged_assets(d)), "-Dbench.mcjar=" + mc_jar(),
+                                   "-cp", os.pathsep.join(str(c) for c in cp), "bench.render.ImageFamilyProof",
+                                   *args[1:]]).returncode
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        sys.exit(code)
+    elif cmd == "imgalloc":
+        # imgalloc: bytes allocated per sprite draw of a family from images after warm-up; exit 1 unless 0
+        d = run_dir()
+        try:
+            cp = compile_all(d)
+            code = subprocess.run([find_tool("java"), "-Xms32m", "-Xmx256m", "-Djava.awt.headless=true",
+                                   "-cp", os.pathsep.join(str(c) for c in cp), "bench.render.ImageFamilyAlloc"]).returncode
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        sys.exit(code)
+    elif cmd in ("ingame", "ingame1201"):
         wrapper = PROJECT / ("gradlew.bat" if os.name == "nt" else "gradlew")
         sys.exit(subprocess.run([str(wrapper), "--no-daemon", "--console=plain", *(args[1:] or ["build"])],
-                                cwd=ROOT / "ingame").returncode)
+                                cwd=ROOT / cmd).returncode)
     else:
         sys.exit(__doc__)
 

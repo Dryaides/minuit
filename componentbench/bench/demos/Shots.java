@@ -52,15 +52,20 @@ public final class Shots {
         return Picture.of(image("portrait.png", 720, 1280)).caption("Tower, portrait").alt("A stone tower");
     }
 
-    public static Picture gem() {
-        return Picture.texture(DIR + "gem.png", 16, 16).pixelArt().alt("A gem, 16 x 16");
+    public static Picture emerald() {
+        return Picture.texture("minecraft:textures/item/emerald.png", 16, 16).pixelArt().alt("Emerald, 16 x 16");
     }
 
     public static Picture face() {
         return Picture.texture(DIR + "face.png", 16, 16).pixelArt().alt("A face, 16 x 16");
     }
 
+    /** The game's painting Sunset, 32 x 16. */
+    public static Picture painting() {
+        return Picture.texture("minecraft:textures/painting/sunset.png", 32, 16).pixelArt().caption("Sunset").alt("The painting Sunset");
+    }
+
     public static List<Picture> gallery() {
-        return List.of(day(), sunset(), night(), snow(), desert(), portrait(), pattern().caption("Test chart"));
+        return List.of(day(), sunset(), night(), snow(), desert(), portrait(), painting());
     }
 }

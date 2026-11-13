@@ -28,6 +28,23 @@ public final class AvatarDemo implements Demo {
         stage.state("group with pictures", 140, 40, s -> s.add(new AvatarGroupComponent(new Box("g", 8, 8, 124, 24), java.util.List.of(
                 new AvatarGroupComponent.Member("Alex Stone", null), new AvatarGroupComponent.Member("Sam Reed", null), new AvatarGroupComponent.Member("Kim Lee", null)))
                 .pictures(java.util.Arrays.asList(Shots.face(), null, Picture.item("minecraft:apple")))));
+        stage.state("heads, initials while a skin loads", W, 40, s -> {
+            Status[] status = {Status.ONLINE, Status.AWAY, Status.BUSY, Status.NONE, Status.OFFLINE};
+            for (int i = 0; i < 5; i++) {
+                String name = Mc.PLAYERS.get(i);
+                s.add(new AvatarComponent(new Box("a" + i, 8 + i * 28, 8, 24, 24), name).skin(Mc.skin(name)).status(status[i]));
+            }
+            s.add(new AvatarComponent(new Box("a5", 148, 8, 24, 24), "Makena").skin(AsyncImage.pending()));
+        });
+        stage.state("sizes with heads", W, 44, s -> {
+            int[] sizes = {8, 10, 12, 16, 20, 24, 32};
+            int at = 6;
+            for (int i = 0; i < sizes.length; i++) {
+                String name = Mc.PLAYERS.get(i);
+                s.add(new AvatarComponent(new Box("a" + sizes[i], at, 6, sizes[i], sizes[i]), name).skin(Mc.skin(name)).status(Status.ONLINE));
+                at += sizes[i] + 6;
+            }
+        });
         stage.state("initials", W, 40, s -> {
             String[] names = {"Alex Stone", "Steve", "Notch", "Jeb Bergensten", "Marie-Luise Kaya", "dinnerbone"};
             for (int i = 0; i < names.length; i++) {

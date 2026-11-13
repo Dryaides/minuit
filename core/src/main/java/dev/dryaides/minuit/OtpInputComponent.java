@@ -203,7 +203,7 @@ public class OtpInputComponent extends BaseComponent {
 
     private void changed() {
         rebuildValue();
-        caretSince = BaseComponent.clock.getAsLong();
+        caretSince = BaseComponent.clock().getAsLong();
         if (onChange != null) {
             onChange.accept(value);
         }
@@ -230,7 +230,7 @@ public class OtpInputComponent extends BaseComponent {
     private void moveCaret(int to) {
         allMarked = false;
         caret = Math.max(0, Math.min(caretEnd(), to));
-        caretSince = BaseComponent.clock.getAsLong();
+        caretSince = BaseComponent.clock().getAsLong();
     }
 
     private void clearAll() {

@@ -101,6 +101,42 @@ class SlotPlacementTest {
     }
 
     @Test
+    void armourOutlineHasOneOwnerAndUnplacedSlotsAreNeverFound() {
+        // The owner's 2.0 rules: the theme draws a placed slot's game outline unless its part sets its own;
+        // the pointer finds no slot a part leaves out; a screen without a panel keeps every slot.
+        SlotComponent helmet = new SlotComponent(new Box("helmet", 7, 7, 18, 18));
+        helmet.empty = SpriteIcon.item("minuit:helmet_outline");
+        SlotComponent chest = new SlotComponent(new Box("chest", 7, 25, 18, 18));
+        SlotPlacement placement = SlotPlacement.of(panel(176, new PlayerInventoryComponent(INVENTORY), helmet, chest), playerMenu());
+        List<String> sprites = new ArrayList<>();
+        Draw d = new Draw() {
+            @Override protected void rect(int x0, int y0, int x1, int y1, int argb) { }
+            @Override protected void string(String text, int x, int y, int argb) { }
+            @Override public int width(String text) { return 6 * text.length(); }
+            @Override public String cut(String text, int maxWidth) { return text; }
+            @Override public void blit(String texture, int x, int y, int u, int v, int w, int h, int texW, int texH, float alpha) { }
+            @Override protected void pushPose(float x, float y, float scale) { }
+            @Override protected void popPose() { }
+            @Override public void scissor(int x0, int y0, int x1, int y1) { }
+            @Override public void endScissor() { }
+            @Override public void tooltip(List<String> lines, int x, int y) { }
+            @Override public void sprite(String atlas, String sprite, int x, int y, int w, int h, float alpha) {
+                sprites.add(sprite + "@" + x + "," + y);
+            }
+        };
+        placement.drawGhost(d, 5, SpriteIcon.gui("minecraft:container/slot/helmet", 16, 16), 8, 8);
+        placement.drawGhost(d, 6, SpriteIcon.gui("minecraft:container/slot/chestplate", 16, 16), 8, 26);
+        assertEquals(List.of("minecraft:container/slot/chestplate@8,26"), sprites);
+
+        assertTrue(placement.finds(5));
+        assertTrue(placement.finds(20));
+        assertFalse(placement.finds(0), "craft result");
+        assertFalse(placement.finds(7), "leggings");
+        assertFalse(placement.finds(45), "offhand");
+        assertTrue(SlotPlacement.NONE.finds(45));
+    }
+
+    @Test
     void widgetsOnTopHideSlotsAndPassiveOnesDoNot() {
         PanelComponent[] holder = new PanelComponent[1];
         DropdownComponent dropdown = new DropdownComponent(new Box("sort", 100, 20, 60, 14), "Sort", 100, 60,

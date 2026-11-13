@@ -1,3 +1,4 @@
+import dev.dryaides.minuit.internal.HostState;
 import java.io.IOException;
 import dev.dryaides.minuit.BaseComponent;
 import dev.dryaides.minuit.ItemSource;
@@ -7,7 +8,8 @@ import dev.dryaides.minuit.ThemeChoice;
 import dev.dryaides.minuit.ThemeFamily;
 import dev.dryaides.minuit.Themes;
 import dev.dryaides.minuit.internal.ThemeFiles;
-import site.SlotScenes;
+import dev.dryaides.minuit.internal.showcase.McScenes;
+import dev.dryaides.minuit.internal.showcase.SlotScenes;
 
 import java.io.File;
 import java.util.List;
@@ -25,7 +27,8 @@ public class SlotBench {
         File out = new File(args.length > 0 ? args[0] : "out/slot");
         out.mkdirs();
         BenchDraw.McFont font = new BenchDraw.McFont();
-        BaseComponent.clock = () -> WidgetBench.now;
+        HostState.clock(() -> WidgetBench.now);
+        dev.dryaides.minuit.ItemLookup.plugIn(McScenes.LOOKUP);
         int shots = 0;
         String looks = args.length > 1 ? args[1] : "bedrock/bedrock,slate/teal";
         for (String look : looks.split(",")) {
@@ -42,6 +45,7 @@ public class SlotBench {
                 ItemView under = ItemSource.under(scene, mx, my);
                 WidgetBench.expect(name + " item under the mouse", "minecraft:oak_log", under == null ? null : under.id());
                 shots += WidgetBench.shot(font, SlotScenes.hudScene(theme), -1, -1, out, "hud-" + name);
+                shots += WidgetBench.shot(font, SlotScenes.equipmentScene(theme), -1, -1, out, "equipment-" + name);
             }
         }
         System.out.println(shots + " shots, " + WidgetBench.problems.size() + " problems");

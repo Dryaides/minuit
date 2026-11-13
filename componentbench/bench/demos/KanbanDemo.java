@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -109,11 +110,11 @@ public final class KanbanDemo implements Demo {
         stage.state("reduced motion does not slide", W, H, s -> {
             KanbanComponent<String> c = s.add(board(null));
             s.settle(0);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 holdOver(s, c, 0, 0, 1, BenchAccess.cardBox(c, 1, 1).y() + 3);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

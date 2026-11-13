@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Stage;
 import dev.dryaides.minuit.BaseComponent;
@@ -14,18 +15,26 @@ import java.util.List;
 public final class DonutChartDemo implements Demo {
     private static final int W = 200;
     private static final int H = 96;
+    /** The ores in their own colours, as the game draws the ingot or the gem. */
+    static final int IRON = 0xFFE2C9B5;
+    static final int GOLD = 0xFFFCEE4B;
+    static final int COPPER = 0xFFE77C56;
+    static final int DIAMOND = 0xFF4AEDD9;
+    static final int REDSTONE = 0xFFE0281C;
+    static final int EMERALD = 0xFF41DC7A;
+    static final int LAPIS = 0xFF4A6FE0;
 
     private static DonutChartComponent ores(Box box) {
         return new DonutChartComponent(box).centerLabel("Blocks")
-                .slice("Iron", 120).slice("Gold", 40).slice("Copper", 80).slice("Diamond", 12);
+                .slice("Iron", 120, IRON).slice("Gold", 40, GOLD).slice("Copper", 80, COPPER).slice("Diamond", 12, DIAMOND);
     }
 
     /** A storage: a few big piles and a tail of rare things. */
     private static DonutChartComponent storage(Box box) {
         return new DonutChartComponent(box).centerLabel("Items")
-                .slice("Cobblestone", 1234).slice("Dirt", 640).slice("Andesite", 300).slice("Iron ingot", 64)
-                .slice("Gold ingot", 12).slice("Coal", 9).slice("Diamond", 5).slice("Redstone", 3)
-                .slice("Emerald", 2).slice("Lapis", 1);
+                .slice("Cobblestone", 1234).slice("Dirt", 640).slice("Andesite", 300).slice("Iron ingot", 64, IRON)
+                .slice("Gold ingot", 12, GOLD).slice("Coal", 9).slice("Diamond", 5, DIAMOND).slice("Redstone", 3, REDSTONE)
+                .slice("Emerald", 2, EMERALD).slice("Lapis", 1, LAPIS);
     }
 
     /** Each slice about half the one before: how much goes into Other depends on the size alone. */
@@ -284,11 +293,11 @@ public final class DonutChartDemo implements Demo {
             DonutChartComponent c = s.add(ores(big()));
             int[] at = onSlice(c, 0);
             s.settle(0);
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.move(at[0], at[1]);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

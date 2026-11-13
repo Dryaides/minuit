@@ -5,6 +5,7 @@ package dev.dryaides.minuit;
  * creative inventory's tabs. The host draws it before the panel, so the panel's frame covers its
  * foot. When the panel leaves no room above it, the tab sticks out of the left edge instead.
  */
+@Internal
 public final class ThemeTab {
 
     /** Across and out of the edge, foot included. */
@@ -35,6 +36,21 @@ public final class ThemeTab {
         return at(panel).contains(mx, my) && !panel.contains(mx, my);
     }
 
+    /**
+     * Where the tab sits on the top edge of a container screen minuit does not draw, the screen's
+     * corner at {@code left}, {@code top}: whole and resting on the edge, since that screen's frame
+     * covers no foot.
+     */
+    public static Box onEdge(int left, int top) {
+        return new Box("theme tab", left + INSET, top - OUT + FOOT, ACROSS, OUT - FOOT);
+    }
+
+    /** Draws a tab at {@code tab} from {@link #onEdge}, closed on every side. */
+    public static void drawOnEdge(Draw d, Theme theme, Box tab, boolean over) {
+        theme.frame().panel(d, theme.palette(), tab.x(), tab.y(), tab.w(), tab.h());
+        face(d, theme, tab.x() + 1, tab.y() + 1, tab.w() - 2, tab.h() - 2, true, over);
+    }
+
     public static void draw(Draw d, Theme theme, Box panel, int mx, int my) {
         Box tab = at(panel);
         Palette p = theme.palette();
@@ -42,13 +58,14 @@ public final class ThemeTab {
         boolean above = tab.y() < panel.y();
         int shownW = above ? tab.w() : tab.w() - FOOT;
         int shownH = above ? tab.h() - FOOT : tab.h();
-        IconArt themed = theme.icon(Icon.PALETTE);
-        boolean over = isOver(panel, mx, my);
         // Face inside the frame's 1 px outline; the panel's own frame closes the foot side.
-        int faceX = tab.x() + 1;
-        int faceY = tab.y() + 1;
-        int faceW = above ? shownW - 2 : shownW - 1;
-        int faceH = above ? shownH - 1 : shownH - 2;
+        face(d, theme, tab.x() + 1, tab.y() + 1, above ? shownW - 2 : shownW - 1, above ? shownH - 1 : shownH - 2,
+                above, isOver(panel, mx, my));
+    }
+
+    private static void face(Draw d, Theme theme, int faceX, int faceY, int faceW, int faceH, boolean above, boolean over) {
+        Palette p = theme.palette();
+        IconArt themed = theme.icon(Icon.PALETTE);
         if (themed != Icon.PALETTE.glyph()) {
             d.icon(themed, faceX + (faceW - themed.width()) / 2, faceY + (faceH - themed.height()) / 2,
                     over ? p.accent() : p.text());

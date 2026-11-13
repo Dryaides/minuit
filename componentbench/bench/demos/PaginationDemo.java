@@ -54,6 +54,11 @@ public final class PaginationDemo implements Demo {
         stage.state("start_of_many", W, H, s -> {
             Rig r = new Rig(s, 200, 10);
         });
+        stage.state("worlds, page 10 of 20", W, 44, s -> {
+            PaginationComponent c = s.add(new PaginationComponent(new Box("pages", 8, 8, 274, 16), s.panel(), 200, 10, p -> { }));
+            c.setPage(9);
+            s.caption(() -> "Worlds " + (c.firstItem() + 1) + " to " + Math.min(c.total(), c.firstItem() + c.pageSize()) + " of 200");
+        });
         stage.state("middle_of_many", W, H, s -> {
             Rig r = new Rig(s, 200, 10);
             r.c.setPage(9);

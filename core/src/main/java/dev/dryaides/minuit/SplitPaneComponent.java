@@ -248,7 +248,7 @@ public class SplitPaneComponent extends BaseComponent {
     }
 
     /**
-     * The panel whose open popup may lie over this split. A see-through family (glass) would show the panes
+     * The panel whose open popup may lie over this split. A see-through palette (the glass mode) would show the panes
      * and the divider through the popup's lines: with this, the split hides what is under it first. Add the
      * split after what else the popup may cover, since this reaches only what is drawn before the split ends.
      */
@@ -510,10 +510,10 @@ public class SplitPaneComponent extends BaseComponent {
 
     private void animate(int from) {
         animating = false;
-        if (!reducedMotion && from != target()) {
+        if (!reducedMotion() && from != target()) {
             animating = true;
             animFrom = from;
-            animAt = clock.getAsLong();
+            animAt = clock().getAsLong();
         }
     }
 
@@ -527,8 +527,8 @@ public class SplitPaneComponent extends BaseComponent {
         if (!animating) {
             return goal;
         }
-        long age = clock.getAsLong() - animAt;
-        if (reducedMotion || age >= FOLD_MS) {
+        long age = clock().getAsLong() - animAt;
+        if (reducedMotion() || age >= FOLD_MS) {
             animating = false;
             return goal;
         }
@@ -1052,6 +1052,11 @@ public class SplitPaneComponent extends BaseComponent {
     }
 
     @Override
+    public boolean keyReleasedCaptured(KeyPress press) {
+        return current != null && current.keyReleasedCaptured(press);
+    }
+
+    @Override
     public boolean mouseClicked(double mx, double my, int button) {
         syncActive();
         if (!accepts() || !isOver(mx, my)) {
@@ -1083,7 +1088,7 @@ public class SplitPaneComponent extends BaseComponent {
     }
 
     private void pressDivider(double mx, double my) {
-        long now = clock.getAsLong();
+        long now = clock().getAsLong();
         Side arrow = arrowAt(mx, my);
         if (arrow != null) {
             lastPressAt = Long.MIN_VALUE / 2;

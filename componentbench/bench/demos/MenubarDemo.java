@@ -50,9 +50,10 @@ public final class MenubarDemo implements Demo {
                             Item.check("Sidebar", false, on -> log.add("side=" + on)))
                     .menu("Help", Item.action("About", () -> log.add("about")).icon(Icon.BUG))
                     .disabled("Redo", true));
-            s.add(new ButtonComponent(new Box("behind", 150, 60, 80, 20), "Behind", () -> behind++));
+            s.fixture(new ButtonComponent(new Box("behind", 150, 60, 80, 20), "Done", () -> behind++));
             s.caption(() -> note.isEmpty() ? String.join(" ", log) : note);
             s.add(bar.popup());
+            s.keepHeight();
         }
 
         /** A title is its text and 5 pixels each side, 100 at most; titles that do not fit end in a menu of "...". */
@@ -234,18 +235,21 @@ public final class MenubarDemo implements Demo {
                     .menu("A very long menu title that goes on far too long", Item.action("Item", () -> { }))
                     .menu("Two", Item.action("Item", () -> { })));
             s.add(bar.popup());
+            s.keepHeight();
             s.move(10, 6);
             s.waitMs(600);
         });
         stage.state("empty_bar", W, 40, s -> {
             MenubarComponent bar = s.add(new MenubarComponent(new Box("bar", 6, 6, W - 12, 14), s.panel()));
             s.add(bar.popup());
+            s.keepHeight();
         });
         stage.state("tiny_box", 40, 24, s -> {
             MenubarComponent bar = s.add(new MenubarComponent(new Box("bar", 0, 0, 36, 10), s.panel())
                     .menu("File", Item.action("Item", () -> { }))
                     .menu("Edit", Item.action("Item", () -> { })));
             s.add(bar.popup());
+            s.keepHeight();
         });
     }
 }

@@ -1,0 +1,96 @@
+// A dev mod for 1.20.1 Fabric: the frame bench (FrameBench), timing one demo state at a time in each theme.
+// Never in the minuit jar and outside common/. Two ways to build it:
+// - inside the repo build, as :ingameBench (-Pingame_bench -Pmc_version=1.20.1, see the repo's settings.gradle):
+//   it compiles against :fabric's own jar and writes its jar into fabric/build/libs, where remotebuild --fetch looks;
+// - alone, through ../build.py ingame1201 <tasks>, after building the minuit 1.20.1 Fabric jar from this branch
+//   (-PminuitJar=<that jar> if its name differs from the default below).
+// Same Loom jar and mode as the repo's fabric/ on obfuscated versions (fabric/build.gradle).
+plugins {
+    id 'dev.architectury.loom-no-remap' apply false
+}
+apply plugin: 'dev.architectury.loom-remap'
+
+group = "dev.dryaides.minuit.bench"
+version = "0"
+base { archivesName = "minuit-frame-bench-1.20.1" }
+
+// Game, loader and Fabric API versions come from the repo's 1.20.1 properties.
+def versions = new Properties()
+file("../../gradle/versions/1.20.1.properties").withInputStream { versions.load(it) }
+def modVersion = new Properties()
+file("../../gradle.properties").withInputStream { modVersion.load(it) }
+
+def inRepo = rootProject != project
+if (inRepo) {
+    evaluationDependsOn(':fabric')
+    // Loom remaps mod* files while configuring, before :fabric has built anything: compile against :fabric's
+    // Mojang-named jar instead. The game loads the real minuit jar beside this one.
+    base { libsDirectory = rootProject.file("fabric/build/libs") }
+}
+def minuitJar = file(findProperty("minuitJar") ?: "../../fabric/build/libs/minuit-fabric-1.20.1-${modVersion.version}.jar")
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${versions.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${versions.fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${versions.fabric_version}"
+    if (inRepo) {
+        compileOnly files(rootProject.project(':fabric').tasks.named('jar'))
+    } else {
+        modImplementation files(minuitJar)
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "src/main/java"
+            srcDir "../bench/api"
+            srcDir "../bench/demos"
+            srcDir "../bench/access"
+        }
+    }
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 17
+}
+
+// The list of demos the bench looks up by name: the game has no folder to scan.
+def demoList = tasks.register("demoList") {
+    def out = layout.buildDirectory.file("generated/bench-demos.txt")
+    def dir = file("../bench/demos")
+    inputs.dir(dir)
+    outputs.file(out)
+    doLast {
+        def names = dir.listFiles().findAll { it.name.endsWith(".java") }.collect { it.name - ".java" }.sort()
+        out.get().asFile.parentFile.mkdirs()
+        out.get().asFile.text = names.join("\n")
+    }
+}
+
+// bench/images/*.png are not in git: MakeImages draws them.
+def makeImages = tasks.register("makeImages", Exec) {
+    def dir = file("../bench/images")
+    inputs.file("../bench/images/MakeImages.java")
+    outputs.dir(dir)
+    commandLine "${System.getProperty('java.home')}/bin/java", "${dir}/MakeImages.java", dir.path
+}
+
+processResources {
+    dependsOn(makeImages)
+    from(demoList)
+    from("../bench/images") {
+        include "*.png"
+        into "assets/minuit_components_bench/textures/bench"
+    }
+}

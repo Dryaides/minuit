@@ -1,3 +1,4 @@
+import dev.dryaides.minuit.internal.HostState;
 import dev.dryaides.minuit.Box;
 import dev.dryaides.minuit.GridComponent;
 import dev.dryaides.minuit.AsyncImage;
@@ -28,14 +29,14 @@ public class ReelBench {
     static final int H = 240;
     static long now = 10_000;
     static int fails;
-    static final List<String> MAPS = site.SiteScenes.MAPS;
+    static final List<String> MAPS = dev.dryaides.minuit.internal.showcase.SiteScenes.MAPS;
 
     public static void main(String[] args) {
         File out = new File(args.length > 0 ? args[0] : "out");
         BenchMock.McFont font = new BenchMock.McFont();
-        BaseComponent.clock = () -> now;
+        HostState.clock(() -> now);
         List<String> sounds = new ArrayList<>();
-        BaseComponent.sound = new UiSound() {
+        HostState.sound(new UiSound() {
             @Override
             public void tick(float frac) {
                 sounds.add("tick");
@@ -45,7 +46,7 @@ public class ReelBench {
             public void land() {
                 sounds.add("land");
             }
-        };
+        });
         for (int i = 0; i < MAPS.size(); i++) {
             BenchMock.DYNAMIC.put("bench:thumb/" + i, thumb(i));
         }

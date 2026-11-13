@@ -1,5 +1,6 @@
 package dev.dryaides.minuit.client;
 
+import dev.dryaides.minuit.Internal;
 import dev.dryaides.minuit.internal.ThemeFiles;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IResourceManager;
@@ -34,6 +35,7 @@ import java.util.zip.ZipFile;
  * found in the packs' own jars, zips and folders: mods first, then the selected packs in the order the game stacks
  * them, so a later entry (a higher pack) wins as it does with the game's listing. Client only.
  */
+@Internal
 public final class ThemeReload implements IResourceManagerReloadListener {
 
     private static final Logger LOG = LogManager.getLogger("minuit");

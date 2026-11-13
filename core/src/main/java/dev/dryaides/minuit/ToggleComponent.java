@@ -1,6 +1,7 @@
 package dev.dryaides.minuit;
 
 import dev.dryaides.minuit.internal.Bounce;
+import dev.dryaides.minuit.internal.ImageFamily;
 
 import java.util.function.Consumer;
 
@@ -40,7 +41,7 @@ public class ToggleComponent extends BaseComponent {
             return;
         }
         float target = this.value ? 1 : 0;
-        long since = this.flipAt < 0 ? -1 : clock.getAsLong() - this.flipAt;
+        long since = this.flipAt < 0 ? -1 : clock().getAsLong() - this.flipAt;
         // A value set from outside a flip (a restored setting, a mod writing the field) rests on its side at once.
         if (since < 0) {
             this.flipFrom = target;
@@ -58,13 +59,24 @@ public class ToggleComponent extends BaseComponent {
         int track;
         if (!this.active) {
             track = p.disabled();
-        } else if (this.value) {
-            track = Shapes.mix(p.accentDeep(), p.accent(), 0.5F + this.hoverAnim * 0.5F);
         } else {
-            track = Shapes.mix(p.wellEdge(), p.raisedHover(), this.hoverAnim);
+            // Official palettes are checked at design time: the OFF groove is the palette track grey, the ON one its primary, unshifted.
+            int off = Shapes.mix(p.track(), p.raisedHover(), this.value ? 0F : this.hoverAnim * 0.3F);
+            if (this.value) {
+                // The palette's own primary, as on buttons and the slider fill; in glass the half's, unmuted.
+                Palette m = GlassPalette.marks(p);
+                track = Shapes.mix(m.primary(), m.primaryHover(), this.hoverAnim);
+            } else {
+                track = off;
+            }
         }
-        style.track(d, p, this.x, sy, SWITCH, 10, this.active ? track : style == FrameStyles.BEDROCK ? p.disabled() : p.wellEdge());
-        if (!this.active && style != FrameStyles.BEDROCK) {
+        FrameStyle shape = style instanceof GlassFrame glass ? glass.base() : style;
+        boolean bedrock = (shape instanceof ImageFamily images ? images.base() : shape) == FrameStyles.BEDROCK;
+        style.track(d, p, this.x, sy, SWITCH, 10, this.active ? track : bedrock ? p.disabled() : p.wellEdge());
+        if (this.active && !this.value) {
+            style.trackEdge(d, p, this.x, sy, SWITCH, 10, p.textFaint());
+        }
+        if (!this.active && !bedrock) {
             Shapes.rounded(d, this.x + 1, sy + 1, SWITCH - 2, 8, 4, track);
         }
         int kx = this.x + 1 + Math.round(this.knob * (SWITCH - 10));
@@ -107,7 +119,7 @@ public class ToggleComponent extends BaseComponent {
         }
         click();
         this.flipFrom = this.knob;
-        this.flipAt = clock.getAsLong();
+        this.flipAt = clock().getAsLong();
         this.value = !this.value;
         this.onChange.accept(this.value);
         return true;

@@ -109,7 +109,7 @@ public abstract class MinuitScreen extends Screen {
         this.renderBackground(pose);
         super.render(pose, mouseX, mouseY, partial);
         if (this.panel != null) {
-            this.logic.draw(new GuiDraw(pose), this.panel, mouseX, mouseY);
+            this.logic.draw(new GuiDraw(pose), this.panel, mouseX, mouseY, MinuitClient.background(), this.width, this.height);
         }
     }
 
@@ -135,6 +135,9 @@ public abstract class MinuitScreen extends Screen {
     public void tick() {
         super.tick();
         this.logic.tick(this.panel);
+        if (GamepadPoll.tick(this.host, this.panel)) {
+            onClose();
+        }
     }
 
     @Override
@@ -159,6 +162,12 @@ public abstract class MinuitScreen extends Screen {
     public boolean keyPressed(int key, int scancode, int modifiers) {
         return this.logic.keyPressed(this.panel, GameInput.stroke(key, scancode))
                 || super.keyPressed(key, scancode, modifiers);
+    }
+
+    @Override
+    public boolean keyReleased(int key, int scancode, int modifiers) {
+        return this.logic.keyReleased(this.panel, GameInput.stroke(key, scancode))
+                || super.keyReleased(key, scancode, modifiers);
     }
 
     @Override
@@ -194,8 +203,8 @@ public abstract class MinuitScreen extends Screen {
         Platform.screens().onGameThread(task);
     }
 
-    /** Opens {@code screen}, or closes the current one for null. */
-    protected static void show(@org.jetbrains.annotations.Nullable Screen screen) {
+    /** Opens {@code screen}, or closes the current one for null, the way this game version wants it; call this rather than {@code Minecraft.setScreen}. */
+    public static void show(@org.jetbrains.annotations.Nullable Screen screen) {
         Minecraft.getInstance().setScreen(screen);
     }
 
@@ -203,7 +212,7 @@ public abstract class MinuitScreen extends Screen {
      * Opens {@code screen} with its panel gliding in from {@code from} ({@link Slide}): a menu tab that
      * opens another screen. A screen that is not a {@code MinuitScreen} opens at once.
      */
-    protected static void show(Screen screen, Slide from) {
+    public static void show(Screen screen, Slide from) {
         if (screen instanceof MinuitScreen next) {
             next.slideFrom(from);
         }

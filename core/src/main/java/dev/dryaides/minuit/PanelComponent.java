@@ -1,5 +1,7 @@
 package dev.dryaides.minuit;
 
+import dev.dryaides.minuit.internal.Inspector;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -19,10 +21,12 @@ public abstract class PanelComponent {
     protected int top;
     protected final List<BaseComponent> widgets = new ArrayList<>();
     /**
-     * Drawn over everything and given the clicks first, a dropdown's open list for instance. A
-     * click outside it only closes it.
+     * Drawn over everything through the {@link OverlayLayer} and given the input first, a dropdown's open list for
+     * instance. A click outside it only closes it.
      */
     protected BaseComponent overlay;
+    /** The popups of every widget drawn inside this panel while it is the root of a frame; see {@link OverlayLayer}. */
+    private final OverlayLayer layer = new OverlayLayer();
     private BaseComponent focus;
     /** The stop the keyboard is on, ringed while the player moves with the keys. */
     private BaseComponent cursor;
@@ -51,8 +55,27 @@ public abstract class PanelComponent {
         return new Box("panel", this.left, this.top, width(), height());
     }
 
+    private Box overlayArea;
+
+    /**
+     * The box the open overlay may cover, in the panel's coordinates: the whole screen or canvas the host
+     * gives (a demo stage, a site card's canvas), the panel's bounds while none is given.
+     */
+    public Box overlayArea() {
+        return this.overlayArea != null ? this.overlayArea : bounds();
+    }
+
+    public void overlayArea(Box area) {
+        this.overlayArea = area;
+    }
+
     public Theme theme() {
         return this.theme;
+    }
+
+    /** Draws in {@code theme} from the next frame on, layout and state untouched: for a palette change in the same frame style. */
+    public void retheme(Theme theme) {
+        this.theme = theme;
     }
 
     /** Where a header's title starts: after the back arrow when the page has one. */
@@ -115,21 +138,62 @@ public abstract class PanelComponent {
      * screen draws this, then its items, then {@link #drawOverlay}, so a dropdown lies over the items.
      */
     public final void drawBase(Draw d, int mx, int my, float delta) {
+        boolean root = this.layer.begin(d, true);
+        if (Inspector.ENABLED && root) {
+            Inspector.beginFrame(d);
+        }
         drawBackground(d, mx, my);
         for (BaseComponent widget : this.widgets) {
+            if (Inspector.ENABLED && root) {
+                Inspector.beginWidget(widget);
+            }
             widget.draw(d, this.theme, mx, my, delta);
         }
+        if (Inspector.ENABLED && root) {
+            Inspector.endWidget();
+        }
         drawForeground(d, mx, my);
-        if (this.ring && this.overlay == null && this.cursor != null && this.cursor.visible) {
+        if (this.ring && !popupOpen() && this.cursor != null && this.cursor.visible) {
             drawRing(d);
+        }
+        if (root) {
+            this.layer.end(d);
         }
     }
 
-    /** The open overlay (a dropdown's list), if any. */
+    /**
+     * The popups: this panel's open overlay (a dropdown's list) and every popup its widgets queued in
+     * {@link #drawBase}. A panel drawn inside another host only queues its overlay there; the root draws them all.
+     */
     public final void drawOverlay(Draw d, int mx, int my, float delta) {
-        if (this.overlay != null) {
-            this.overlay.draw(d, this.theme, mx, my, delta);
+        boolean root = this.layer.begin(d, false);
+        BaseComponent open = this.overlay;
+        if (open != null) {
+            Theme theme = this.theme;
+            open.placeOverlay(theme, overlayArea());
+            d.overlay(open, mx, my, (on, x, y) -> open.draw(on, theme, x, y, delta)).keys()
+                    .openWhile(() -> this.overlay == open)
+                    .onClose(() -> {
+                        if (this.overlay == open) {
+                            this.overlay = null;
+                        }
+                    });
         }
+        if (root) {
+            if (Inspector.ENABLED) {
+                Inspector.queue(d, this, this.theme, mx, my);
+            }
+            this.layer.flush(d, mx, my);
+        }
+    }
+
+    /** True while a popup is open over the panel: its overlay, or a popup a widget drew in the last frame. */
+    public boolean popupOpen() {
+        return this.overlay != null || this.layer.isOpen();
+    }
+
+    OverlayLayer layer() {
+        return this.layer;
     }
 
     private void drawRing(Draw d) {
@@ -196,9 +260,18 @@ public abstract class PanelComponent {
 
     /** Puts the keyboard on {@code stop}: a field takes the keys, a scroll box brings it into view. */
     private void moveTo(BaseComponent stop, boolean forward) {
+        moveTo(stop, forward, null, null);
+    }
+
+    /** {@link #moveTo}; an arrow ({@code key}) leaving the stop at {@code from} enters the next one beside it. */
+    private void moveTo(BaseComponent stop, boolean forward, InputKey key, Box from) {
         this.cursor = stop;
         this.ring = true;
-        stop.enter(forward);
+        if (key != null && from != null) {
+            stop.enterFrom(key, from);
+        } else {
+            stop.enter(forward);
+        }
         BaseComponent owner = ownerOf(stop);
         if (stop.takesFocus()) {
             focus(owner);
@@ -219,13 +292,17 @@ public abstract class PanelComponent {
     }
 
     private boolean step(int dir) {
+        return step(dir, null);
+    }
+
+    private boolean step(int dir, InputKey arrow) {
         List<BaseComponent> stops = stops();
         if (stops.isEmpty()) {
             return false;
         }
         int at = stops.indexOf(this.cursor);
         int next = at < 0 ? (dir > 0 ? 0 : stops.size() - 1) : Math.floorMod(at + dir, stops.size());
-        moveTo(stops.get(next), dir > 0);
+        moveTo(stops.get(next), dir > 0, arrow, at < 0 ? null : this.cursor.focusBox());
         return true;
     }
 
@@ -240,6 +317,9 @@ public abstract class PanelComponent {
      * @return true when an overlay was open: the key then closes it, not the screen
      */
     public boolean closeOverlay() {
+        if (this.layer.closeTop()) {
+            return true;
+        }
         boolean open = this.overlay != null;
         this.overlay = null;
         return open;
@@ -268,7 +348,12 @@ public abstract class PanelComponent {
      * {@code super} first.
      */
     public List<String> tooltipAt(double mx, double my) {
-        if (this.overlay != null) {
+        if (this.layer.isOpen()) {
+            List<String> lines = this.layer.tooltipAt(mx, my);
+            if (lines != null) {
+                return lines;
+            }
+        } else if (this.overlay != null) {
             return this.overlay.tooltipAt(mx, my);
         }
         for (int i = this.widgets.size() - 1; i >= 0; i--) {
@@ -287,15 +372,18 @@ public abstract class PanelComponent {
      */
     public final void drawTooltip(Draw d, int mx, int my) {
         List<String> lines = tooltipAt(mx, my);
-        BaseComponent owner = lines == null ? null : tipOwner(mx, my);
-        this.tip.draw(d, lines, mx, owner == null ? my : owner.tooltipY(mx, my));
+        int y = my;
+        if (lines != null && this.layer.isOpen() && this.layer.tooltipAt(mx, my) != null) {
+            y = this.layer.tooltipY(mx, my);
+        } else if (lines != null) {
+            BaseComponent owner = this.overlay != null ? this.overlay : tipOwner(mx, my);
+            y = owner == null ? my : owner.tooltipY(mx, my);
+        }
+        this.tip.draw(d, this.theme, lines, mx, y, this.overlayArea);
     }
 
     /** The widget whose tip shows at the pointer, or null when the tip is the panel's own. */
     private BaseComponent tipOwner(double mx, double my) {
-        if (this.overlay != null) {
-            return this.overlay;
-        }
         for (int i = this.widgets.size() - 1; i >= 0; i--) {
             BaseComponent widget = this.widgets.get(i);
             if (widget.visible && widget.tooltipAt(mx, my) != null) {
@@ -346,7 +434,10 @@ public abstract class PanelComponent {
      * @return false when nothing used the key, so the host may close the screen on Escape
      */
     public boolean keyPressed(InputKey key, boolean shift) {
-        if (this.overlay != null) {
+        if (this.layer.takesKeys()) {
+            return this.layer.keyPressed(key, shift);
+        }
+        if (this.overlay != null && !this.layer.isOpen()) {
             if (key == InputKey.ESCAPE) {
                 closeOverlay();
             } else if (!this.overlay.keyPressed(key, shift) && (key == InputKey.ENTER || key == InputKey.SPACE)) {
@@ -361,8 +452,13 @@ public abstract class PanelComponent {
                 return true;
             }
             if (key == InputKey.ESCAPE) {
+                if (this.layer.closeTop()) {
+                    return true;
+                }
                 focus(null);
-                return true;
+                if (!held.passesKeys()) {
+                    return true;
+                }
             }
         } else if (on != null && !on.takesFocus() && on.visible && on.active && stops().contains(on)
                 && on.keyPressed(key, shift)) {
@@ -372,8 +468,8 @@ public abstract class PanelComponent {
         }
         return switch (key) {
             case TAB -> step(shift ? -1 : 1);
-            case UP, LEFT -> step(-1);
-            case DOWN, RIGHT -> step(1);
+            case UP, LEFT -> step(-1, key);
+            case DOWN, RIGHT -> step(1, key);
             case ENTER, SPACE -> {
                 if (on == null || !on.visible || !on.active || !stops().contains(on)) {
                     yield false;
@@ -385,6 +481,9 @@ public abstract class PanelComponent {
                 yield on.activate();
             }
             case ESCAPE -> {
+                if (this.layer.closeTop()) {
+                    yield true;
+                }
                 if (this.back == null) {
                     yield false;
                 }
@@ -406,14 +505,26 @@ public abstract class PanelComponent {
         return capturing() && this.focus.keyCaptured(key);
     }
 
+    /** A raw key let go, for the capturing widget; true when it used it. */
+    public boolean rawKeyReleased(KeyPress key) {
+        return capturing() && this.focus.keyReleasedCaptured(key);
+    }
+
     public boolean charTyped(int codepoint) {
+        if (this.layer.takesKeys()) {
+            return this.layer.charTyped(codepoint);
+        }
         BaseComponent held = this.focus;
         return held != null && held.visible && held.charTyped(codepoint);
     }
 
     public boolean mouseClicked(double mx, double my, int button) {
         BaseComponent open = this.overlay;
-        if (open != null) {
+        if (this.layer.isOpen()) {
+            if (this.layer.mouseClicked(mx, my, button)) {
+                return true;
+            }
+        } else if (open != null) {
             if (open.isOver(mx, my)) {
                 open.mouseClicked(mx, my, button);
             } else {
@@ -459,6 +570,7 @@ public abstract class PanelComponent {
     }
 
     public boolean mouseReleased(double mx, double my, int button) {
+        this.layer.mouseReleased(mx, my, button);
         boolean any = false;
         for (BaseComponent widget : this.widgets) {
             any |= widget.mouseReleased(mx, my, button);
@@ -467,6 +579,9 @@ public abstract class PanelComponent {
     }
 
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        if (this.layer.mouseDragged(mx, my, button, dx, dy)) {
+            return true;
+        }
         for (BaseComponent widget : this.widgets) {
             if (widget.mouseDragged(mx, my, button, dx, dy)) {
                 return true;
@@ -476,7 +591,11 @@ public abstract class PanelComponent {
     }
 
     public boolean mouseScrolled(double mx, double my, double amount) {
-        if (this.overlay != null) {
+        if (this.layer.isOpen()) {
+            if (this.layer.mouseScrolled(mx, my, amount)) {
+                return true;
+            }
+        } else if (this.overlay != null) {
             return true;
         }
         for (int i = this.widgets.size() - 1; i >= 0; i--) {

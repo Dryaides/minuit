@@ -25,7 +25,9 @@ final class GameInput {
             InputConstants.KEY_DELETE, InputConstants.KEY_HOME, InputConstants.KEY_END, InputConstants.KEY_LEFT,
             InputConstants.KEY_RIGHT, InputConstants.KEY_UP, InputConstants.KEY_DOWN, InputConstants.KEY_SPACE,
             InputConstants.KEY_A, InputConstants.KEY_C, InputConstants.KEY_X, InputConstants.KEY_V,
-            InputConstants.MOUSE_BUTTON_LEFT, InputConstants.MOUSE_BUTTON_RIGHT, InputConstants.MOUSE_BUTTON_MIDDLE);
+            InputConstants.MOUSE_BUTTON_LEFT, InputConstants.MOUSE_BUTTON_RIGHT, InputConstants.MOUSE_BUTTON_MIDDLE,
+            InputConstants.KEY_LSHIFT, InputConstants.KEY_RSHIFT, InputConstants.KEY_LCONTROL,
+            InputConstants.KEY_RCONTROL, InputConstants.KEY_LALT, InputConstants.KEY_RALT);
 
     static final UiSound SOUNDS = SoundCues.over(GameInput::play);
 

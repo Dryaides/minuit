@@ -159,6 +159,7 @@ public class DonutChartComponent extends BaseComponent {
     private int legendW;
     private int legendRows;
     private final ScrollBar legendScroll = new ScrollBar();
+    private FrameStyle frame = FrameStyles.VANILLA;
     private boolean legendBar;
     private int rowH = LINE;
     private String idleTop = "";
@@ -550,6 +551,44 @@ public class DonutChartComponent extends BaseComponent {
         return Math.round(share * 100D) + "%";
     }
 
+    /** Whole percents of the rows, largest remainder first, so the legend sums to the rounded total. */
+    private int[] percents() {
+        int n = rows.size();
+        int[] out = new int[n];
+        if (total <= 0D) {
+            return out;
+        }
+        double[] exact = new double[n];
+        double sum = 0D;
+        int floors = 0;
+        for (int i = 0; i < n; i++) {
+            Slice s = rows.get(i);
+            exact[i] = s == back ? 0D : s.value / total * 100D;
+            out[i] = (int) Math.floor(exact[i]);
+            sum += exact[i];
+            floors += out[i];
+        }
+        int left = (int) Math.round(sum) - floors;
+        for (; left > 0; left--) {
+            int best = -1;
+            for (int i = 0; i < n; i++) {
+                if (exact[i] - out[i] > 0D && (best < 0 || exact[i] - out[i] > exact[best] - out[best])) {
+                    best = i;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            exact[best] = out[best] + 1;
+            out[best]++;
+        }
+        return out;
+    }
+
+    private static String percentText(double value, int percent) {
+        return value > 0D && percent == 0 ? "<1%" : percent + "%";
+    }
+
     private void refresh() {
         if (!dirty && laidW == w && laidH == h) {
             return;
@@ -890,10 +929,11 @@ public class DonutChartComponent extends BaseComponent {
             idleTop = centerValue != null ? centerValue : total > 0D ? valueText(total) : "";
             idleBottom = centerLabel;
         }
+        int[] percents = shares ? percents() : null;
         int shareW = 0;
         for (int i = 0; i < rows.size(); i++) {
             Slice s = rows.get(i);
-            s.share = s == back ? "" : shares ? shareText(total <= 0D ? 0D : s.value / total) : valueText(s.value);
+            s.share = s == back ? "" : shares ? percentText(s.value, percents[i]) : valueText(s.value);
             shareW = Math.max(shareW, TextMeasure.width(s.share));
         }
         for (int i = 0; i < rows.size(); i++) {
@@ -921,7 +961,7 @@ public class DonutChartComponent extends BaseComponent {
         if (s == back) {
             return active ? Ink.soft(t.palette(), DataLook.back(t.palette())) : t.palette().disabledText();
         }
-        int color = s.custom ? DataLook.opaque(s.color) : DataLook.seriesColour(t, seriesPalette, s.index);
+        int color = s.custom ? SeriesColors.custom(t.palette(), s.color, true) : DataLook.opaque(SeriesColors.fill(t.palette(), seriesPalette, s.index));
         return active ? color : DataLook.faded(t.palette(), color);
     }
 
@@ -931,6 +971,10 @@ public class DonutChartComponent extends BaseComponent {
         }
         int row = legendScroll.offset() + (int) Math.floor((my - legendY) / rowH);
         return row < rows.size() ? row : -1;
+    }
+
+    private int legendBarX() {
+        return ScrollBar.x(frame, legendX + legendW);
     }
 
     private boolean overLegend(double mx, double my) {
@@ -949,7 +993,7 @@ public class DonutChartComponent extends BaseComponent {
         colouredActive = active;
         litFor = lit;
         litFade = fade;
-        int neutral = Ink.readable(Shapes.mix(DataLook.opaque(p.textSoft()), DataLook.back(p), OTHER_SOFT), DataLook.back(p), Ink.MARK);
+        int neutral = Ink.readable(p, Shapes.mix(DataLook.opaque(p.textSoft()), DataLook.back(p), OTHER_SOFT), DataLook.back(p), Ink.MARK);
         otherInk = active ? neutral : DataLook.faded(p, neutral);
         otherStripe = Shapes.mix(otherInk, DataLook.back(p), STRIPE);
         int lightInk = DataLook.opaque(Ink.on(p, DataLook.back(p)));
@@ -1053,9 +1097,10 @@ public class DonutChartComponent extends BaseComponent {
             d.text(s.share, legendX + textW - d.width(s.share), textY, index == lit ? ink : soft);
         }
         if (legendBar) {
-            int barX = ScrollBar.x(t.frame(), legendX + legendW);
+            frame = t.frame();
+            int barX = legendBarX();
             int trackH = legendRows * rowH;
-            legendScroll.draw(d, t, barX, legendY, trackH, active && inLegend);
+            legendScroll.draw(d, t, barX, legendY, trackH, legendScroll.dragging() || active && inLegend);
             if (!active) {
                 RowLook.dimBar(d, p, barX, legendY, BAR, trackH);
             }
@@ -1192,6 +1237,9 @@ public class DonutChartComponent extends BaseComponent {
             return false;
         }
         refresh();
+        if (legendBar && legendScroll.press(mx, my, legendBarX(), legendY, legendRows * rowH)) {
+            return true;
+        }
         int at = legendRowAt(mx, my);
         if (at < 0) {
             at = rowAt(mx, my);
@@ -1232,6 +1280,18 @@ public class DonutChartComponent extends BaseComponent {
         if (cursor >= 0) {
             moveCursor(cursor);
         }
+    }
+
+    @Override
+    public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
+        return legendScroll.drag(my);
+    }
+
+    @Override
+    public boolean mouseReleased(double mx, double my, int button) {
+        boolean held = legendScroll.dragging();
+        legendScroll.release();
+        return held;
     }
 
     @Override

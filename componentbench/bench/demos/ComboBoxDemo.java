@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -65,7 +66,6 @@ public final class ComboBoxDemo implements Demo {
         }
 
         ComboBoxComponent<String> placed(ComboBoxComponent<String> c) {
-            s.add(c.popup());
             return c;
         }
 
@@ -116,12 +116,12 @@ public final class ComboBoxDemo implements Demo {
     @Override
     public void states(Stage stage) {
 
-        stage.state("items", 200, 130, s -> {
+        stage.state("items", 200, 150, s -> {
             dev.dryaides.minuit.ComboBoxComponent<String> c = s.add(new dev.dryaides.minuit.ComboBoxComponent<String>(new Box("c", 8, 8, 150, 18), s.panel(),
-                    java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple"), o -> "").iconArt(o -> dev.dryaides.minuit.ItemView.of(o)));
+                    java.util.List.of("minecraft:diamond", "minecraft:iron_pickaxe", "minecraft:oak_log", "minecraft:redstone", "minecraft:apple"), Mc::name).iconArt(o -> dev.dryaides.minuit.ItemView.of(o)));
             c.select("minecraft:diamond");
-            s.add(c.popup());
             c.open();
+            s.keepHeight();
             s.waitMs(300);
         });
         stage.state("items field", 200, 40, s -> {
@@ -233,7 +233,6 @@ public final class ComboBoxDemo implements Demo {
             ComboBoxComponent<String> e = s.add(new ComboBoxComponent<>(new Box("e", FX, 30, FW, FH), s.panel(), BLOCKS, o -> o)
                     .placeholder("Nothing to pick"));
             e.active(false);
-            s.add(c.popup());
             s.click(FX + 20, 14);
             s.focus(c);
             s.key(InputKey.DOWN);
@@ -573,8 +572,6 @@ public final class ComboBoxDemo implements Demo {
             ComboBoxComponent<String> a = r.combo(new Box("a", FX, FY, FW, FH), BLOCKS).maxRows(5);
             ComboBoxComponent<String> b = r.combo(new Box("b", FX, FY + 22, FW, FH), BLOCKS);
             b.select("Stone Bricks");
-            s.add(a.popup());
-            s.add(b.popup());
             s.click(FX + 20, FY + 6);
             s.waitMs(OPENED);
         });
@@ -583,8 +580,6 @@ public final class ComboBoxDemo implements Demo {
             Rig r = new Rig(s, 110);
             ComboBoxComponent<String> a = r.combo(new Box("a", FX, FY, FW, FH), BLOCKS);
             ComboBoxComponent<String> b = r.combo(new Box("b", FX, FY + 22, FW, FH), BLOCKS).maxRows(7); // clear of the line of values
-            s.add(a.popup());
-            s.add(b.popup());
             s.click(FX + 20, FY + 6);
             s.waitMs(OPENED);
             s.click(rowX(s) + 10, FY + 26);
@@ -713,7 +708,6 @@ public final class ComboBoxDemo implements Demo {
 
         stage.state("too tall for both sides", W, 80, s -> {
             ComboBoxComponent<String> c = s.add(new ComboBoxComponent<>(new Box("c", FX, 30, FW, FH), s.panel(), BLOCKS, o -> o));
-            s.add(c.popup());
             s.click(FX + 20, 36);
             s.waitMs(OPENED);
             s.settle(0);
@@ -760,11 +754,11 @@ public final class ComboBoxDemo implements Demo {
         stage.state("reduced motion snaps", W, H, s -> {
             Rig r = new Rig(s);
             ComboBoxComponent<String> c = r.placed(r.combo());
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 s.click(FX + 20, FY + 6);
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
             s.settle(0);
         });
@@ -784,7 +778,6 @@ public final class ComboBoxDemo implements Demo {
             List<String> log = new ArrayList<>();
             ComboBoxComponent<String> c = s.add(new ComboBoxComponent<>(new Box("c", FX, FY, FW, FH), s.panel(), BLOCKS, o -> o)
                     .onSelect(v -> log.add("sel")));
-            s.add(c.popup());
             c.visible = false;
             s.click(FX + 20, FY + 6);
             c.open();
@@ -806,7 +799,6 @@ public final class ComboBoxDemo implements Demo {
             thin.select("Stone");
             ComboBoxComponent<String> noBar = s.add(new ComboBoxComponent<>(new Box("n", FX, 26, 45, 12), s.panel(), BLOCKS, o -> o));
             noBar.select("Stone");
-            s.add(small.popup());
             s.focus(small);
             s.key(InputKey.DOWN);
             s.waitMs(OPENED);
@@ -814,7 +806,6 @@ public final class ComboBoxDemo implements Demo {
 
         stage.state("zero size", W, 50, s -> {
             ComboBoxComponent<String> c = s.add(new ComboBoxComponent<>(new Box("c", FX, FY, 0, 0), s.panel(), BLOCKS, o -> o));
-            s.add(c.popup());
             c.select("Stone");
         });
 

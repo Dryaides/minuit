@@ -47,7 +47,7 @@ Replace `26.1.2` with `26.2`, `26.3`, `1.21.1`, `1.20.1`, `1.19.2`, `1.18.2` or 
 
 - `common/fence.tsv`: per file in `common/src/main`, how many distinct Minecraft names it uses (`net.minecraft` and `com.mojang` imports and fully qualified names). A file over its row fails, and a file with no row that names Minecraft fails. The numbers only go down.
 - `src/main` stays Java 17 source: no `Math.clamp`, `getFirst`, `getLast`, `removeFirst`, `removeLast`, guarded or record patterns in `case`, or unnamed `_`.
-- `common/port-fence.tsv`: per port dir, the code line count (comments and strings skipped). It only goes down. A port file with no Minecraft type fails (move it to core), two version dirs of one generation holding a file with the same code fails (move it to the generation dir), and one class in both a generation dir and a version dir fails.
+- Port dirs: a port file with no Minecraft type fails (move it to core; a `main_overrides` stand-in is allowed), two version dirs of one generation holding a file with the same code fails (move it to the generation dir), and one class in both a generation dir and a version dir fails.
 
 Before raising a ceiling, move the logic to core or the file to the generation dir. If the growth is real glue (a new port dir, a new bridge implementation), run `python tools/fence.py <tree> --write`, read the diff of both `.tsv` files, and commit it with the change that justifies it. A new port dir gets its row the same way.
 
@@ -88,9 +88,8 @@ The variant's `GuiDraw.guiPart` resolves the part. Renderers without a game (sit
 2. Create `gradle/versions/<mc>.properties`. Copy the nearest file and set `minecraft_version`, the range keys, `neoform_version` and `neoforge_version` (or `forge_version`), `fabric_version`, `fabric_loader_version`, `port_variant`, `port_dirs`, the `pack_*` formats, `paper_api_version` (26.x), and `fabric_obfuscated=true` if the jar is obfuscated.
 3. Create `common/src/port<variant>/java` (and `fabric/src/port<variant>`, `neoforge/src/port<variant>` where the loader glue differs). Start from the nearest version's files.
 4. Build with `./gradlew build -Pmc_version=<mc> --no-daemon`. Fix compile errors in the version dir. If the same fix is needed on two versions of a generation, put the file in the generation dir.
-5. Add the row to `common/port-fence.tsv` with `python tools/fence.py . --write`.
-6. Check the key codes: `KeyCodes` is filled from the version's own `InputConstants.KEY_*`; never write a number by hand.
-7. Run the checks below, then update the version table here and in `README.md`.
+5. Check the key codes: `KeyCodes` is filled from the version's own `InputConstants.KEY_*`; never write a number by hand.
+6. Run the checks below, then update the version table here and in `README.md`.
 
 ## Fix a version
 

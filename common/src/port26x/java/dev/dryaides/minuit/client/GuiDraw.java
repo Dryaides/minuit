@@ -15,7 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.resources.model.sprite.SpriteId;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
@@ -138,9 +138,21 @@ public final class GuiDraw extends Draw {
             this.g.blitSprite(RenderPipelines.GUI_TEXTURED, id, x, y, w, h, alpha);
             return;
         }
-        this.g.blitSprite(RenderPipelines.GUI_TEXTURED, Minecraft.getInstance().getAtlasManager().get(new SpriteId(atlasId, id)),
-                x, y, w, h, white(alpha));
+        TextureAtlas sheet;
+        try {
+            sheet = Minecraft.getInstance().getAtlasManager().getAtlasOrThrow(atlasId);
+        } catch (IllegalArgumentException ex) {
+            if (UNKNOWN_ATLASES.add(atlas)) {
+                LOG.warn("minuit: no atlas {} in this game version, its sprites draw nothing", atlas);
+            }
+            return;
+        }
+        this.g.blitSprite(RenderPipelines.GUI_TEXTURED, sheet.getSprite(id), x, y, w, h, white(alpha));
     }
+
+    /** Keyed by the atlas definition id (minecraft:items); AtlasManager.get wants the sheet texture id instead. */
+    private static final java.util.Set<String> UNKNOWN_ATLASES = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("minuit");
 
     /** Through the GUI atlas, whose .mcmeta nine-slices the sprite, or a texture cut in nine; resource packs restyle both. */
     @Override
@@ -187,6 +199,11 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
+    protected void vertical(int x0, int y0, int x1, int y1, int top, int bottom) {
+        this.g.fillGradient(x0, y0, x1, y1, top, bottom);
+    }
+
+    @Override
     protected void string(String text, int x, int y, int argb) {
         this.g.text(this.font, text, x, y, argb, false);
     }
@@ -197,7 +214,7 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    protected String cut(String text, int maxWidth) {
+    public String cut(String text, int maxWidth) {
         return this.font.plainSubstrByWidth(text, maxWidth);
     }
 
@@ -242,14 +259,14 @@ public final class GuiDraw extends Draw {
     }
 
     @Override
-    public void push(float x, float y, float scale) {
+    protected void pushPose(float x, float y, float scale) {
         this.g.pose().pushMatrix();
         this.g.pose().translate(x, y);
         this.g.pose().scale(scale, scale);
     }
 
     @Override
-    public void pop() {
+    protected void popPose() {
         this.g.pose().popMatrix();
     }
 

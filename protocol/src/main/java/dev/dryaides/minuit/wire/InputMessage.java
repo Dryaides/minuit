@@ -31,7 +31,14 @@ public sealed interface InputMessage {
         int op = in.u8();
         return switch (op) {
             case CHANGE -> new Change(session, seq, in.str(Limits.NODE_ID), in.bytes(in.remaining()));
-            case PRESS -> Fields.end(in, new Press(session, seq, in.str(Limits.NODE_ID)));
+            case PRESS -> {
+                String nodeId = in.str(Limits.NODE_ID);
+                long confirmed = in.remaining() > 0 ? in.varlong() : NONE;
+                if (confirmed < NONE) {
+                    throw new WireException("confirmed total " + confirmed);
+                }
+                yield Fields.end(in, new Press(session, seq, nodeId, confirmed));
+            }
             case CLOSED -> Fields.end(in, new Closed(session, seq,
                     WireEnums.of(WireEnums.CLOSE_REASONS, in.u8(), "reason")));
             default -> throw new WireException("input op " + op);
@@ -70,11 +77,23 @@ public sealed interface InputMessage {
         }
     }
 
-    record Press(int session, int seq, String nodeId) implements InputMessage {
+    /** No confirmed total on a press. */
+    long NONE = -1;
+
+    /**
+     * A press. A checkout press also carries {@code confirmed}, the cart total the player saw and
+     * confirmed, as a trailing varlong; {@link #NONE} (left off the wire) on any other press.
+     */
+    record Press(int session, int seq, String nodeId, long confirmed) implements InputMessage {
+
+        public Press(int session, int seq, String nodeId) {
+            this(session, seq, nodeId, NONE);
+        }
 
         @Override
         public byte[] encode() {
-            return checked(head(session, seq, PRESS).str(nodeId, Limits.NODE_ID));
+            ByteWriter out = head(session, seq, PRESS).str(nodeId, Limits.NODE_ID);
+            return checked(confirmed < 0 ? out : out.varlong(confirmed));
         }
     }
 

@@ -1,6 +1,6 @@
 package dev.dryaides.minuit.neoforge;
 
-import dev.dryaides.minuit.formui.ClientForms;
+import dev.dryaides.minuit.internal.formui.ClientForms;
 import dev.dryaides.minuit.internal.Handshakes;
 import dev.dryaides.minuit.internal.game.ServerForms;
 import dev.dryaides.minuit.port.mc.WirePayload;
@@ -27,6 +27,7 @@ public final class MinuitNeoForge {
     private static final Logger LOG = LoggerFactory.getLogger("minuit");
 
     public MinuitNeoForge(IEventBus modBus) {
+        NeoForgeBundling.check();
         modBus.addListener(RegisterPayloadHandlersEvent.class, MinuitNeoForge::register);
         ServerForms.sender((player, bytes) -> PacketDistributor.sendToPlayer(player, new WirePayload(WirePayload.SCREEN, bytes)));
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerLoggedOutEvent.class, event -> {

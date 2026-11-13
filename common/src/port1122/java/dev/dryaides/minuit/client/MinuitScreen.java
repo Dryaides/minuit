@@ -93,7 +93,7 @@ public abstract class MinuitScreen extends GuiScreen {
         drawDefaultBackground();
         super.drawScreen(mouseX, mouseY, partial);
         if (this.panel != null) {
-            this.logic.draw(new GuiDraw(), this.panel, mouseX, mouseY);
+            this.logic.draw(new GuiDraw(), this.panel, mouseX, mouseY, MinuitClient.background(), this.width, this.height);
         }
     }
 
@@ -119,6 +119,9 @@ public abstract class MinuitScreen extends GuiScreen {
     public void updateScreen() {
         super.updateScreen();
         this.logic.tick(this.panel);
+        if (GamepadPoll.tick(this.host, this.panel)) {
+            onClose();
+        }
     }
 
     @Override
@@ -173,6 +176,14 @@ public abstract class MinuitScreen extends GuiScreen {
         }
     }
 
+    @Override
+    public void handleKeyboardInput() throws IOException {
+        if (!Keyboard.getEventKeyState() && this.logic.keyReleased(this.panel, GameInput.stroke(Keyboard.getEventKey()))) {
+            return;
+        }
+        super.handleKeyboardInput();
+    }
+
     /** Escape: closes the screen; a screen opened over another one goes back to it instead. */
     public void onClose() {
         if (this.logic.closeOverlay(this.panel)) {
@@ -208,8 +219,8 @@ public abstract class MinuitScreen extends GuiScreen {
         Platform.screens().onGameThread(task);
     }
 
-    /** Opens {@code screen}, or closes the current one for null. */
-    protected static void show(@Nullable GuiScreen screen) {
+    /** Opens {@code screen}, or closes the current one for null, the way this game version wants it; call this rather than {@code Minecraft.setScreen}. */
+    public static void show(@Nullable GuiScreen screen) {
         Minecraft.getMinecraft().displayGuiScreen(screen);
     }
 
@@ -217,7 +228,7 @@ public abstract class MinuitScreen extends GuiScreen {
      * Opens {@code screen} with its panel gliding in from {@code from} ({@link Slide}): a menu tab that
      * opens another screen. A screen that is not a {@code MinuitScreen} opens at once.
      */
-    protected static void show(GuiScreen screen, Slide from) {
+    public static void show(GuiScreen screen, Slide from) {
         if (screen instanceof MinuitScreen) {
             ((MinuitScreen) screen).slideFrom(from);
         }

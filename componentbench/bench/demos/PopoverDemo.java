@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Scene;
 import bench.api.Stage;
@@ -29,7 +30,7 @@ public final class PopoverDemo implements Demo {
 
         Rig(Scene s, Box place) {
             this.s = s;
-            s.add(new ButtonComponent(new Box("other", W - 70, H - 28, 62, 20), "Behind", () -> behind[0]++));
+            s.fixture(new ButtonComponent(new Box("other", W - 70, H - 28, 62, 20), "Done", () -> behind[0]++));
             anchor = s.add(new ButtonComponent(place, "Fog", () -> pop.toggle()));
             pop = s.add(new PopoverComponent(anchor, s.panel()).title("Fog").text(BODY));
         }
@@ -106,11 +107,11 @@ public final class PopoverDemo implements Demo {
 
         stage.state("reduced motion opens at once", W, H, s -> {
             Rig r = new Rig(s, near(8, 8));
-            BaseComponent.reducedMotion = true;
+            HostState.reducedMotion(true);
             try {
                 r.pop.open();
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 

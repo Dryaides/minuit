@@ -552,14 +552,14 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
 
     private void startFold(int index, List<Row<T>> before, boolean opening) {
         int count = Math.abs(rows.size() - before.size());
-        if (BaseComponent.reducedMotion || count == 0 || (long) count * rowHeight > 2L * viewH()) {
+        if (BaseComponent.reducedMotion() || count == 0 || (long) count * rowHeight > 2L * viewH()) {
             return;
         }
         foldStart = index + 1;
         foldCount = count;
         foldOpening = opening;
         foldGhost = opening ? List.of() : new ArrayList<>(before.subList(index + 1, index + 1 + count));
-        foldAt = BaseComponent.clock.getAsLong();
+        foldAt = BaseComponent.clock().getAsLong();
     }
 
     /** Pixels of the moving rows still showing; -1 when nothing is moving. */
@@ -567,8 +567,8 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
         if (foldStart < 0) {
             return -1;
         }
-        long age = BaseComponent.clock.getAsLong() - foldAt;
-        if (BaseComponent.reducedMotion || age >= FOLD_MS || foldStart > rows.size()) {
+        long age = BaseComponent.clock().getAsLong() - foldAt;
+        if (BaseComponent.reducedMotion() || age >= FOLD_MS || foldStart > rows.size()) {
             foldStart = -1;
             foldGhost = List.of();
             return -1;
@@ -875,7 +875,7 @@ public class TreeComponent<T> extends BaseComponent implements ItemSource {
             fold(i, !row.expanded);
             return true;
         }
-        long now = BaseComponent.clock.getAsLong();
+        long now = BaseComponent.clock().getAsLong();
         boolean twice = lastClicked != null && lastClicked.equals(row.node) && now - lastClickAt <= DOUBLE_CLICK_MS;
         BaseComponent.click();
         setCursor(i);

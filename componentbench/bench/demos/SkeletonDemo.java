@@ -1,5 +1,6 @@
 package bench.demos;
 
+import dev.dryaides.minuit.internal.HostState;
 import bench.api.Demo;
 import bench.api.Stage;
 import dev.dryaides.minuit.BaseComponent;
@@ -32,13 +33,13 @@ public final class SkeletonDemo implements Demo {
         });
 
         stage.state("reduced motion rests", W, 62, s -> {
-            s.paint((d, t) -> BaseComponent.reducedMotion = true);
+            s.paint((d, t) -> HostState.reducedMotion(true));
             SkeletonComponent c = s.add(SkeletonComponent.lines(new Box("l", 8, 8, 184, 46), 4));
-            s.paint((d, t) -> BaseComponent.reducedMotion = false);
-            BaseComponent.reducedMotion = true;
+            s.paint((d, t) -> HostState.reducedMotion(false));
+            HostState.reducedMotion(true);
             try {
             } finally {
-                BaseComponent.reducedMotion = false;
+                HostState.reducedMotion(false);
             }
         });
 
