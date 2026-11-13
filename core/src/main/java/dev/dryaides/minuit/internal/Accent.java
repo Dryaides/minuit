@@ -84,7 +84,8 @@ public record Accent(String id, int light, int dark) {
         boolean dark = dark(p);
         int c = dark ? this.dark : this.light;
         int deep = Shapes.mix(c, 0xFF000000, 0.25F);
-        int onFill = Shapes.contrast(0xFFFFFFFF, c) >= Shapes.contrast(0xFF09090B, c) ? 0xFFFFFFFF : 0xFF09090B;
+        // WCAG 2 ratios favour black on mid greens and oranges where white reads better: white wins from 3:1.
+        int onFill = Shapes.contrast(0xFFFFFFFF, c) >= 3.0 ? 0xFFFFFFFF : 0xFF09090B;
         int hover = Shapes.mix(c, onFill == 0xFFFFFFFF ? 0xFF000000 : 0xFFFFFFFF, 0.15F);
         return OfficialPalettes.derive(p, new Palette(p.frame(), p.frameDark(), p.frameLight(), p.trim(),
                 p.surface(), p.surfaceEdge(), p.section(), p.well(), p.wellEdge(),

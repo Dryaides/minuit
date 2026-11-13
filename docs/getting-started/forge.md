@@ -19,7 +19,7 @@ repositories {
 ```groovy
 dependencies {
     // ForgeGradle
-    implementation fg.deobf("maven.modrinth:minuit:2.0.0+1.20.1-forge")
+    implementation fg.deobf("maven.modrinth:minuit:2.0.1+1.20.1-forge")
 }
 ```
 

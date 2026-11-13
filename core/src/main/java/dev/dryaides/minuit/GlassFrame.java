@@ -293,6 +293,11 @@ public final class GlassFrame implements FrameStyle {
     }
 
     @Override
+    public void selectedMark(Draw d, Palette p, int x, int y, int w, int h, int color) {
+        this.base.selectedMark(d, p, x, y, w, h, color);
+    }
+
+    @Override
     public Shapes.Relief selectedRelief() {
         return this.base.selectedRelief();
     }

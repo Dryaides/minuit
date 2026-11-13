@@ -121,6 +121,13 @@ public interface FrameStyle {
         return Shapes.selectedFace(p, hover);
     }
 
+    /**
+     * The mark a toggled-on option button carries over its face, drawn after the button at its box;
+     * tabs and segments never get it. None by default.
+     */
+    default void selectedMark(Draw d, Palette p, int x, int y, int w, int h, int color) {
+    }
+
     /** The bevel of a toggled-on choice. */
     default Shapes.Relief selectedRelief() {
         return Shapes.Relief.RAISED;

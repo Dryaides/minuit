@@ -24,6 +24,7 @@ public class TabsComponent extends BaseComponent {
     private PressStyle press = PressStyle.OVERLAP;
     /** A bar under the shown tab's label; null follows the family (on for Bedrock, whose tabs carry one). */
     private Boolean underline;
+    private boolean separator;
     private int laidGap = GAP, laidX, laidY, laidW, laidH;
 
     /** @param onSelect the index of the tab clicked, after it is shown */
@@ -86,6 +87,12 @@ public class TabsComponent extends BaseComponent {
     /** Draws a bar under the shown tab's label, or not; null, the default, draws it for the Bedrock family only. */
     public TabsComponent underline(Boolean value) {
         this.underline = value;
+        return this;
+    }
+
+    /** Draws a line under the whole tab row, off by default; a separator component is the usual way to divide a page. */
+    public TabsComponent separator(boolean value) {
+        this.separator = value;
         return this;
     }
 
@@ -183,7 +190,9 @@ public class TabsComponent extends BaseComponent {
         if (gap < 0 && this.index >= 0 && this.index < this.tabs.size()) {
             this.tabs.get(this.index).draw(d, theme, mx, my, this.delta);
         }
-        d.fill(this.x, this.y + this.h + 2, this.x + this.w, this.y + this.h + 3, theme.palette().surfaceEdge());
+        if (this.separator) {
+            d.fill(this.x, this.y + this.h + 2, this.x + this.w, this.y + this.h + 3, theme.palette().surfaceEdge());
+        }
     }
 
     /** The tabs as one joined row in {@link #press}, labels on the faces, and the optional bar under the shown one. */
@@ -213,11 +222,17 @@ public class TabsComponent extends BaseComponent {
             int lx = tab.x + (tab.w - fit) / 2;
             d.textShrink(tab.label, lx, this.y + shift[i], room, faceH, 0.75F, ink);
             if (bar && shown[i]) {
+                // Bedrock's own tab rule runs under the middle of the label, not its whole width.
                 int by = this.y + shift[i] + (faceH + 9) / 2 + 1;
-                d.fill(lx, by, lx + fit, by + 1, ink);
+                int u = Math.max(4, fit / 2);
+                d.fill(lx + (fit - u) / 2, by, lx + (fit - u) / 2 + u, by + 1, ink);
+            } else if (shown[i]) {
+                style.selectedMark(d, p, tab.x, this.y + shift[i], tab.w, this.h - shift[i], faces[i]);
             }
         }
-        d.fill(this.x, this.y + this.h + 2, this.x + this.w, this.y + this.h + 3, p.surfaceEdge());
+        if (this.separator) {
+            d.fill(this.x, this.y + this.h + 2, this.x + this.w, this.y + this.h + 3, p.surfaceEdge());
+        }
     }
 
     @Override

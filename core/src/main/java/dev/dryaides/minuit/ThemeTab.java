@@ -48,7 +48,8 @@ public final class ThemeTab {
     /** Draws a tab at {@code tab} from {@link #onEdge}, closed on every side. */
     public static void drawOnEdge(Draw d, Theme theme, Box tab, boolean over) {
         theme.frame().panel(d, theme.palette(), tab.x(), tab.y(), tab.w(), tab.h());
-        face(d, theme, tab.x() + 1, tab.y() + 1, tab.w() - 2, tab.h() - 2, true, over);
+        // The closed tab's face is one row shorter than an open one's, which rounds the word a row low.
+        face(d, theme, tab.x() + 1, tab.y() + 1, tab.w() - 2, tab.h() - 2, true, over, 1);
     }
 
     public static void draw(Draw d, Theme theme, Box panel, int mx, int my) {
@@ -60,17 +61,17 @@ public final class ThemeTab {
         int shownH = above ? tab.h() - FOOT : tab.h();
         // Face inside the frame's 1 px outline; the panel's own frame closes the foot side.
         face(d, theme, tab.x() + 1, tab.y() + 1, above ? shownW - 2 : shownW - 1, above ? shownH - 1 : shownH - 2,
-                above, isOver(panel, mx, my));
+                above, isOver(panel, mx, my), 0);
     }
 
-    private static void face(Draw d, Theme theme, int faceX, int faceY, int faceW, int faceH, boolean above, boolean over) {
+    private static void face(Draw d, Theme theme, int faceX, int faceY, int faceW, int faceH, boolean above, boolean over, int lift) {
         Palette p = theme.palette();
         IconArt themed = theme.icon(Icon.PALETTE);
         if (themed != Icon.PALETTE.glyph()) {
             d.icon(themed, faceX + (faceW - themed.width()) / 2, faceY + (faceH - themed.height()) / 2,
                     over ? p.accent() : p.text());
         } else if (above) {
-            d.text(WORD, faceX + (faceW - d.width(WORD) + 1) / 2, faceY + (faceH - 7) / 2, over ? p.accent() : p.text());
+            d.text(WORD, faceX + (faceW - d.width(WORD) + 1) / 2, faceY + (faceH - 7) / 2 - lift, over ? p.accent() : p.text());
         } else {
             // A texture takes no tint: the clock dims at rest and lights up under the pointer instead.
             LOGO.draw(d, faceX + (faceW - LOGO.width()) / 2, faceY + (faceH - LOGO.height()) / 2, 0, over ? 1F : 0.8F);

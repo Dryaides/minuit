@@ -109,7 +109,7 @@ public final class ChartDemo implements Demo {
         stage.state("title and legend", W, H, s -> {
             ChartComponent c = chart(s).title("Ore mined");
             c.addSeries("Iron").color(DonutChartDemo.IRON).set(WAVE);
-            c.addSeries("Gold").color(DonutChartDemo.GOLD).set(OTHER);
+            c.addSeries("Diamond").color(DonutChartDemo.DIAMOND).set(OTHER);
         });
 
         stage.state("title only", W, H, s -> {

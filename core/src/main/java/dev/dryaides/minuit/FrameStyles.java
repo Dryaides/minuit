@@ -240,6 +240,14 @@ public final class FrameStyles {
             well(d, p, x, y, w, h, focused, false);
         }
 
+        /** A text field is a flat well, outline and fill: the icon well's shaded and lit rows read as a bevel around typed text. */
+        @Override
+        public void field(Draw d, Palette p, int x, int y, int w, int h, boolean focused) {
+            Palette ink = FieldInk.palette(p);
+            d.fill(x, y, x + w, y + h, focused ? ink.text() : ink.wellEdge());
+            d.fill(x + 1, y + 1, x + w - 1, y + h - 1, ink.well());
+        }
+
         /**
          * The wiki's icon well: edge, a shaded top and a lit bottom, two rows each from 10 px tall as the
          * reference measures, one below; under the mouse the fill steps 8 % toward black on a light chroma,
@@ -283,7 +291,6 @@ public final class FrameStyles {
         private void raised(Draw d, Palette p, int x, int y, int w, int h, int color, Shapes.Relief relief, int sunk, int lip) {
             boolean off = color == p.disabled();
             int k = h - lip >= 6 ? Math.max(0, Math.min(lip, sunk)) : 0;
-            boolean pressed = k == lip;
             int top = y + k;
             int face = k > 0 ? scale(color, 1F - 0.1F * k / lip) : color;
             int edge = off ? p.track() : Accent.dark(p) ? DARK_OUTLINE : scale(face, 0.6F);
@@ -301,10 +308,6 @@ public final class FrameStyles {
             }
             if (k < lip) {
                 d.fill(x + 1, b, x + w - 1, y + h - 1, scale(face, 208F / 255F));
-            }
-            if (pressed && relief == Shapes.Relief.PRESSED && (color == p.primary() || color == p.primaryHover()) && w > 12) {
-                int u = Math.max(4, w / 5);
-                d.fill(x + (w - u) / 2, b - 1, x + (w - u) / 2 + u, b, p.primaryText());
             }
         }
 
@@ -362,6 +365,14 @@ public final class FrameStyles {
         @Override
         public int tabText(Palette p, boolean selected, boolean active) {
             return !active ? p.disabledText() : selected ? p.primaryText() : Shapes.textFor(p, p.raisedText(), p.raised());
+        }
+
+        @Override
+        public void selectedMark(Draw d, Palette p, int x, int y, int w, int h, int color) {
+            if ((color == p.primary() || color == p.primaryHover()) && w > 12) {
+                int u = Math.max(4, w / 5);
+                d.fill(x + (w - u) / 2, y + h - 2, x + (w - u) / 2 + u, y + h - 1, p.primaryText());
+            }
         }
 
         /** A chosen option turns green and sinks, with a white rule under its label. */
@@ -1029,6 +1040,15 @@ public final class FrameStyles {
      * top left and a dark rim at the bottom right, sunk by the same rims swapped.
      */
     public static final FrameStyle SOFT = new FrameStyle() {
+        /** The chosen option's mark, as on Bedrock: a rule in the label's ink under the label. */
+        @Override
+        public void selectedMark(Draw d, Palette p, int x, int y, int w, int h, int color) {
+            if ((color == selectedFace(p, 0F) || color == selectedFace(p, 1F)) && w > 12 && h > 8) {
+                int u = Math.max(4, w / 5);
+                d.fill(x + (w - u) / 2, y + h - 3, x + (w - u) / 2 + u, y + h - 2, Shapes.textOn(p, color));
+            }
+        }
+
         @Override
         public Insets panelInsets() {
             return new Insets(2, 2, 2, 2);
@@ -1172,11 +1192,6 @@ public final class FrameStyles {
                 lined(d, p.line(), x, y, w, h, 3, color);
             } else {
                 rims(d, p, x, y, w, h, 3, color, relief != Shapes.Relief.PRESSED, 1);
-            }
-            // The chosen option's mark, as on Bedrock: a rule in the label's ink under the label.
-            if (relief == Shapes.Relief.PRESSED && (color == selectedFace(p, 0F) || color == selectedFace(p, 1F)) && w > 12 && h > 8) {
-                int u = Math.max(4, w / 5);
-                d.fill(x + (w - u) / 2, y + h - 3, x + (w - u) / 2 + u, y + h - 2, Shapes.textOn(p, color));
             }
         }
 

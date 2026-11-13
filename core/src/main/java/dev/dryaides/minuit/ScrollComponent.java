@@ -187,6 +187,23 @@ public class ScrollComponent extends BaseComponent {
         int barX = this.x + this.w - BAR;
         boolean lit = hovered && this.bar.overThumb(mx, my, barX, this.y + 2, this.h - 4);
         this.bar.draw(d, theme, barX, this.y + 2, this.h - 4, lit);
+        edgeCue(d, theme.palette());
+    }
+
+    /** A 1 px light line across the whole viewport, scroll bar included, on each edge that clips content. */
+    private void edgeCue(Draw d, Palette p) {
+        int max = maxScroll();
+        if (max <= 0) {
+            return;
+        }
+        int line = p.surfaceEdge();
+        int offset = this.bar.offset();
+        if (offset > 0) {
+            d.fill(this.x, this.y, this.x + this.w, this.y + 1, line);
+        }
+        if (offset < max) {
+            d.fill(this.x, this.y + this.h - 1, this.x + this.w, this.y + this.h, line);
+        }
     }
 
     @Override

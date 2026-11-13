@@ -219,6 +219,9 @@ public class ButtonComponent extends BaseComponent {
                     down ? Shapes.Relief.PRESSED
                             : this.selected ? theme.frame().selectedRelief() : Shapes.Relief.RAISED);
         }
+        if (this.selected && this.active && !down) {
+            frame.selectedMark(d, p, this.x, py, this.w, ph, Shapes.mix(base, hover, this.hoverAnim));
+        }
         int sink = bouncy ? squash : sunk >= 0 ? sunk : down ? travel : this.selected ? selectedTravel : 0;
         int shiftX = bouncy || !down ? 0 : frame.pressShiftX();
         IconArt drawnIcon = this.themeIcon != null ? theme.icon(this.themeIcon) : this.icon;

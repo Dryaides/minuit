@@ -210,7 +210,7 @@ package, so its copy never resolves to another plugin's classes:
 ```groovy
 plugins { id 'com.gradleup.shadow' version '<current>' }
 dependencies {
-    implementation 'dev.dryaides:minuit-paper-26.1.2:2.0.0'
+    implementation 'dev.dryaides:minuit-paper-26.1.2:2.0.1'
     compileOnly 'io.papermc.paper:paper-api:26.1.2.build.74-stable'
 }
 shadowJar {

@@ -11,7 +11,7 @@ repositories {
     maven { url = "<MINUIT_MAVEN_URL>" } // not published yet
 }
 dependencies {
-    implementation "dev.dryaides:minuit-paper-26.1.2:2.0.0" // its POM pulls minuit-protocol
+    implementation "dev.dryaides:minuit-paper-26.1.2:2.0.1" // its POM pulls minuit-protocol
     compileOnly "io.papermc.paper:paper-api:<paper-api-version>"
 }
 ```

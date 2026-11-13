@@ -17,7 +17,7 @@ public final class DonutChartDemo implements Demo {
     private static final int H = 96;
     /** The ores in their own colours, as the game draws the ingot or the gem. */
     static final int IRON = 0xFFE2C9B5;
-    static final int GOLD = 0xFFFCEE4B;
+    static final int GOLD = 0xFFFFC21A;
     static final int COPPER = 0xFFE77C56;
     static final int DIAMOND = 0xFF4AEDD9;
     static final int REDSTONE = 0xFFE0281C;

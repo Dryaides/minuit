@@ -24,8 +24,8 @@ public final class Shapes {
         d.fill(x, y + r, x + w, y + h - r, color);
         for (int i = 0; i < r; i++) {
             int inset = cornerInset(r, i);
-            d.fill(x + inset, y + i, x + w - inset, y + i + 1, color);
-            d.fill(x + inset, y + h - 1 - i, x + w - inset, y + h - i, color);
+            d.fill(x + left(inset), y + i, x + w - right(inset), y + i + 1, color);
+            d.fill(x + left(inset), y + h - 1 - i, x + w - right(inset), y + h - i, color);
         }
     }
 
@@ -41,13 +41,14 @@ public final class Shapes {
         for (int row = 0; row < h; row++) {
             int inset = rowInset(r, h, row);
             if (row == 0 || row == h - 1) {
-                d.fill(x + inset, y + row, x + w - inset, y + row + 1, color);
+                d.fill(x + left(inset), y + row, x + w - right(inset), y + row + 1, color);
                 continue;
             }
             int open = Math.max(rowInset(r, h, row - 1), rowInset(r, h, row + 1));
-            int run = Math.max(1, open - inset);
-            d.fill(x + inset, y + row, x + inset + run, y + row + 1, color);
-            d.fill(x + w - inset - run, y + row, x + w - inset, y + row + 1, color);
+            int l = left(inset);
+            int rr = right(inset);
+            d.fill(x + l, y + row, x + l + Math.max(1, left(open) - l), y + row + 1, color);
+            d.fill(x + w - rr - Math.max(1, right(open) - rr), y + row, x + w - rr, y + row + 1, color);
         }
     }
 
@@ -67,12 +68,12 @@ public final class Shapes {
             int inset = rowInset(r, h, row);
             int inner = row - t;
             if (iw <= 0 || ih <= 0 || inner < 0 || inner >= ih) {
-                d.fill(x + inset, y + row, x + w - inset, y + row + 1, color);
+                d.fill(x + left(inset), y + row, x + w - right(inset), y + row + 1, color);
                 continue;
             }
-            int open = Math.max(inset, t + rowInset(ir, ih, inner));
-            d.fill(x + inset, y + row, x + open, y + row + 1, color);
-            d.fill(x + w - open, y + row, x + w - inset, y + row + 1, color);
+            int innerInset = rowInset(ir, ih, inner);
+            d.fill(x + left(inset), y + row, x + Math.max(left(inset), t + left(innerInset)), y + row + 1, color);
+            d.fill(x + w - Math.max(right(inset), t + right(innerInset)), y + row, x + w - right(inset), y + row + 1, color);
         }
     }
 
@@ -211,6 +212,19 @@ public final class Shapes {
         }
     }
 
+    /** Sides of a joined segment that meet a neighbour: their corners draw square. Set only around one segment's draw. */
+    static final int SQUARE_LEFT = 1;
+    static final int SQUARE_RIGHT = 2;
+    static int squareSides;
+
+    private static int left(int inset) {
+        return (squareSides & SQUARE_LEFT) != 0 ? 0 : inset;
+    }
+
+    private static int right(int inset) {
+        return (squareSides & SQUARE_RIGHT) != 0 ? 0 : inset;
+    }
+
     private static int rowInset(int r, int h, int row) {
         if (row < r) {
             return cornerInset(r, row);
@@ -275,6 +289,9 @@ public final class Shapes {
      * contrasts more, pure black or white when the near tone falls short.
      */
     public static int textOn(Palette p, int face) {
+        if (onAccent(p, face)) {
+            return 0xFFFFFFFF;
+        }
         if (contrast(p.raisedText(), face) >= 4.5) {
             return p.raisedText();
         }
@@ -297,7 +314,30 @@ public final class Shapes {
     public static int textFor(Palette p, int preferred, int face) {
         int alpha = face >>> 24;
         int shown = alpha == 0xFF ? face : mix(p.surface() | 0xFF000000, face | 0xFF000000, alpha / 255F);
+        if (onAccent(p, shown)) {
+            return 0xFFFFFFFF;
+        }
         return contrast(preferred, shown) >= 4.5 ? preferred : textOn(p, shown);
+    }
+
+    /**
+     * True when {@code face} is the accent fill (primary, its hover, or a tone between them) and white
+     * reaches 3:1 on it: the same rule as the primary button's text, so a selected tab or segment agrees with it.
+     */
+    static boolean onAccent(Palette p, int face) {
+        if (contrast(0xFFFFFFFF, face | 0xFF000000) < 3.0) {
+            return false;
+        }
+        int reach = channelGap(p.primary(), p.primaryHover()) + 2;
+        return channelGap(face, p.primary()) <= reach;
+    }
+
+    private static int channelGap(int a, int b) {
+        int gap = 0;
+        for (int shift = 0; shift <= 16; shift += 8) {
+            gap = Math.max(gap, Math.abs(((a >> shift) & 0xFF) - ((b >> shift) & 0xFF)));
+        }
+        return gap;
     }
 
     /**

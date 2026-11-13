@@ -27,11 +27,11 @@ repositories {
     }
 }
 dependencies {
-    implementation "maven.modrinth:minuit:2.0.0+26.1.2-neoforge" // 2.0.0+<mc>-<loader>
+    implementation "maven.modrinth:minuit:2.0.1+26.1.2-neoforge" // 2.0.1+<mc>-<loader>
 }
 ```
 
-Paper plugins take `dev.dryaides:minuit-paper-<mc>:2.0.0` from `<MINUIT_MAVEN_URL>` (not published yet).
+Paper plugins take `dev.dryaides:minuit-paper-<mc>:2.0.1` from `<MINUIT_MAVEN_URL>` (not published yet).
 Per-loader setup: [docs/getting-started](docs/getting-started/README.md). Code assistants: [llms.txt](llms.txt).
 
 ## Contributing

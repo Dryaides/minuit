@@ -18,7 +18,7 @@ repositories {
 
 ```groovy
 dependencies {
-    implementation "maven.modrinth:minuit:2.0.0+26.1.2-neoforge"
+    implementation "maven.modrinth:minuit:2.0.1+26.1.2-neoforge"
 }
 ```
 

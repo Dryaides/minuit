@@ -21,9 +21,9 @@ Depend on the build for your game version:
 ```groovy
 dependencies {
     // 1.21.1 and older (Loom remaps the jar)
-    modImplementation "maven.modrinth:minuit:2.0.0+1.21.1-fabric"
+    modImplementation "maven.modrinth:minuit:2.0.1+1.21.1-fabric"
     // 26.x
-    implementation "maven.modrinth:minuit:2.0.0+26.1.2-fabric"
+    implementation "maven.modrinth:minuit:2.0.1+26.1.2-fabric"
 }
 ```
 

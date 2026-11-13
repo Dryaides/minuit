@@ -60,8 +60,31 @@ public enum PressStyle {
                 int x0 = i == 0 ? xs[i] : xs[i] - 1;
                 int w = xs[i + 1] - x0;
                 int sunk = pushed ? travel : 0;
-                segment(d, p, style, x0, y, w, h, faces[i], sunk);
-                if (selected[i]) {
+                Shapes.squareSides = (i > 0 ? Shapes.SQUARE_LEFT : 0) | (i < n - 1 ? Shapes.SQUARE_RIGHT : 0);
+                try {
+                    segment(d, p, style, x0, y, w, h, faces[i], sunk);
+                } finally {
+                    Shapes.squareSides = 0;
+                }
+                if (selected[i] && style.gameWidgets()) {
+                    // The game's sprite fills the whole box whatever the sink: its white rim, corners included, goes black.
+                    d.fill(x0, y, x0 + w, y + 1, 0xFF000000);
+                    d.fill(x0, y + h - 1, x0 + w, y + h, 0xFF000000);
+                    d.fill(x0, y + 1, x0 + 1, y + h - 1, 0xFF000000);
+                    d.fill(x0 + w - 1, y + 1, x0 + w, y + h - 1, 0xFF000000);
+                } else if (selected[i] && style.corner() > 0) {
+                    // A rounded button keeps its rims in the corner curve, which a straight outline would leave lit.
+                    Shapes.squareSides = (i > 0 ? Shapes.SQUARE_LEFT : 0) | (i < n - 1 ? Shapes.SQUARE_RIGHT : 0);
+                    Shapes.ring(d, x0, y + sunk, w, h - sunk, Math.min(3, style.corner()), selectedEdge(p));
+                    Shapes.squareSides = 0;
+                    // The family's lit rim leaves a light pixel just inside a rounded foot corner, which the ring misses.
+                    if (i == 0) {
+                        d.fill(x0 + 1, y + h - 2, x0 + 2, y + h - 1, faces[i]);
+                    }
+                    if (i == n - 1) {
+                        d.fill(x0 + w - 2, y + h - 2, x0 + w - 1, y + h - 1, faces[i]);
+                    }
+                } else if (selected[i]) {
                     outline(d, x0, y + sunk, w, h - sunk, selectedEdge(p));
                 }
                 shift[i] = sunk;
