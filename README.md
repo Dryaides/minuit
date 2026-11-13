@@ -12,10 +12,10 @@
 ![minuit](docs/images/og.png)
 
 minuit lets you build your mod's screens from ready components: panels, buttons, toggles, sliders,
-dropdowns, lists, tabs and more. Players choose one look for every mod that uses it, among six
+dropdowns, lists, tabs and more. Players choose one look for every mod that uses it, among five
 theme families, light or dark.
 
-![One window in five families, light above and dark below](docs/images/themes.png)
+![The same menu in Vanilla, Bedrock, Slate, Bubbly and Soft](docs/images/families.gif)
 
 ## Use it in your mod
 
